@@ -1,0 +1,27 @@
+# Community Overlay — kchat.community.veterans.guardrail.v1
+#
+# Veterans peer-support overlay (adult-only). Loosens self-harm to a
+# label for peer support, tightens scam (benefits fraud).
+
+skill_id: kchat.community.veterans.guardrail.v1
+parent: kchat.global.guardrail.baseline
+schema_version: 1
+signers: [trust_and_safety]
+
+community_profile:
+  kind: veterans
+  age_mode: adult_only
+  visibility: members_only_summary
+  set_by: group_admin
+
+rules:
+  - category: 2   # SELF_HARM
+    action: label_only
+    note: >-
+      Self-harm references surface a label only — peer-support
+      context, follows the health_support pattern.
+  - category: 7   # SCAM_FRAUD
+    action: strong_warn
+    note: >-
+      Benefits / VA-impersonation / advance-fee scams tightened to a
+      hard modal warning.

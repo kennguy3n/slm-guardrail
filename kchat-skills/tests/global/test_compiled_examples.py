@@ -100,6 +100,33 @@ EXAMPLES: tuple[tuple[str, str | None, str | None], ...] = (
     ("country_au", "au", None),
     ("country_nz", "nz", None),
     ("country_tr", "tr", None),
+    # Phase 6 expansion country packs (19 additional countries).
+    # Eastern Europe.
+    ("country_ru", "ru", None),
+    ("country_ua", "ua", None),
+    ("country_ro", "ro", None),
+    ("country_gr", "gr", None),
+    ("country_cz", "cz", None),
+    ("country_hu", "hu", None),
+    # Nordics.
+    ("country_dk", "dk", None),
+    ("country_fi", "fi", None),
+    ("country_no", "no", None),
+    # Western Europe / Atlantic.
+    ("country_ie", "ie", None),
+    # Middle East.
+    ("country_il", "il", None),
+    ("country_iq", "iq", None),
+    # North Africa.
+    ("country_ma", "ma", None),
+    ("country_dz", "dz", None),
+    # Sub-Saharan Africa.
+    ("country_gh", "gh", None),
+    ("country_tz", "tz", None),
+    ("country_et", "et", None),
+    # Latin America.
+    ("country_ec", "ec", None),
+    ("country_uy", "uy", None),
 )
 
 
@@ -177,6 +204,22 @@ class TestExamplesCoverage:
         for stem in community_stems:
             assert (EXAMPLES_DIR / f"{stem}.txt").exists(), stem
 
+    def test_total_compiled_example_count_is_73(self):
+        """Phase 6 target: 73 compiled examples total.
+
+        14 Phase 1-4 references (baseline + 8 communities + 3 archetypes
+        + 2 combos) + 40 Phase 5 country packs + 19 Phase 6 country
+        packs = 73.
+        """
+        assert len(EXAMPLES) == 73, (
+            f"expected 73 reference compiled examples; got {len(EXAMPLES)}"
+        )
+        on_disk = sorted(p.name for p in EXAMPLES_DIR.glob("*.txt"))
+        assert len(on_disk) == 73, (
+            f"expected 73 reference .txt files in {EXAMPLES_DIR}; "
+            f"got {len(on_disk)}"
+        )
+
     def test_all_three_jurisdiction_archetypes_covered(self):
         for stem in (
             "jurisdiction_strict_adult",
@@ -226,4 +269,32 @@ class TestExamplesCoverage:
             path = EXAMPLES_DIR / f"country_{cc}.txt"
             assert path.exists(), (
                 f"Phase 5 country pack {cc!r} missing compiled example {path}"
+            )
+
+    def test_phase6_all_19_country_packs_covered(self):
+        country_codes = (
+            # Eastern Europe.
+            "ru", "ua", "ro", "gr", "cz", "hu",
+            # Nordics.
+            "dk", "fi", "no",
+            # Western Europe / Atlantic.
+            "ie",
+            # Middle East.
+            "il", "iq",
+            # North Africa.
+            "ma", "dz",
+            # Sub-Saharan Africa.
+            "gh", "tz", "et",
+            # Latin America.
+            "ec", "uy",
+        )
+        assert len(country_codes) == 19, (
+            "Phase 6 delivers exactly 19 additional country packs; "
+            "country_codes tuple must remain in sync with "
+            "tools/regenerate_compiled_examples.py."
+        )
+        for cc in country_codes:
+            path = EXAMPLES_DIR / f"country_{cc}.txt"
+            assert path.exists(), (
+                f"Phase 6 country pack {cc!r} missing compiled example {path}"
             )

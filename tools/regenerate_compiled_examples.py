@@ -91,6 +91,33 @@ COMBOS: tuple[tuple[str, str | None, str | None], ...] = (
     ("country_au", "au", None),
     ("country_nz", "nz", None),
     ("country_tr", "tr", None),
+    # Phase 6 expansion country packs (19 additional countries).
+    # Eastern Europe.
+    ("country_ru", "ru", None),
+    ("country_ua", "ua", None),
+    ("country_ro", "ro", None),
+    ("country_gr", "gr", None),
+    ("country_cz", "cz", None),
+    ("country_hu", "hu", None),
+    # Nordics.
+    ("country_dk", "dk", None),
+    ("country_fi", "fi", None),
+    ("country_no", "no", None),
+    # Western Europe / Atlantic.
+    ("country_ie", "ie", None),
+    # Middle East.
+    ("country_il", "il", None),
+    ("country_iq", "iq", None),
+    # North Africa.
+    ("country_ma", "ma", None),
+    ("country_dz", "dz", None),
+    # Sub-Saharan Africa.
+    ("country_gh", "gh", None),
+    ("country_tz", "tz", None),
+    ("country_et", "et", None),
+    # Latin America.
+    ("country_ec", "ec", None),
+    ("country_uy", "uy", None),
 )
 
 

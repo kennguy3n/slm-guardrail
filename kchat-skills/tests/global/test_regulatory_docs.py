@@ -77,7 +77,7 @@ def test_nist_ai_rmf_references_core_artefacts():
         assert needle in text, f"nist_ai_rmf_alignment.md must reference {needle!r}"
 
 
-def test_unicef_itu_references_core_artefacts_and_all_40_countries():
+def test_unicef_itu_references_core_artefacts_and_all_59_countries():
     text = UNICEF_ITU_COP.read_text(encoding="utf-8")
     for needle in (
         "baseline.yaml",
@@ -89,17 +89,27 @@ def test_unicef_itu_references_core_artefacts_and_all_40_countries():
         assert needle in text, (
             f"unicef_itu_cop_alignment.md must reference {needle!r}"
         )
-    # All 40 country ISO codes should appear in the per-jurisdiction table.
-    all_40 = (
+    # All 59 country ISO codes should appear in the per-jurisdiction table.
+    all_59 = (
+        # Phase 5 wave 1.
         "US", "DE", "BR", "IN", "JP",
+        # Phase 5 wave 2.
         "MX", "CA", "AR", "CO", "CL", "PE",
         "FR", "GB", "ES", "IT", "NL", "PL", "SE", "PT", "CH", "AT",
         "KR", "ID", "PH", "TH", "VN", "MY", "SG", "TW", "PK", "BD",
         "NG", "ZA", "EG", "SA", "AE", "KE",
         "AU", "NZ", "TR",
+        # Phase 6 expansion (19 additional countries).
+        "RU", "UA", "RO", "GR", "CZ", "HU",
+        "DK", "FI", "NO",
+        "IE",
+        "IL", "IQ",
+        "MA", "DZ",
+        "GH", "TZ", "ET",
+        "EC", "UY",
     )
-    assert len(all_40) == 40
-    for cc in all_40:
+    assert len(all_59) == 59
+    for cc in all_59:
         # Each ISO code should appear as a table row entry.
         needle = f"| {cc} |"
         assert needle in text, (

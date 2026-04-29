@@ -149,9 +149,15 @@ categories have a severity floor of 5 regardless of model confidence.
 │   ├── kr/  id/  ph/  th/  vn/  my/   # Phase 5 wave 2 — Asia-Pacific
 │   ├── sg/  tw/  pk/  bd/             # Phase 5 wave 2 — Asia-Pacific (cont.)
 │   ├── ng/  za/  eg/  sa/  ae/  ke/   # Phase 5 wave 2 — Middle East / Africa
-│   └── au/  nz/  tr/                  # Phase 5 wave 2 — Other
+│   ├── au/  nz/  tr/                  # Phase 5 wave 2 — Other
+│   ├── ru/  ua/  ro/  gr/  cz/  hu/   # Phase 6 expansion — Eastern Europe
+│   ├── dk/  fi/  no/                  # Phase 6 expansion — Nordics
+│   ├── ie/                            # Phase 6 expansion — W. Europe
+│   ├── il/  iq/  ma/  dz/             # Phase 6 expansion — MENA
+│   ├── gh/  tz/  et/                  # Phase 6 expansion — Sub-Saharan Africa
+│   └── ec/  uy/                       # Phase 6 expansion — Latin America
 │
-├── communities/
+├── communities/                      # 38 community overlays
 │   ├── _template/
 │   │   └── overlay.yaml             # community overlay template
 │   ├── school.yaml
@@ -161,7 +167,17 @@ categories have a severity floor of 5 regardless of model confidence.
 │   ├── marketplace.yaml
 │   ├── health_support.yaml
 │   ├── political.yaml
-│   └── gaming.yaml
+│   ├── gaming.yaml                  # ↑ Phase 1 — original 8 overlays
+│   ├── religious.yaml  sports.yaml  creative_arts.yaml
+│   ├── education_higher.yaml  volunteer.yaml  neighborhood.yaml
+│   ├── parenting.yaml  dating.yaml  fitness.yaml  travel.yaml
+│   ├── book_club.yaml  music.yaml  photography.yaml  cooking.yaml
+│   ├── tech_support.yaml  language_learning.yaml  pet_owners.yaml
+│   ├── environmental.yaml  journalism.yaml  legal_support.yaml
+│   ├── mental_health.yaml  startup.yaml  nonprofit.yaml
+│   ├── seniors.yaml  lgbtq_support.yaml  veterans.yaml
+│   ├── hobbyist.yaml  science.yaml  open_source.yaml
+│   └── emergency_response.yaml      # ↑ Phase 6 expansion — 30 overlays
 │
 ├── prompts/
 │   ├── runtime_instruction.txt      # 10-rule SLM instruction
@@ -217,11 +233,14 @@ repository today; the rest are scheduled for Phase 2.
 
 These let us exercise the full bundle composition (global + jurisdiction +
 community) end-to-end across both archetypal and concrete country packs.
-Phase 5 shipped the full 40-country set — see the
-“Supported Countries” table below for the ISO codes, primary
-languages, and key legal references.
+Phase 5 shipped the original 40-country set; Phase 6 added 19 more
+for a total of **59 country packs**, **38 community overlays**, and
+**3 jurisdiction archetypes** — **100 skills** in all. See the
+“Supported Countries” table below for ISO codes, primary languages,
+and key legal references, and the “Community Overlays” table for
+the full list of community kinds.
 
-### Supported countries (40)
+### Supported countries (59)
 
 | ISO-3166 | Country | Primary languages | Key legal references |
 | --- | --- | --- | --- |
@@ -265,6 +284,68 @@ languages, and key legal references.
 | AU | Australia | en | Criminal Code Act 1995 (child exploitation + terrorism), Online Safety Act 2021. |
 | NZ | New Zealand | en, mi | Films, Videos and Publications Classification Act, Terrorism Suppression Act. |
 | TR | Turkey | tr | TCK child protection, TMK anti-terrorism. |
+| RU | Russia | ru | Federal Law 124-FZ child protection, Federal Law 114-FZ anti-extremism, Roskomnadzor rules. |
+| UA | Ukraine | uk, ru | Law on Child Protection (1995), Law on Combating Terrorism (2003). |
+| RO | Romania | ro | Legea 272/2004 child protection, Legea 535/2004 anti-terrorism. |
+| GR | Greece | el | Greek Penal Code child protection, Law 3251/2004 anti-terrorism. |
+| CZ | Czech Republic | cs | Trestní zákoník §§ 192-193 child protection, § 311 anti-terrorism. |
+| HU | Hungary | hu | Btk. § 204 child protection, §§ 314-318 terrorism offences. |
+| DK | Denmark | da | Straffeloven § 235 child protection, § 114 anti-terrorism. |
+| FI | Finland | fi | Rikoslaki 17:18-19 child protection, 34a luku terrorism. |
+| NO | Norway | no, nb | Straffeloven § 311 child protection, § 131 anti-terrorism. |
+| IE | Ireland | en, ga | Online Safety and Media Regulation Act 2022, Child Trafficking and Pornography Act 1998. |
+| IL | Israel | he, ar | Penal Code § 214, Counter-Terrorism Law 5776-2016. |
+| IQ | Iraq | ar, ku | Juvenile Welfare Law No. 76/1983, Anti-Terrorism Law No. 13/2005. |
+| MA | Morocco | ar, fr | Code Pénal Art. 503 child protection, Loi 03-03 anti-terrorism. |
+| DZ | Algeria | ar, fr | Loi 15-12 child protection, Code Pénal Art. 87 bis anti-terrorism. |
+| GH | Ghana | en | Children's Act 1998 (Act 560), Anti-Terrorism Act 2008 (Act 762). |
+| TZ | Tanzania | sw, en | Law of the Child Act 2009, Prevention of Terrorism Act 2002. |
+| ET | Ethiopia | am, en | Criminal Code Art. 644 CSAM, Anti-Terrorism Proclamation 1176/2020. |
+| EC | Ecuador | es | Código de la Niñez y Adolescencia (CONA), COIP Art. 366 anti-terrorism. |
+| UY | Uruguay | es | Código de la Niñez y la Adolescencia (CNA), Ley 19.293 anti-terrorism. |
+
+### Community Overlays (38)
+
+| Overlay | Age mode | Notable tightenings / loosenings |
+| --- | --- | --- |
+| school | minor_present | tightens HARASSMENT, BULLYING; tightens SEXUAL_ADULT |
+| family | mixed_age | tightens HARASSMENT; loosens MISINFORMATION_HEALTH for parents |
+| workplace | adult_only | tightens HARASSMENT (workplace civility); tightens PRIVATE_DATA |
+| adult_only | adult_only | loosens SEXUAL_ADULT to label_only |
+| marketplace | mixed_age | tightens SCAM_FRAUD, ILLEGAL_GOODS, MALWARE_LINK |
+| health_support | mixed_age | loosens SELF_HARM (peer support); tightens MISINFORMATION_HEALTH |
+| political | adult_only | tightens HATE, MISINFORMATION_CIVIC; tightens HARASSMENT |
+| gaming | mixed_age | tightens HARASSMENT (anti-toxicity); tightens VIOLENCE_THREAT |
+| religious | mixed_age | tightens HATE, HARASSMENT |
+| sports | mixed_age | tightens HARASSMENT (anti-pile-on), VIOLENCE_THREAT |
+| creative_arts | mixed_age | warns SEXUAL_ADULT (artistic context), enforces COMMUNITY_RULE |
+| education_higher | adult_only | loosens SEXUAL_ADULT, tightens MISINFORMATION_HEALTH |
+| volunteer | mixed_age | tightens SCAM_FRAUD, PRIVATE_DATA |
+| neighborhood | mixed_age | tightens PRIVATE_DATA, warns SCAM_FRAUD |
+| parenting | mixed_age | tightens SEXUAL_ADULT, warns MISINFORMATION_HEALTH |
+| dating | adult_only | loosens SEXUAL_ADULT, tightens SCAM_FRAUD, HARASSMENT |
+| fitness | mixed_age | warns MISINFORMATION_HEALTH, tightens DRUGS_WEAPONS |
+| travel | adult_only | tightens SCAM_FRAUD, warns PRIVATE_DATA |
+| book_club | mixed_age | warns HARASSMENT |
+| music | mixed_age | warns SEXUAL_ADULT, HARASSMENT |
+| photography | mixed_age | warns SEXUAL_ADULT, tightens PRIVATE_DATA |
+| cooking | mixed_age | warns SCAM_FRAUD, label-only MISINFORMATION_HEALTH |
+| tech_support | adult_only | tightens SCAM_FRAUD, MALWARE_LINK, PRIVATE_DATA |
+| language_learning | mixed_age | warns HATE / HARASSMENT (educational context) |
+| pet_owners | mixed_age | warns SCAM_FRAUD, tightens ILLEGAL_GOODS |
+| environmental | mixed_age | warns MISINFORMATION_HEALTH, MISINFORMATION_CIVIC |
+| journalism | adult_only | loosens EXTREMISM, warns VIOLENCE_THREAT |
+| legal_support | adult_only | tightens PRIVATE_DATA, SCAM_FRAUD |
+| mental_health | adult_only | loosens SELF_HARM (peer support), warns MISINFORMATION_HEALTH |
+| startup | adult_only | tightens SCAM_FRAUD, warns PRIVATE_DATA |
+| nonprofit | mixed_age | tightens SCAM_FRAUD, warns MISINFORMATION_CIVIC |
+| seniors | adult_only | tightens SCAM_FRAUD, PRIVATE_DATA, MISINFORMATION_HEALTH |
+| lgbtq_support | adult_only | tightens HATE, HARASSMENT |
+| veterans | adult_only | loosens SELF_HARM (peer support), tightens SCAM_FRAUD |
+| hobbyist | mixed_age | warns SCAM_FRAUD, ILLEGAL_GOODS |
+| science | mixed_age | warns MISINFORMATION_HEALTH, MISINFORMATION_CIVIC |
+| open_source | adult_only | tightens MALWARE_LINK, warns SCAM_FRAUD |
+| emergency_response | adult_only | tightens MISINFORMATION_HEALTH, SCAM_FRAUD, warns PRIVATE_DATA |
 
 ## Getting Started
 
@@ -276,9 +357,11 @@ Phase 0 (foundation), Phase 1 (global baseline + community overlays),
 Phase 2 (jurisdiction archetype overlays), Phase 3 (hybrid local
 pipeline + SLM integration), Phase 4 (skill-pack compiler + signing),
 Phase 5 (40 country-specific jurisdiction overlays) and Phase 6
-(bias auditing, pack lifecycle, adversarial / obfuscation corpus,
-regulatory alignment, performance benchmarking, community feedback /
-appeal flow) are all complete. The repository currently ships:
+(skill expansion to 100 packs, bias auditing, pack lifecycle,
+adversarial / obfuscation corpus, regulatory alignment, performance
+benchmarking, community feedback / appeal flow) are all complete.
+The repository currently ships **100 skills** — 59 country packs +
+38 community overlays + 3 jurisdiction archetypes:
 
 - the complete (non-stub) global baseline
   ([`kchat-skills/global/baseline.yaml`](kchat-skills/global/baseline.yaml)),
@@ -290,7 +373,8 @@ appeal flow) are all complete. The repository currently ships:
   ([`prompts/runtime_instruction.txt`](kchat-skills/prompts/runtime_instruction.txt))
   and compiled-prompt format reference
   ([`prompts/compiled_prompt_format.md`](kchat-skills/prompts/compiled_prompt_format.md)),
-- the eight community overlays under
+- the 38 community overlays (8 Phase 1 originals + 30 Phase 6
+  additions) under
   [`kchat-skills/communities/`](kchat-skills/communities/),
 - the device-local expiring counter implementation at
   [`kchat-skills/compiler/counters.py`](kchat-skills/compiler/counters.py),
@@ -321,12 +405,13 @@ appeal flow) are all complete. The repository currently ships:
   [`kchat-skills/compiler/skill_passport.schema.json`](kchat-skills/compiler/skill_passport.schema.json)),
   and the anti-misuse validator at
   [`kchat-skills/compiler/anti_misuse.py`](kchat-skills/compiler/anti_misuse.py),
-- 54 reference compiled prompts under
+- 73 reference compiled prompts under
   [`kchat-skills/prompts/compiled_examples/`](kchat-skills/prompts/compiled_examples/)
   covering the global baseline, every Phase 1–2 community and
-  jurisdiction overlay combination, and the 40 Phase 5 country
-  packs (`country_us.txt` through `country_tr.txt`),
-- the 40 Phase 5 country packs under
+  jurisdiction overlay combination, the 40 Phase 5 country
+  packs (`country_us.txt` through `country_tr.txt`), and the 19
+  Phase 6 country packs (`country_ru.txt` through `country_uy.txt`),
+- the 59 country packs (40 Phase 5 + 19 Phase 6) under
   [`kchat-skills/jurisdictions/<cc>/`](kchat-skills/jurisdictions/) —
   each with concrete legal-age, protected-class, listed-extremist-org,
   election-rule, and override values, a `normalization.yaml`, and
@@ -438,7 +523,7 @@ kchat-skills/
 ├── prompts/              # 10-rule SLM instruction + compiled examples
 │   ├── runtime_instruction.txt
 │   ├── compiled_prompt_format.md
-│   └── compiled_examples/  # 54 reference compiled prompts (Phase 4 + Phase 5)
+│   └── compiled_examples/  # 73 reference compiled prompts (Phase 4 + Phase 5 + Phase 6)
 ├── compiler/             # skill-pack compiler (Phase 3-4)
 │   ├── counters.py           # device-local expiring counter store (Phase 1)
 │   ├── pipeline.py           # 7-step hybrid local pipeline (Phase 3)
@@ -634,7 +719,7 @@ Guidelines to the concrete artefact(s) that satisfy it:
   seven trustworthy-AI characteristics.
 - [`unicef_itu_cop_alignment.md`](kchat-skills/docs/regulatory/unicef_itu_cop_alignment.md)
   — child-rights due diligence plus a per-jurisdiction statutory
-  table for all 40 country packs.
+  table for all 59 country packs.
 - [`README.md`](kchat-skills/docs/regulatory/README.md) — index
   linking to all three.
 
