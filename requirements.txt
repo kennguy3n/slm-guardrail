@@ -4,3 +4,5 @@
 pytest>=8.0
 PyYAML>=6.0
 jsonschema>=4.0
+# ed25519 signing / verification of compiled skill passports (Phase 4).
+cryptography>=42.0

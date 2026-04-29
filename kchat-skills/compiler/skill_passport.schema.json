@@ -1,0 +1,158 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "kchat.guardrail.skill_passport.v1",
+  "title": "KChat Guardrail Skill Passport",
+  "description": "Signed manifest distributed alongside every compiled skill pack. See ARCHITECTURE.md \"Compiler Pipeline + Skill Passport\" (lines 681-712).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "skill_id",
+    "skill_version",
+    "schema_version",
+    "parent",
+    "authored_by",
+    "reviewed_by",
+    "model_compatibility",
+    "expires_on",
+    "test_results"
+  ],
+  "properties": {
+    "skill_id": {
+      "type": "string",
+      "pattern": "^kchat\\."
+    },
+    "skill_version": {
+      "type": "string",
+      "description": "Semver version of the skill pack (e.g. 1.2.3)."
+    },
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "parent": {
+      "type": ["string", "null"],
+      "description": "Skill id of the parent pack the manifest descends from (null for the global baseline)."
+    },
+    "authored_by": {
+      "type": "string"
+    },
+    "reviewed_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["legal", "cultural", "trust_and_safety"],
+      "properties": {
+        "legal": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "cultural": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "trust_and_safety": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      }
+    },
+    "model_compatibility": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "model_id",
+          "model_min_version",
+          "max_instruction_tokens",
+          "max_output_tokens"
+        ],
+        "properties": {
+          "model_id": {"type": "string"},
+          "model_min_version": {"type": "string"},
+          "max_instruction_tokens": {
+            "type": "integer",
+            "maximum": 1800,
+            "exclusiveMinimum": 0
+          },
+          "max_output_tokens": {
+            "type": "integer",
+            "maximum": 600,
+            "exclusiveMinimum": 0
+          }
+        }
+      }
+    },
+    "expires_on": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    },
+    "test_results": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "child_safety_recall",
+        "child_safety_precision",
+        "privacy_leak_precision",
+        "scam_recall",
+        "protected_speech_false_positive",
+        "minority_language_false_positive",
+        "p95_latency_ms"
+      ],
+      "properties": {
+        "child_safety_recall": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "child_safety_precision": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "privacy_leak_precision": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "scam_recall": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "protected_speech_false_positive": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "minority_language_false_positive": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "p95_latency_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 250
+        }
+      }
+    },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "key_id", "value"],
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "const": "ed25519"
+        },
+        "key_id": {"type": "string"},
+        "value": {
+          "type": "string",
+          "description": "Base64-encoded ed25519 signature over the deterministic JSON serialisation of the passport excluding this signature object."
+        }
+      }
+    }
+  }
+}

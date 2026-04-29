@@ -809,15 +809,33 @@ anti_misuse_controls:
 ├── prompts/
 │   ├── runtime_instruction.txt      # 10-rule SLM instruction
 │   ├── compiled_prompt_format.md    # compiled-prompt section reference
-│   └── compiled_examples/
+│   └── compiled_examples/           # 14 reference compiled prompts (Phase 4):
+│       ├── baseline_only.txt
+│       ├── community_school.txt
+│       ├── community_family.txt
+│       ├── community_workplace.txt
+│       ├── community_adult_only.txt
+│       ├── community_marketplace.txt
+│       ├── community_health_support.txt
+│       ├── community_political.txt
+│       ├── community_gaming.txt
+│       ├── jurisdiction_strict_adult.txt
+│       ├── jurisdiction_strict_hate.txt
+│       ├── jurisdiction_strict_marketplace.txt
+│       ├── strict_marketplace_workplace.txt
+│       └── strict_adult_school.txt
 │
 ├── compiler/
 │   ├── pipeline.md
-│   ├── skill_passport.schema.json
-│   ├── counters.py                  # device-local expiring counter store
-│   ├── pipeline.py                  # 7-step hybrid local pipeline (Phase 3)
-│   ├── slm_adapter.py               # SLMAdapter Protocol + MockSLMAdapter (Phase 3)
-│   └── threshold_policy.py          # hard-coded threshold enforcement (Phase 3)
+│   ├── skill_passport.schema.json    # Draft-07 passport schema (Phase 4)
+│   ├── counters.py                   # device-local expiring counter store
+│   ├── pipeline.py                   # 7-step hybrid local pipeline (Phase 3)
+│   ├── slm_adapter.py                # SLMAdapter Protocol + MockSLMAdapter (Phase 3)
+│   ├── threshold_policy.py           # hard-coded threshold enforcement (Phase 3)
+│   ├── metric_validator.py           # 7-metric validator (Phase 3)
+│   ├── compiler.py                   # skill-pack compiler pipeline (Phase 4)
+│   ├── skill_passport.py             # ed25519 signing / verification (Phase 4)
+│   └── anti_misuse.py                # anti-misuse validation rules (Phase 4)
 │
 ├── tests/
 │   ├── test_suite_template.yaml     # Phase 1 metrics framework
@@ -830,6 +848,9 @@ anti_misuse_controls:
     ├── PROPOSAL.md
     ├── ARCHITECTURE.md
     └── PHASES.md
+
+/tools
+└── regenerate_compiled_examples.py  # refresh prompts/compiled_examples
 ```
 
 ### Test Tooling
@@ -901,6 +922,38 @@ Concrete test files in this repository:
   threshold enforcement at `kchat-skills/compiler/threshold_policy.py`:
   four confidence thresholds, uncertainty handling, lower-numbered-
   category tie-break, and the CHILD_SAFETY severity-5 floor.
+- `kchat-skills/tests/global/test_metric_validator.py` — 7-metric
+  validator (`kchat-skills/compiler/metric_validator.py`): per-category
+  recall / precision computation, protected-speech and minority-
+  language false-positive rates, p95 latency, threshold-boundary
+  pass / fail at the seven shipping thresholds, end-to-end validation
+  through `GuardrailPipeline.validate_metrics`.
+- `kchat-skills/tests/global/test_compiler.py` — skill-pack compiler
+  (`kchat-skills/compiler/compiler.py`): pack loading, conflict
+  resolution (severity take_max, action most_protective, immutable
+  privacy_rules, CHILD_SAFETY pinned to severity 5), compiled-prompt
+  generation matching the format reference, 1800-instruction-token
+  budget enforcement.
+- `kchat-skills/tests/global/test_skill_passport.py` — ed25519
+  skill passport (`kchat-skills/compiler/skill_passport.py`): passport
+  construction, sign / verify round-trip, expired-passport rejection,
+  18-month expiry-window cap, signature tamper detection, model
+  compatibility checks, JSON-Schema validation against
+  `kchat-skills/compiler/skill_passport.schema.json`.
+- `kchat-skills/tests/global/test_anti_misuse.py` — anti-misuse
+  validation (`kchat-skills/compiler/anti_misuse.py`): vague /
+  invented-category rejection, jurisdiction-pack required reviewer
+  signers, community-pack `trust_and_safety` requirement,
+  protected-context handling for severity floors ≥ 4,
+  privacy-rule immutability, lexicon-provenance requirement, and
+  end-to-end validation across every Phase 1–2 pack in the repo.
+- `kchat-skills/tests/global/test_compiled_examples.py` — Phase 4
+  compiled-prompt reference outputs under
+  `kchat-skills/prompts/compiled_examples/`: existence and non-empty,
+  required `[INSTRUCTION] / [GLOBAL_BASELINE] / [JURISDICTION_OVERLAY]
+  / [COMMUNITY_OVERLAY] / [INPUT] / [OUTPUT]` sections, instruction
+  token budget < 1800, byte-for-byte equality with what the live
+  compiler emits today (catches drift).
 
 See [`PROGRESS.md`](PROGRESS.md) and the project [`README.md`](README.md)
 for the full test toolchain and run instructions.

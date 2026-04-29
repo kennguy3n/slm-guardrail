@@ -25,6 +25,11 @@ from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from counters import CounterStore  # type: ignore[import-not-found]
+from metric_validator import (  # type: ignore[import-not-found]
+    MetricReport,
+    MetricThresholds,
+    MetricValidator,
+)
 from slm_adapter import SLMAdapter  # type: ignore[import-not-found]
 from threshold_policy import ThresholdPolicy  # type: ignore[import-not-found]
 
@@ -382,6 +387,27 @@ class GuardrailPipeline:
             self.counter_store.apply_counter_updates(group_id, updates)
 
         return output
+
+    # ------------------------------------------------------------------
+    # Compiler-side metric-validation hook.
+    # ------------------------------------------------------------------
+    def validate_metrics(
+        self,
+        test_cases: list[dict[str, Any]],
+        *,
+        thresholds: Optional[MetricThresholds] = None,
+    ) -> MetricReport:
+        """Run ``test_cases`` end-to-end and return a :class:`MetricReport`.
+
+        Phase 4 compiler entry point — the compiler refuses to sign a
+        skill-pack bundle whose ``MetricReport.passed`` is ``False``.
+        ``test_cases`` follow the ``case_schema`` block of
+        ``kchat-skills/tests/test_suite_template.yaml``.
+        """
+        validator = MetricValidator(
+            thresholds=thresholds or MetricThresholds()
+        )
+        return validator.run_pipeline(self, test_cases)
 
 
 def _finalise_output(output: dict[str, Any]) -> dict[str, Any]:
