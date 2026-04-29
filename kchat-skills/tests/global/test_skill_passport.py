@@ -245,6 +245,55 @@ class TestModelCompatibility:
         with pytest.raises(PassportValidationError, match="not compatible"):
             p.verify(public_key=pk, model=other)
 
+    @pytest.mark.parametrize(
+        "have, want",
+        [
+            ("1.0", "1.0.0"),       # equal under zero-padding
+            ("1", "1.0.0"),
+            ("1.0.0", "1.0"),
+            ("1.0.0", "1"),
+            ("2", "1.9.9"),
+        ],
+    )
+    def test_short_runtime_version_accepted_when_zero_pad_equivalent(
+        self, have, want
+    ):
+        # Pack requires `want`, runtime advertises `have`. The shorter tuple
+        # must be padded with zeros so e.g. "1.0" is treated as ">= 1.0.0".
+        sk, pk = generate_keypair()
+        p = build_passport(
+            skill_id="kchat.global.guardrail.baseline",
+            skill_version="1.0.0",
+            parent=None,
+            authored_by="kchat-core@kchat.example",
+            legal_reviewers=("legal-review@kchat.example",),
+            cultural_reviewers=("cultural-review@kchat.example",),
+            trust_and_safety_reviewers=("trust@kchat.example",),
+            model_compatibility=(
+                ModelCompatibility(
+                    model_id="kchat.slm.tiny",
+                    model_min_version=want,
+                ),
+            ),
+            expires_on=date.today() + timedelta(days=30),
+            test_results=TestResults(
+                child_safety_recall=0.99,
+                child_safety_precision=0.95,
+                privacy_leak_precision=0.95,
+                scam_recall=0.90,
+                protected_speech_false_positive=0.02,
+                minority_language_false_positive=0.03,
+                p95_latency_ms=180,
+            ),
+        )
+        p.sign(private_key=sk, key_id="k1")
+        runtime = ModelCompatibility(
+            model_id="kchat.slm.tiny",
+            model_min_version=have,
+        )
+        # Must NOT raise.
+        p.verify(public_key=pk, model=runtime)
+
 
 # ---------------------------------------------------------------------------
 # JSON Schema validation.

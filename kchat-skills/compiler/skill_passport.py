@@ -261,7 +261,15 @@ def _version_tuple(v: str) -> tuple[int, ...]:
 
 
 def _version_at_least(have: str, want: str) -> bool:
-    return _version_tuple(have) >= _version_tuple(want)
+    h, w = _version_tuple(have), _version_tuple(want)
+    # Pad the shorter tuple with zeros so e.g. ``1.0`` and ``1.0.0`` compare
+    # equal — Python's native tuple comparison would otherwise treat the
+    # shorter tuple as less, incorrectly rejecting compatible runtime
+    # versions in the security-critical model-compatibility check.
+    length = max(len(h), len(w))
+    h = h + (0,) * (length - len(h))
+    w = w + (0,) * (length - len(w))
+    return h >= w
 
 
 def generate_keypair() -> tuple[Ed25519PrivateKey, Ed25519PublicKey]:
