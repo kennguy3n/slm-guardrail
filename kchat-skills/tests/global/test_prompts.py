@@ -83,18 +83,18 @@ def test_compiled_prompt_format_doc_exists(prompts_dir):
 
 
 def test_compiled_example_exists_with_required_sections(prompts_dir):
-    path = prompts_dir / "compiled_examples" / "workplace_strict_marketplace.txt"
+    path = prompts_dir / "compiled_examples" / "strict_marketplace_workplace.txt"
     assert path.is_file(), f"missing {path}"
     text = _read(path)
     for section in COMPILED_REQUIRED_SECTIONS:
         assert section in text, (
-            f"workplace_strict_marketplace.txt missing section: {section}"
+            f"strict_marketplace_workplace.txt missing section: {section}"
         )
 
 
 def test_compiled_example_section_order(prompts_dir):
     """Sections must appear in the documented order."""
-    path = prompts_dir / "compiled_examples" / "workplace_strict_marketplace.txt"
+    path = prompts_dir / "compiled_examples" / "strict_marketplace_workplace.txt"
     text = _read(path)
     positions = [text.find(s) for s in COMPILED_REQUIRED_SECTIONS]
     assert all(p >= 0 for p in positions)
