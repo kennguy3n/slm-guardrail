@@ -1,0 +1,323 @@
+"""Skill passport — schema, ed25519 signing, and verification.
+
+Spec reference: ARCHITECTURE.md "Compiler Pipeline + Skill Passport"
+(lines 681-712) and PHASES.md Phase 4.
+
+A *signed pack* carries a passport that records:
+
+* identity (``skill_id``, ``skill_version``, ``schema_version``,
+  ``parent``)
+* provenance (``authored_by``, ``reviewed_by`` per role)
+* model compatibility (``model_id`` / ``model_min_version`` /
+  ``max_instruction_tokens`` / ``max_output_tokens``)
+* expiry (``expires_on`` — max 18 months from issuance)
+* test results (the seven shipping metrics)
+* signature (ed25519, base64-encoded)
+
+The signature covers a deterministic JSON serialisation of every
+non-signature field. Verification rejects:
+
+* expired passports;
+* passports whose ``expires_on`` is more than 18 months after now;
+* tampered passports (signature mismatch);
+* model-incompatibility (when an explicit model context is supplied).
+
+The reference implementation uses the :mod:`cryptography` library;
+test code generates ephemeral keys per case so no key material is
+checked in.
+"""
+from __future__ import annotations
+
+import base64
+import json
+from dataclasses import dataclass, field
+from datetime import date, datetime, timedelta, timezone
+from typing import Any, Optional
+
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+    Ed25519PrivateKey,
+    Ed25519PublicKey,
+)
+
+
+SIGNATURE_ALGORITHM = "ed25519"
+PASSPORT_SCHEMA_VERSION = 1
+MAX_EXPIRY_DAYS = 18 * 30  # ~18 months — matches ARCHITECTURE.md.
+
+
+# ---------------------------------------------------------------------------
+# Dataclasses — mirror the YAML schema from ARCHITECTURE.md lines 683-712.
+# ---------------------------------------------------------------------------
+@dataclass(frozen=True)
+class ModelCompatibility:
+    model_id: str
+    model_min_version: str
+    max_instruction_tokens: int = 1800
+    max_output_tokens: int = 600
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "model_id": self.model_id,
+            "model_min_version": self.model_min_version,
+            "max_instruction_tokens": int(self.max_instruction_tokens),
+            "max_output_tokens": int(self.max_output_tokens),
+        }
+
+
+@dataclass(frozen=True)
+class TestResults:
+    # Tell pytest not to collect this dataclass as a test class.
+    __test__ = False
+
+    child_safety_recall: float
+    child_safety_precision: float
+    privacy_leak_precision: float
+    scam_recall: float
+    protected_speech_false_positive: float
+    minority_language_false_positive: float
+    p95_latency_ms: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "child_safety_recall": float(self.child_safety_recall),
+            "child_safety_precision": float(self.child_safety_precision),
+            "privacy_leak_precision": float(self.privacy_leak_precision),
+            "scam_recall": float(self.scam_recall),
+            "protected_speech_false_positive": float(
+                self.protected_speech_false_positive
+            ),
+            "minority_language_false_positive": float(
+                self.minority_language_false_positive
+            ),
+            "p95_latency_ms": int(self.p95_latency_ms),
+        }
+
+
+@dataclass(frozen=True)
+class Reviewers:
+    legal: tuple[str, ...] = ()
+    cultural: tuple[str, ...] = ()
+    trust_and_safety: tuple[str, ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "legal": list(self.legal),
+            "cultural": list(self.cultural),
+            "trust_and_safety": list(self.trust_and_safety),
+        }
+
+
+@dataclass(frozen=True)
+class Signature:
+    algorithm: str
+    key_id: str
+    value: str  # base64 ed25519 signature
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "algorithm": self.algorithm,
+            "key_id": self.key_id,
+            "value": self.value,
+        }
+
+
+@dataclass
+class SkillPassport:
+    """The ARCHITECTURE.md "skill_passport" YAML, in Python form."""
+
+    skill_id: str
+    skill_version: str
+    parent: Optional[str]
+    authored_by: str
+    reviewed_by: Reviewers
+    model_compatibility: tuple[ModelCompatibility, ...]
+    expires_on: date
+    test_results: TestResults
+    schema_version: int = PASSPORT_SCHEMA_VERSION
+    signature: Optional[Signature] = None
+
+    # ------------------------------------------------------------------
+    # Serialisation helpers.
+    # ------------------------------------------------------------------
+    def to_dict(self, *, include_signature: bool = True) -> dict[str, Any]:
+        out: dict[str, Any] = {
+            "skill_id": self.skill_id,
+            "skill_version": self.skill_version,
+            "schema_version": int(self.schema_version),
+            "parent": self.parent,
+            "authored_by": self.authored_by,
+            "reviewed_by": self.reviewed_by.to_dict(),
+            "model_compatibility": [
+                m.to_dict() for m in self.model_compatibility
+            ],
+            "expires_on": self.expires_on.isoformat(),
+            "test_results": self.test_results.to_dict(),
+        }
+        if include_signature and self.signature is not None:
+            out["signature"] = self.signature.to_dict()
+        return out
+
+    def signing_payload(self) -> bytes:
+        """Deterministic JSON serialisation of the unsigned payload."""
+        return json.dumps(
+            self.to_dict(include_signature=False),
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+
+    # ------------------------------------------------------------------
+    # Sign / verify.
+    # ------------------------------------------------------------------
+    def sign(self, *, private_key: Ed25519PrivateKey, key_id: str) -> "SkillPassport":
+        sig_bytes = private_key.sign(self.signing_payload())
+        self.signature = Signature(
+            algorithm=SIGNATURE_ALGORITHM,
+            key_id=key_id,
+            value=base64.b64encode(sig_bytes).decode("ascii"),
+        )
+        return self
+
+    def verify(
+        self,
+        *,
+        public_key: Ed25519PublicKey,
+        now: Optional[date] = None,
+        model: Optional[ModelCompatibility] = None,
+    ) -> None:
+        """Validate the passport.
+
+        Raises :class:`PassportValidationError` on any of:
+
+        * missing or wrong-algorithm signature;
+        * tampered signature;
+        * passport already expired (``expires_on < now``);
+        * passport overshooting the 18-month expiry budget
+          (``expires_on > now + 18 months``);
+        * model-id mismatch when ``model`` is supplied.
+        """
+        if self.signature is None:
+            raise PassportValidationError("passport is unsigned")
+        if self.signature.algorithm != SIGNATURE_ALGORITHM:
+            raise PassportValidationError(
+                f"unsupported signature algorithm: {self.signature.algorithm}"
+            )
+        try:
+            public_key.verify(
+                base64.b64decode(self.signature.value),
+                self.signing_payload(),
+            )
+        except (InvalidSignature, ValueError) as exc:
+            raise PassportValidationError("signature mismatch") from exc
+
+        today = now or _today_utc()
+        if self.expires_on < today:
+            raise PassportValidationError(
+                f"passport expired on {self.expires_on.isoformat()}"
+            )
+        max_expiry = today + timedelta(days=MAX_EXPIRY_DAYS)
+        if self.expires_on > max_expiry:
+            raise PassportValidationError(
+                f"expires_on {self.expires_on.isoformat()} exceeds "
+                f"the 18-month window (max {max_expiry.isoformat()})"
+            )
+
+        if model is not None:
+            ok = any(
+                mc.model_id == model.model_id
+                and _version_at_least(model.model_min_version, mc.model_min_version)
+                for mc in self.model_compatibility
+            )
+            if not ok:
+                raise PassportValidationError(
+                    f"passport not compatible with model "
+                    f"{model.model_id}@{model.model_min_version}"
+                )
+
+
+class PassportValidationError(ValueError):
+    """Raised when a skill passport fails verification."""
+
+
+# ---------------------------------------------------------------------------
+# Helpers.
+# ---------------------------------------------------------------------------
+def _today_utc() -> date:
+    return datetime.now(timezone.utc).date()
+
+
+def _version_tuple(v: str) -> tuple[int, ...]:
+    parts: list[int] = []
+    for p in v.split("."):
+        # tolerate semver pre-release suffixes by truncating at non-digit.
+        digits = ""
+        for ch in p:
+            if ch.isdigit():
+                digits += ch
+            else:
+                break
+        parts.append(int(digits) if digits else 0)
+    return tuple(parts)
+
+
+def _version_at_least(have: str, want: str) -> bool:
+    h, w = _version_tuple(have), _version_tuple(want)
+    # Pad the shorter tuple with zeros so e.g. ``1.0`` and ``1.0.0`` compare
+    # equal — Python's native tuple comparison would otherwise treat the
+    # shorter tuple as less, incorrectly rejecting compatible runtime
+    # versions in the security-critical model-compatibility check.
+    length = max(len(h), len(w))
+    h = h + (0,) * (length - len(h))
+    w = w + (0,) * (length - len(w))
+    return h >= w
+
+
+def generate_keypair() -> tuple[Ed25519PrivateKey, Ed25519PublicKey]:
+    """Convenience wrapper around :class:`Ed25519PrivateKey.generate`."""
+    sk = Ed25519PrivateKey.generate()
+    return sk, sk.public_key()
+
+
+def build_passport(
+    *,
+    skill_id: str,
+    skill_version: str,
+    parent: Optional[str],
+    authored_by: str,
+    legal_reviewers: tuple[str, ...] = (),
+    cultural_reviewers: tuple[str, ...] = (),
+    trust_and_safety_reviewers: tuple[str, ...] = (),
+    model_compatibility: tuple[ModelCompatibility, ...],
+    expires_on: date,
+    test_results: TestResults,
+) -> SkillPassport:
+    """Construct an unsigned passport with consistent typing."""
+    return SkillPassport(
+        skill_id=skill_id,
+        skill_version=skill_version,
+        parent=parent,
+        authored_by=authored_by,
+        reviewed_by=Reviewers(
+            legal=tuple(legal_reviewers),
+            cultural=tuple(cultural_reviewers),
+            trust_and_safety=tuple(trust_and_safety_reviewers),
+        ),
+        model_compatibility=tuple(model_compatibility),
+        expires_on=expires_on,
+        test_results=test_results,
+    )
+
+
+__all__ = [
+    "MAX_EXPIRY_DAYS",
+    "ModelCompatibility",
+    "PASSPORT_SCHEMA_VERSION",
+    "PassportValidationError",
+    "Reviewers",
+    "SIGNATURE_ALGORITHM",
+    "Signature",
+    "SkillPassport",
+    "TestResults",
+    "build_passport",
+    "generate_keypair",
+]

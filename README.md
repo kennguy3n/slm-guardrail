@@ -213,9 +213,9 @@ deliverables are skill *definitions* (YAML), prompt templates, schemas, test
 suites, and a compiler specification.
 
 Phase 0 (foundation), Phase 1 (global baseline + community overlays),
-and Phase 2 (jurisdiction archetype overlays) are complete; Phase 3
-(hybrid local pipeline + SLM integration) is in progress. The
-repository currently ships:
+Phase 2 (jurisdiction archetype overlays), Phase 3 (hybrid local
+pipeline + SLM integration), and Phase 4 (skill-pack compiler +
+signing) are complete. The repository currently ships:
 
 - the complete (non-stub) global baseline
   ([`kchat-skills/global/baseline.yaml`](kchat-skills/global/baseline.yaml)),
@@ -247,7 +247,21 @@ repository currently ships:
   [`kchat-skills/jurisdictions/`](kchat-skills/jurisdictions/), plus a
   per-archetype minority-language / code-switching false-positive
   corpus at
-  [`kchat-skills/tests/jurisdictions/test_minority_language_fp.py`](kchat-skills/tests/jurisdictions/test_minority_language_fp.py).
+  [`kchat-skills/tests/jurisdictions/test_minority_language_fp.py`](kchat-skills/tests/jurisdictions/test_minority_language_fp.py),
+- the Phase 4 skill-pack compiler at
+  [`kchat-skills/compiler/compiler.py`](kchat-skills/compiler/compiler.py)
+  with the metric validator at
+  [`kchat-skills/compiler/metric_validator.py`](kchat-skills/compiler/metric_validator.py),
+  the ed25519 skill-passport implementation at
+  [`kchat-skills/compiler/skill_passport.py`](kchat-skills/compiler/skill_passport.py)
+  (schema at
+  [`kchat-skills/compiler/skill_passport.schema.json`](kchat-skills/compiler/skill_passport.schema.json)),
+  and the anti-misuse validator at
+  [`kchat-skills/compiler/anti_misuse.py`](kchat-skills/compiler/anti_misuse.py),
+- 14 reference compiled prompts under
+  [`kchat-skills/prompts/compiled_examples/`](kchat-skills/prompts/compiled_examples/)
+  covering the global baseline plus every Phase 1–2 community and
+  jurisdiction overlay combination.
 
 ### Quick start
 
@@ -317,12 +331,17 @@ kchat-skills/
 ├── prompts/              # 10-rule SLM instruction + compiled examples
 │   ├── runtime_instruction.txt
 │   ├── compiled_prompt_format.md
-│   └── compiled_examples/
-├── compiler/             # skill-pack compiler (Phase 4)
+│   └── compiled_examples/  # 14 reference compiled prompts (Phase 4)
+├── compiler/             # skill-pack compiler (Phase 3-4)
 │   ├── counters.py           # device-local expiring counter store (Phase 1)
 │   ├── pipeline.py           # 7-step hybrid local pipeline (Phase 3)
 │   ├── slm_adapter.py        # SLMAdapter Protocol + MockSLMAdapter (Phase 3)
-│   └── threshold_policy.py   # hard-coded threshold enforcement (Phase 3)
+│   ├── threshold_policy.py   # hard-coded threshold enforcement (Phase 3)
+│   ├── metric_validator.py   # 7-metric validator (Phase 3)
+│   ├── compiler.py           # skill-pack compiler pipeline (Phase 4)
+│   ├── skill_passport.py     # ed25519 signing / verification (Phase 4)
+│   ├── skill_passport.schema.json  # Draft-07 passport schema (Phase 4)
+│   └── anti_misuse.py        # anti-misuse validation rules (Phase 4)
 ├── tests/                # pytest validation suite
 │   ├── test_suite_template.yaml    # metrics framework (Phase 1)
 │   ├── test_test_suite_template.py
@@ -331,7 +350,12 @@ kchat-skills/
 │   │   ├── test_counters.py
 │   │   ├── test_pipeline.py        # 7-step hybrid pipeline
 │   │   ├── test_slm_adapter.py     # SLMAdapter / MockSLMAdapter
-│   │   └── test_threshold_policy.py # hard-coded threshold policy
+│   │   ├── test_threshold_policy.py # hard-coded threshold policy
+│   │   ├── test_metric_validator.py # 7-metric validator (Phase 3)
+│   │   ├── test_compiler.py         # skill-pack compiler (Phase 4)
+│   │   ├── test_skill_passport.py   # ed25519 passport (Phase 4)
+│   │   ├── test_anti_misuse.py      # anti-misuse rules (Phase 4)
+│   │   └── test_compiled_examples.py # compiled-prompt references
 │   ├── jurisdictions/
 │   │   ├── test_jurisdiction_template.py
 │   │   ├── test_archetype_strict_adult.py
@@ -340,7 +364,60 @@ kchat-skills/
 │   │   └── test_minority_language_fp.py
 │   └── communities/
 └── docs/                 # pointers to the root-level project docs
+
+tools/                    # repo-level utilities (run from repo root)
+└── regenerate_compiled_examples.py  # refresh compiled_examples/*.txt
 ```
+
+### Compiling a skill pack
+
+The Phase 4 compiler resolves the global baseline plus optional
+jurisdiction and community overlays into a single compiled prompt
+(< 1800 instruction tokens) ready for the on-device SLM:
+
+```bash
+# Compile the global baseline only (writes to stdout):
+python kchat-skills/compiler/compiler.py > /tmp/baseline.txt
+
+# Compile baseline + jurisdiction archetype + community overlay:
+python kchat-skills/compiler/compiler.py \
+    --jurisdiction archetype-strict-marketplace \
+    --community workplace \
+    --out kchat-skills/prompts/compiled_examples/strict_marketplace_workplace.txt
+```
+
+The CLI is also available as
+`PYTHONPATH=kchat-skills/compiler python -m compiler ...`. To
+regenerate the full set of reference
+compiled examples after changing baseline / overlays, run:
+
+```bash
+python tools/regenerate_compiled_examples.py
+```
+
+### Signing workflow
+
+Every compiled bundle ships with an ed25519-signed *skill passport*
+(see [`compiler/skill_passport.py`](kchat-skills/compiler/skill_passport.py)
+and [`compiler/skill_passport.schema.json`](kchat-skills/compiler/skill_passport.schema.json)).
+The passport carries identity (`skill_id`, `skill_version`, `parent`),
+provenance (`authored_by`, `reviewed_by.legal/cultural/trust_and_safety`),
+model compatibility (`model_id` / `model_min_version` /
+`max_instruction_tokens` / `max_output_tokens`), an `expires_on`
+date (max 18 months from issuance), the per-pack `test_results`
+recorded by [`metric_validator`](kchat-skills/compiler/metric_validator.py),
+and a base64 ed25519 `signature` covering the deterministic JSON
+serialisation of every other field.
+
+A pack is rejected by the runtime if any of the following is true:
+the signature does not verify against the compiler's public key;
+`expires_on` is in the past or more than 18 months in the future;
+the runtime SLM is not listed in `model_compatibility`; or any of the
+[`anti_misuse`](kchat-skills/compiler/anti_misuse.py) rules fail
+(invented categories, overlay redefining `privacy_rules`, jurisdiction
+pack missing `legal_review` / `cultural_review` signers, community
+pack missing `trust_and_safety` signer, severity floors ≥ 4 without
+protected-speech `allowed_contexts`, or lexicons without provenance).
 
 ### Documentation
 

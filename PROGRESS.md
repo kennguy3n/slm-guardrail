@@ -1,7 +1,7 @@
 # KChat SLM Guardrail Skills — Progress
 
-**Status:** In progress | ~75%
-**Current phase:** Phase 3 — Hybrid Local Pipeline + SLM Integration (partial)
+**Status:** In progress | ~90%
+**Current phase:** Phase 4 — Skill Pack Compiler + Signing (complete)
 **Last updated:** 2026-04-29
 
 This file tracks delivery against the phased plan in
@@ -83,18 +83,26 @@ This file tracks delivery against the phased plan in
   `warn=0.62`, `strong_warn=0.78`, `critical_intervention=0.85`) at
   `kchat-skills/compiler/threshold_policy.py`, including child-safety
   severity-floor handling.
-- [ ] Metric validation: `child_safety_recall ≥ 0.98`,
-  `protected_speech_false_positive ≤ 0.05`, p95 latency ≤ 250 ms.
+- [x] Metric validation: `child_safety_recall ≥ 0.98`,
+  `protected_speech_false_positive ≤ 0.05`, p95 latency ≤ 250 ms —
+  `kchat-skills/compiler/metric_validator.py` plus pipeline hook
+  `GuardrailPipeline.validate_metrics`.
 
 ---
 
 ## Phase 4 — Skill Pack Compiler + Signing
 
-- [ ] Compiler pipeline (authoring → review → tests → prompt compiler
-  → signed bundle).
-- [ ] Skill passport schema + ed25519 signing.
-- [ ] Anti-misuse validation rules + tests.
-- [ ] Compiled-prompt reference outputs for Phase 1–2 packs.
+- [x] Compiler pipeline (authoring → review → tests → prompt compiler
+  → signed bundle) — `kchat-skills/compiler/compiler.py`
+  (`SkillPackCompiler`, conflict resolution, 1800-token budget
+  enforcement).
+- [x] Skill passport schema + ed25519 signing —
+  `kchat-skills/compiler/skill_passport.py` and
+  `kchat-skills/compiler/skill_passport.schema.json`.
+- [x] Anti-misuse validation rules + tests —
+  `kchat-skills/compiler/anti_misuse.py`.
+- [x] Compiled-prompt reference outputs for Phase 1–2 packs —
+  14 combinations under `kchat-skills/prompts/compiled_examples/`.
 
 ---
 
@@ -118,6 +126,49 @@ This file tracks delivery against the phased plan in
 ---
 
 ## Changelog
+
+### 2026-04-29 — Phase 3 close + Phase 4 complete
+
+- `kchat-skills/compiler/metric_validator.py` — metric validation
+  framework. Computes recall / precision / FP / p95 latency from
+  test-case results, returns a per-metric `MetricVerdict` against the
+  seven shipping thresholds (`child_safety_recall ≥ 0.98`,
+  `child_safety_precision ≥ 0.90`, `privacy_leak_precision ≥ 0.90`,
+  `scam_recall ≥ 0.85`, `protected_speech_false_positive ≤ 0.05`,
+  `minority_language_false_positive ≤ 0.07`, `latency_p95_ms ≤ 250`).
+  Wired into `GuardrailPipeline.validate_metrics` so the compiler can
+  refuse to sign bundles whose metrics regress.
+- `kchat-skills/compiler/compiler.py` — Phase 4 compiler pipeline.
+  Loads baseline + jurisdiction + community YAML, applies
+  conflict-resolution rules from `baseline.skill_selection`
+  (severity take_max, action most_protective, immutable
+  privacy_rules, CHILD_SAFETY pinned to severity 5), emits a single
+  compiled prompt within the 1800 instruction-token budget. Includes
+  `python -m compiler.compiler` CLI.
+- `kchat-skills/compiler/skill_passport.py` +
+  `skill_passport.schema.json` — `SkillPassport` dataclass mirroring
+  ARCHITECTURE.md lines 683-712, ed25519 signing / verification via
+  `cryptography`, expiry checks (max 18 months), model-compatibility
+  checks, deterministic JSON signing payload, Draft-07 JSON Schema.
+- `kchat-skills/compiler/anti_misuse.py` — anti-misuse validator.
+  Rejects vague categories, invented categories, jurisdiction packs
+  missing `legal_review` / `cultural_review` signers, community
+  packs missing `trust_and_safety`, severity floors ≥ 4 without
+  protected-speech `allowed_contexts`, overlays redefining
+  `privacy_rules`, and lexicons without provenance.
+- `kchat-skills/prompts/compiled_examples/` — 14 reference compiled
+  prompts: baseline only, baseline + each of the 8 community
+  overlays, baseline + each of the 3 jurisdiction archetypes, plus
+  `strict_marketplace_workplace` and `strict_adult_school` combined
+  examples. All under the 1800-token instruction budget.
+- `tools/regenerate_compiled_examples.py` — regenerator script for
+  the reference compiled examples.
+- `kchat-skills/tests/global/test_metric_validator.py`,
+  `test_compiler.py`, `test_skill_passport.py`, `test_anti_misuse.py`,
+  `test_compiled_examples.py` — 175+ new tests covering every
+  Phase 3-4 module and every reference compiled prompt.
+- `requirements.txt` / `pyproject.toml` — added
+  `cryptography>=42.0` for ed25519 signing.
 
 ### 2026-04-29 — Phase 2 close + Phase 3 partial
 
