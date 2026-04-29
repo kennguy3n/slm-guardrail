@@ -1,0 +1,29 @@
+# Community Overlay — kchat.community.political.guardrail.v1
+#
+# Campaign / civic overlay. Tightens civic misinformation to warn and
+# applies a workplace-style harassment policy.
+
+skill_id: kchat.community.political.guardrail.v1
+parent: kchat.global.guardrail.baseline
+schema_version: 1
+signers: [trust_and_safety]
+
+community_profile:
+  kind: political
+  age_mode: adult_only
+  visibility: public_summary
+  set_by: group_admin
+
+rules:
+  - category: 14   # MISINFORMATION_CIVIC
+    action: warn
+    note: >-
+      Election or civic misinformation surfaces a warning when a
+      jurisdiction-flagged civic window is open. Authoritative
+      electoral-authority resource links surface alongside the warning.
+  - category: 5    # HARASSMENT
+    action: warn
+    suggest_mute: true
+    note: >-
+      Targeted insults, doxxing, and pile-on warn before display and
+      offer a peer-mute.

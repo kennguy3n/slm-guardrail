@@ -182,18 +182,19 @@ categories have a severity floor of 5 regardless of model confidence.
 ## Practical First Build
 
 The first 12 starter skills cover the global baseline plus enough overlays
-to validate the layering model:
+to validate the layering model. Items marked **(landed)** ship in this
+repository today; the rest are scheduled for Phase 2.
 
-1. `kchat.global.guardrail.baseline` — the global baseline skill.
-2. `community.school` — minors-aware community overlay.
-3. `community.family` — household / kin group overlay.
-4. `community.workplace` — professional / B2B overlay.
-5. `community.adult_only` — explicitly opt-in adult overlay.
-6. `community.marketplace` — buy / sell / trade overlay.
+1. `kchat.global.guardrail.baseline` — the global baseline skill. **(landed)**
+2. `community.school` — minors-aware community overlay. **(landed)**
+3. `community.family` — household / kin group overlay. **(landed)**
+4. `community.workplace` — professional / B2B overlay. **(landed)**
+5. `community.adult_only` — explicitly opt-in adult overlay. **(landed)**
+6. `community.marketplace` — buy / sell / trade overlay. **(landed)**
 7. `community.health_support` — peer-support overlay (loosens self-harm
-   labels in supportive context, tightens medical-misinformation rules).
-8. `community.political` — campaign / civic overlay.
-9. `community.gaming` — large public gaming community overlay.
+   labels in supportive context, tightens medical-misinformation rules). **(landed)**
+8. `community.political` — campaign / civic overlay. **(landed)**
+9. `community.gaming` — large public gaming community overlay. **(landed)**
 10. `jurisdiction.archetype-strict-adult` — strict adult-content jurisdiction
     archetype.
 11. `jurisdiction.archetype-strict-hate` — strict hate / extremism
@@ -210,6 +211,20 @@ one.
 This project is in **early development**. There is no runtime yet; the
 deliverables are skill *definitions* (YAML), prompt templates, schemas, test
 suites, and a compiler specification.
+
+Phase 0 (foundation) and the first three Phase 1 deliverables are now
+available: the complete (non-stub) global baseline
+([`kchat-skills/global/baseline.yaml`](kchat-skills/global/baseline.yaml)),
+the SLM input contract
+([`local_signal_schema.json`](kchat-skills/global/local_signal_schema.json))
+and privacy contract
+([`privacy_contract.yaml`](kchat-skills/global/privacy_contract.yaml)),
+the runtime SLM instruction prompt
+([`prompts/runtime_instruction.txt`](kchat-skills/prompts/runtime_instruction.txt))
+and compiled-prompt format reference
+([`prompts/compiled_prompt_format.md`](kchat-skills/prompts/compiled_prompt_format.md)),
+and the eight community overlays under
+[`kchat-skills/communities/`](kchat-skills/communities/).
 
 ### Quick start
 
@@ -235,9 +250,10 @@ baseline (`taxonomy.yaml`, `severity.yaml`, `output_schema.json`,
 `baseline.yaml`). It is pure Python — no SLM runtime is required.
 
 ```bash
-pytest                            # run all tests
-pytest kchat-skills/tests/global  # only the global-baseline tests
-pytest -v                         # verbose
+pytest                                 # run all tests
+pytest kchat-skills/tests/global       # only the global-baseline tests
+pytest kchat-skills/tests/communities  # only the community-overlay tests
+pytest -v                              # verbose
 ```
 
 ### Project layout
@@ -252,8 +268,18 @@ kchat-skills/
 ├── jurisdictions/        # jurisdiction overlay packs (Phase 2+)
 │   └── _template/
 ├── communities/          # community overlay packs (Phase 1+)
-│   └── _template/
+│   ├── _template/         # community overlay template
+│   ├── school.yaml        # minors-aware
+│   ├── family.yaml        # household / kin
+│   ├── workplace.yaml     # professional / B2B
+│   ├── adult_only.yaml    # opt-in adult
+│   ├── marketplace.yaml   # buy / sell / trade
+│   ├── health_support.yaml
+│   ├── political.yaml     # campaign / civic
+│   └── gaming.yaml        # public gaming community
 ├── prompts/              # 10-rule SLM instruction + compiled examples
+│   ├── runtime_instruction.txt
+│   ├── compiled_prompt_format.md
 │   └── compiled_examples/
 ├── compiler/             # skill-pack compiler (Phase 4)
 ├── tests/                # pytest validation suite

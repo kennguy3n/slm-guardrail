@@ -1,4 +1,4 @@
-"""Validation tests for kchat-skills/global/baseline.yaml (Phase 0 stub)."""
+"""Validation tests for kchat-skills/global/baseline.yaml (Phase 1 complete)."""
 from __future__ import annotations
 
 import yaml
@@ -31,10 +31,40 @@ def test_baseline_schema_version(baseline):
     assert baseline["schema_version"] == 1
 
 
-def test_baseline_marked_as_stub(baseline):
-    # Phase 0 deliverable is explicitly a stub; Phase 1 completes it.
-    assert baseline.get("stub") is True
-    assert baseline.get("phase") == 0
+def test_baseline_is_complete(baseline):
+    # Phase 1 completes the baseline. The stub flag must be absent or
+    # explicitly False, the phase must be 1, and the status must be
+    # "complete".
+    assert baseline.get("stub", False) is False
+    assert baseline.get("phase") == 1
+    assert baseline.get("status") == "complete"
+
+
+def test_baseline_privacy_rules_block_present(baseline):
+    pr = baseline.get("privacy_rules")
+    assert pr is not None
+    # Either the contract is referenced or all 8 rules are inlined.
+    assert pr.get("immutable") is True
+    assert "contract_ref" in pr
+    rules = pr.get("rules", [])
+    assert isinstance(rules, list)
+    # Inline rules must enumerate all 8 rule ids 1..8.
+    ids = sorted(r["id"] for r in rules)
+    assert ids == [1, 2, 3, 4, 5, 6, 7, 8]
+
+
+def test_baseline_input_contract_references_local_signal_schema(baseline):
+    ic = baseline.get("input_contract")
+    assert ic is not None
+    assert ic["schema_id"] == "kchat.guardrail.local_signal.v1"
+    required = set(ic.get("required_blocks", []))
+    assert required == {"message", "context", "local_signals", "constraints"}
+
+
+def test_baseline_references_runtime_instruction_and_compiled_prompt_format(baseline):
+    refs = baseline.get("references", {})
+    assert "runtime_instruction" in refs
+    assert "compiled_prompt_format" in refs
 
 
 def test_baseline_decision_policy_thresholds(baseline):
@@ -77,8 +107,7 @@ def test_baseline_child_safety_severity_floor_5(baseline):
 
 def test_baseline_references_phase_0_artifacts(baseline):
     refs = baseline.get("references", {})
-    # Must reference taxonomy, severity, output_schema (already authored)
-    # plus local_signal_schema and privacy_contract (Phase 0 follow-up).
+    # Must reference all five Phase 0 structural primitives.
     for key in (
         "taxonomy",
         "severity",

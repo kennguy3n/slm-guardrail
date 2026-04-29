@@ -1,34 +1,90 @@
-# kchat.global.guardrail.baseline — Phase 0 STUB
-#
-# STATUS: Phase 0 stub. The full implementation (privacy rules, input
-# contract details, runtime instruction, etc.) lands in Phase 1. This stub
-# wires together the structural primitives produced in Phase 0:
-# taxonomy.yaml, severity.yaml, output_schema.json (and, when authored,
-# local_signal_schema.json + privacy_contract.yaml) so downstream tooling
-# and tests can resolve them.
+# kchat.global.guardrail.baseline — Phase 1
 #
 # The global baseline is ALWAYS active. No overlay may remove a category,
 # change its ID, weaken severity for child safety, or alter the privacy
 # rules. See ARCHITECTURE.md "Global Baseline Skill".
+#
+# This is the complete (non-stub) baseline. It composes the structural
+# primitives authored in Phase 0 (taxonomy.yaml, severity.yaml,
+# output_schema.json, local_signal_schema.json, privacy_contract.yaml)
+# with the runtime instruction prompt and the compiled-prompt examples.
 
 skill_id: kchat.global.guardrail.baseline
 schema_version: 1
-phase: 0
-stub: true
+phase: 1
+status: complete
 parent: null
-status: stub
+signers: [trust_and_safety]
 
 # Structural references resolved at compile time. Paths are relative to
 # this file's directory (kchat-skills/global/).
 references:
-  taxonomy:              ./taxonomy.yaml
-  severity:              ./severity.yaml
-  output_schema:         ./output_schema.json
-  # The following are also Phase 0 deliverables and will be authored in
-  # subsequent commits; the references are pre-wired so the compiler can
-  # validate the bundle once they exist.
-  local_signal_schema:   ./local_signal_schema.json   # SLM input contract
-  privacy_contract:      ./privacy_contract.yaml      # 8 non-negotiable privacy rules
+  taxonomy:                ./taxonomy.yaml
+  severity:                ./severity.yaml
+  output_schema:           ./output_schema.json
+  local_signal_schema:     ./local_signal_schema.json   # SLM input contract
+  privacy_contract:        ./privacy_contract.yaml      # 8 non-negotiable privacy rules
+  runtime_instruction:     ../prompts/runtime_instruction.txt
+  compiled_prompt_format:  ../prompts/compiled_examples/
+
+# Privacy rules — the eight non-negotiable rules from PROPOSAL.md, embedded
+# inline so this baseline is self-contained even if the contract file is
+# missing at compile time. The canonical, machine-enforceable form lives in
+# `privacy_contract.yaml` (referenced above as `privacy_contract`). Every
+# overlay inherits these rules verbatim; the compiler rejects any pack that
+# attempts to weaken them.
+privacy_rules:
+  contract_ref: ./privacy_contract.yaml
+  immutable: true
+  rules:
+    - id: 1
+      rule: >-
+        The model only analyzes content already decrypted and visible on
+        this device to this user.
+    - id: 2
+      rule: >-
+        The model must never request more context than is provided in the
+        structured input.
+    - id: 3
+      rule: >-
+        The model must never attempt to identify the sender, recipient,
+        group membership, or social graph beyond what is in the structured
+        input.
+    - id: 4
+      rule: >-
+        The model output must never contain the original message text,
+        message fragments longer than 8 tokens, message IDs, or any direct
+        quote that could re-identify the message off-device.
+    - id: 5
+      rule: >-
+        The model output must not contain hashes, fingerprints, embeddings,
+        or cryptographic commitments to message content.
+    - id: 6
+      rule: >-
+        The model must not request, assume, or infer plaintext from other
+        conversations, other devices, or other users.
+    - id: 7
+      rule: >-
+        The model must not produce content that would only be useful to a
+        server-side moderator (for example, "report this message ID to
+        backend X" or "send this label to a central queue").
+    - id: 8
+      rule: >-
+        The model must operate identically when offline; it must not
+        depend on server-side completion of any safety decision.
+
+# Input contract — structured object the runtime hands to the SLM. The
+# canonical Draft-07 schema lives at `local_signal_schema.json`; this
+# block records the contract id and budget so overlays and the prompt
+# compiler can reference it without parsing JSON.
+input_contract:
+  schema_ref: ./local_signal_schema.json
+  schema_id: kchat.guardrail.local_signal.v1
+  required_blocks:
+    - message
+    - context
+    - local_signals
+    - constraints
 
 # Decision policy thresholds — hard-coded in the runtime; the SLM cannot
 # override them. Source: ARCHITECTURE.md "Decision Policy".
@@ -94,9 +150,8 @@ skill_selection:
         of overlay configuration.
 
 # Child safety policy — highest priority. Source: ARCHITECTURE.md
-# "Child Safety Policy". This block is a stub of the full policy that
-# will be expanded in Phase 1; the severity floor and forbidden-upload
-# rule are load-bearing and must remain stable across phases.
+# "Child Safety Policy". The severity floor and forbidden-upload rule are
+# load-bearing and must remain stable across phases.
 child_safety_policy:
   priority: highest
   severity_floor: 5
@@ -121,16 +176,3 @@ child_safety_policy:
   user_notice:
     rationale_id: child_safety_floor_v1
     resource_link_id: child_safety_resources_v1
-
-# Privacy rules — the full eight non-negotiable rules will be authored as
-# kchat-skills/global/privacy_contract.yaml in a subsequent Phase 0 commit
-# and validated by the compiler in Phase 4. This block records the
-# reference and the immutability constraint; no overlay may relax these
-# rules.
-privacy_rules:
-  reference: ./privacy_contract.yaml
-  immutable: true
-  note: >-
-    The full privacy contract (eight non-negotiable rules) lives in
-    privacy_contract.yaml. Every authored skill pack — including this
-    baseline stub — inherits the contract verbatim.

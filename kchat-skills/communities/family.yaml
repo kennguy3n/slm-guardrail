@@ -1,0 +1,33 @@
+# Community Overlay — kchat.community.family.guardrail.v1
+#
+# Household / kin-group overlay. Mixed-age default. Adult sexual content
+# is hard-warned; harassment is warned with mute suggestion.
+
+skill_id: kchat.community.family.guardrail.v1
+parent: kchat.global.guardrail.baseline
+schema_version: 1
+signers: [trust_and_safety]
+
+community_profile:
+  kind: family
+  age_mode: mixed_age
+  visibility: members_only_summary
+  set_by: group_admin
+
+rules:
+  - category: 10   # SEXUAL_ADULT
+    action: strong_warn
+    note: >-
+      Adult sexual content surfaces a hard modal warning in mixed-age
+      family groups regardless of jurisdiction.
+  - category: 5    # HARASSMENT
+    action: warn
+    suggest_mute: true
+    note: >-
+      Targeted insults / pile-on warn before display and offer mute on
+      the involved peer.
+  - category: 9    # PRIVATE_DATA
+    action: warn
+    suggest_redact: true
+    note: >-
+      PII / location of family members suggests redaction before send.
