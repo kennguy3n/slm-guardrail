@@ -263,6 +263,67 @@ def test_apply_counter_updates_rejects_empty_counter_id(store):
         )
 
 
+def test_apply_counter_updates_is_atomic_on_bad_delta(store):
+    # Entry 1 is valid, entry 2 has a bad delta. The batch must fail
+    # without applying entry 1, so a caller that fixes the input and
+    # retries does not double-count.
+    updates = [
+        {"counter_id": "valid", "delta": 1},
+        {"counter_id": "bad", "delta": "oops"},
+    ]
+    with pytest.raises(TypeError):
+        store.apply_counter_updates("g", updates)
+    assert store.get_count("g", "valid") == 0
+    assert store.get_count("g", "bad") == 0
+
+
+def test_apply_counter_updates_is_atomic_on_empty_counter_id(store):
+    updates = [
+        {"counter_id": "valid", "delta": 1},
+        {"counter_id": "", "delta": 1},
+    ]
+    with pytest.raises(ValueError):
+        store.apply_counter_updates("g", updates)
+    assert store.get_count("g", "valid") == 0
+
+
+def test_apply_counter_updates_persists_once(tmp_path, frozen_clock):
+    # When a path is configured, a successful batch must produce
+    # exactly one on-disk write regardless of batch size.
+    path = tmp_path / "counters.bin"
+    key = b"\x33" * 32
+    store = CounterStore(
+        path=path,
+        keystore=InMemoryKeystore(key=key),
+        clock=frozen_clock,
+    )
+    calls = {"n": 0}
+    original_persist = store._persist  # noqa: SLF001
+
+    def counted_persist():
+        calls["n"] += 1
+        return original_persist()
+
+    store._persist = counted_persist  # type: ignore[assignment]  # noqa: SLF001
+    store.apply_counter_updates(
+        "g",
+        [
+            {"counter_id": "a", "delta": 1},
+            {"counter_id": "a", "delta": 1},
+            {"counter_id": "b", "delta": 2},
+        ],
+    )
+    assert calls["n"] == 1
+    # And state must round-trip through the encrypted blob.
+    store2 = CounterStore(
+        path=path,
+        keystore=InMemoryKeystore(key=key),
+        clock=frozen_clock,
+    )
+    assert store2.get_count("g", "a") == 2
+    assert store2.get_count("g", "b") == 2
+
+
 # ---------------------------------------------------------------------------
 # Encrypted persistence
 # ---------------------------------------------------------------------------

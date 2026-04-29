@@ -246,10 +246,20 @@ class CounterStore:
         """Apply a batch of ``counter_updates`` from the SLM output.
 
         ``counter_updates`` items must match the shape defined by
-        ``kchat-skills/global/output_schema.json``:
-        each entry has a non-empty ``counter_id`` string and an
-        integer ``delta``.
+        ``kchat-skills/global/output_schema.json``: each entry has a
+        non-empty ``counter_id`` string and an integer ``delta``.
+
+        The batch is atomic: all entries are validated before any are
+        written, and persistence (if configured) happens once at the
+        end. A validation failure on entry *N* leaves the store
+        unchanged, so a caller can safely fix the input and retry the
+        full batch without double-counting.
         """
+        if not isinstance(group_id, str) or not group_id:
+            raise ValueError("group_id must be a non-empty string")
+
+        # First pass: validate the entire batch and materialise entries.
+        materialised: list[tuple[str, int]] = []
         for update in counter_updates:
             cid = update["counter_id"]
             delta = update["delta"]
@@ -259,7 +269,21 @@ class CounterStore:
                 )
             if isinstance(delta, bool) or not isinstance(delta, int):
                 raise TypeError("counter_updates[].delta must be int")
-            self.increment(group_id, cid, delta=delta, ts=ts)
+            materialised.append((cid, delta))
+
+        if not materialised:
+            return
+
+        # Second pass: apply to in-memory state, then persist once.
+        if ts is None:
+            ts = float(self.clock())
+        group = self._data.setdefault(group_id, {})
+        for cid, delta in materialised:
+            group.setdefault(cid, []).append(
+                CounterEntry(ts=ts, delta=delta)
+            )
+        if self.path is not None:
+            self._persist()
 
     # ------------------------------------------------------------------
     # Read
