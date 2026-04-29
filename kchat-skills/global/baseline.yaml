@@ -25,7 +25,7 @@ references:
   local_signal_schema:     ./local_signal_schema.json   # SLM input contract
   privacy_contract:        ./privacy_contract.yaml      # 8 non-negotiable privacy rules
   runtime_instruction:     ../prompts/runtime_instruction.txt
-  compiled_prompt_format:  ../prompts/compiled_examples/
+  compiled_prompt_format:  ../prompts/compiled_prompt_format.md
 
 # Privacy rules — the eight non-negotiable rules from PROPOSAL.md, embedded
 # inline so this baseline is self-contained even if the contract file is

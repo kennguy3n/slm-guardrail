@@ -643,7 +643,7 @@ allowed_contexts: QUOTED_SPEECH_CONTEXT, NEWS_CONTEXT, EDUCATION_CONTEXT,
                   COUNTERSPEECH_CONTEXT
 
 [COMMUNITY_OVERLAY]
-id: kchat.community.workplace.v1
+id: kchat.community.workplace.guardrail.v1
 age_mode: adult_only
 rules:
   - category 5 HARASSMENT action=warn suggest_mute=true
