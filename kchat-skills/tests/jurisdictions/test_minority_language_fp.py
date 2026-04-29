@@ -330,15 +330,232 @@ MINORITY_LANGUAGE_FP_CASES: list[dict[str, Any]] = [
         lang_hint="de",
         locale="de-DE",
     ),
+    # ------------------------------------------------------------------
+    # Country pack: us — Spanish/English code-switching + Navajo /
+    # Cherokee minority-language false positives.
+    # ------------------------------------------------------------------
+    _case(
+        "us-cs-019-es-en-family",
+        "Spanish/English code-switched family note.",
+        archetype="us",
+        tags=["code_switching", "false_positive"],
+        text="Mi mamá and I are heading to the farmers market this morning.",
+        lang_hint="es",
+        locale="es-US",
+    ),
+    _case(
+        "us-cs-020-en-es-school",
+        "English/Spanish code-switched school-event chat.",
+        archetype="us",
+        tags=["code_switching", "false_positive"],
+        text="The escuela has a potluck on Friday — bringing tamales y arroz.",
+        lang_hint="en",
+        locale="en-US",
+    ),
+    _case(
+        "us-ml-021-nv-greeting",
+        "Navajo (Diné Bizaad) benign greeting; minority-language coverage.",
+        archetype="us",
+        tags=["minority_language", "false_positive"],
+        text="Yáʼátʼééh, doo ánísts'íísígíí da, t'áá íiyisíí.",
+        lang_hint="nv",
+        locale="nv-US",
+    ),
+    _case(
+        "us-ml-022-chr-stickball",
+        "Cherokee-language stickball / community-event note.",
+        archetype="us",
+        tags=["minority_language", "false_positive"],
+        text="ᎠᏂᏎᎵᎬᎢ ᎠᎴ ᎠᎾᏘᏍᏗ ᎠᏂᏍᎦᎩ ᏥᏍᏚ.",
+        lang_hint="chr",
+        locale="chr-US",
+    ),
+    # ------------------------------------------------------------------
+    # Country pack: de — Turkish/German code-switching + Sorbian
+    # minority-language false positives.
+    # ------------------------------------------------------------------
+    _case(
+        "de-cs-023-tr-de-bakery",
+        "Turkish/German code-switched bakery chat.",
+        archetype="de",
+        tags=["code_switching", "false_positive"],
+        text="Pazartesi günü Bäckerei'ye gittim und habe Brötchen gekauft.",
+        lang_hint="tr",
+        locale="tr-DE",
+    ),
+    _case(
+        "de-cs-024-de-tr-family",
+        "German/Turkish code-switched family chat.",
+        archetype="de",
+        tags=["code_switching", "false_positive"],
+        text="Annem dedi mein Bruder kommt am Wochenende für ein Familientreffen.",
+        lang_hint="de",
+        locale="de-DE",
+    ),
+    _case(
+        "de-ml-025-hsb-village",
+        "Upper Sorbian (Hornjoserbsce) village-festival note.",
+        archetype="de",
+        tags=["minority_language", "false_positive"],
+        text="Jutře je w našej wsy ludowy swjedźeń z hudźbu a rejemi.",
+        lang_hint="hsb",
+        locale="hsb-DE",
+    ),
+    _case(
+        "de-ml-026-dsb-school",
+        "Lower Sorbian (Dolnoserbski) school-event note.",
+        archetype="de",
+        tags=["minority_language", "false_positive"],
+        text="Naša šula sobotu wótpołdnja swěśi swój lětny swěźeń.",
+        lang_hint="dsb",
+        locale="dsb-DE",
+    ),
+    # ------------------------------------------------------------------
+    # Country pack: br — Tupi / Guarani minority-language + Portuguese
+    # / English code-switching false positives.
+    # ------------------------------------------------------------------
+    _case(
+        "br-ml-027-tpw-river",
+        "Tupi-language river-and-fishing description.",
+        archetype="br",
+        tags=["minority_language", "false_positive"],
+        text="Paranã pe ouri sy, kunhã pirá rerekoara.",
+        lang_hint="tpw",
+        locale="tpw-BR",
+    ),
+    _case(
+        "br-ml-028-gn-greeting",
+        "Guarani benign morning greeting.",
+        archetype="br",
+        tags=["minority_language", "false_positive"],
+        text="Mba'éichapa nde pyhareve, che irũ porã?",
+        lang_hint="gn",
+        locale="gn-BR",
+    ),
+    _case(
+        "br-cs-029-pt-en-mixed",
+        "Portuguese/English code-switched workplace chat.",
+        archetype="br",
+        tags=["code_switching", "false_positive"],
+        text="Vou enviar o relatório agora, please review when you have time.",
+        lang_hint="pt",
+        locale="pt-BR",
+    ),
+    _case(
+        "br-cs-030-en-pt-football",
+        "English/Portuguese code-switched football chat.",
+        archetype="br",
+        tags=["code_switching", "false_positive"],
+        text="Did you see the jogo last night? O time was incredible.",
+        lang_hint="en",
+        locale="en-BR",
+    ),
+    # ------------------------------------------------------------------
+    # Country pack: in — Tamil / Bengali / Urdu minority languages plus
+    # Hinglish (Hindi/English) code-switching false positives.
+    # ------------------------------------------------------------------
+    _case(
+        "in-ml-031-ta-festival",
+        "Tamil-language festival-greeting note.",
+        archetype="in",
+        tags=["minority_language", "false_positive"],
+        text="இனிய பொங்கல் வாழ்த்துக்கள், குடும்பத்துடன் கொண்டாடுங்கள்.",
+        lang_hint="ta",
+        locale="ta-IN",
+    ),
+    _case(
+        "in-ml-032-bn-school",
+        "Bengali-language school-event note.",
+        archetype="in",
+        tags=["minority_language", "false_positive"],
+        text="আগামীকাল আমাদের স্কুলে বার্ষিক ক্রীড়া প্রতিযোগিতা হবে।",
+        lang_hint="bn",
+        locale="bn-IN",
+    ),
+    _case(
+        "in-ml-033-ur-greeting",
+        "Urdu-language family-greeting note.",
+        archetype="in",
+        tags=["minority_language", "false_positive"],
+        text="السلام علیکم، گھر میں سب خیریت سے ہیں اور آپ کو یاد کرتے ہیں۔",
+        lang_hint="ur",
+        locale="ur-IN",
+    ),
+    _case(
+        "in-cs-034-hi-en-hinglish",
+        "Hinglish (Hindi/English) workplace chat.",
+        archetype="in",
+        tags=["code_switching", "false_positive"],
+        text="Boss ne kaha report submit karni hai by tomorrow morning, ok?",
+        lang_hint="hi",
+        locale="hi-IN",
+    ),
+    _case(
+        "in-cs-035-en-hi-mixed",
+        "English/Hindi code-switched recipe note.",
+        archetype="in",
+        tags=["code_switching", "false_positive"],
+        text="I made some khichdi for dinner, very simple aur healthy.",
+        lang_hint="en",
+        locale="en-IN",
+    ),
+    # ------------------------------------------------------------------
+    # Country pack: jp — Okinawan / Ainu minority languages plus
+    # Japanese / English code-switching false positives.
+    # ------------------------------------------------------------------
+    _case(
+        "jp-ml-036-ryu-greeting",
+        "Okinawan (Uchinaaguchi) benign greeting and weather note.",
+        archetype="jp",
+        tags=["minority_language", "false_positive"],
+        text="Haisai, chuu nu uchinaa ya tin nu yutasha yannee.",
+        lang_hint="ryu",
+        locale="ryu-JP",
+    ),
+    _case(
+        "jp-ml-037-ain-mountain",
+        "Ainu-language mountain-hike note.",
+        archetype="jp",
+        tags=["minority_language", "false_positive"],
+        text="Tane anak nupuri or ta paye=an ruwe ne na, pirka kewtumu kor.",
+        lang_hint="ain",
+        locale="ain-JP",
+    ),
+    _case(
+        "jp-cs-038-ja-en-meeting",
+        "Japanese/English code-switched office-meeting chat.",
+        archetype="jp",
+        tags=["code_switching", "false_positive"],
+        text="今日のmeetingは三時からですか? Or did it move to 4pm?",
+        lang_hint="ja",
+        locale="ja-JP",
+    ),
+    _case(
+        "jp-cs-039-en-ja-food",
+        "English/Japanese code-switched dinner-plan chat.",
+        archetype="jp",
+        tags=["code_switching", "false_positive"],
+        text="Let's get お寿司 tonight, that new place near the eki was great.",
+        lang_hint="en",
+        locale="en-JP",
+    ),
 ]
 
 
 # Archetypes covered by this corpus. Kept explicit so adding a new
 # archetype requires updating the coverage assertions deliberately.
+# The Phase 5 first-wave country packs (us, de, br, in, jp) appear
+# alongside the original three archetype overlays so the coverage
+# assertions exercise both layers of the jurisdiction model.
 ARCHETYPES = (
     "archetype-strict-adult",
     "archetype-strict-hate",
     "archetype-strict-marketplace",
+    "us",
+    "de",
+    "br",
+    "in",
+    "jp",
 )
 
 

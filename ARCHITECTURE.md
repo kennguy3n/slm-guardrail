@@ -788,6 +788,26 @@ anti_misuse_controls:
 │   │   ├── overlay.yaml             # severity_floor 4 on cat 11 & 12
 │   │   ├── normalization.yaml
 │   │   └── lexicons/
+│   ├── us/                           # United States (Phase 5)
+│   │   ├── overlay.yaml             # CSAM floor 5; FTO list; FTC fraud floor 3
+│   │   ├── normalization.yaml
+│   │   └── lexicons/en.yaml
+│   ├── de/                           # Germany (Phase 5)
+│   │   ├── overlay.yaml             # NetzDG / StGB §86a floor 5; §130 floor 4
+│   │   ├── normalization.yaml
+│   │   └── lexicons/de.yaml
+│   ├── br/                           # Brazil (Phase 5)
+│   │   ├── overlay.yaml             # ECA child floor 5; Lei 7.716/89 hate floor 4
+│   │   ├── normalization.yaml
+│   │   └── lexicons/pt.yaml
+│   ├── in/                           # India (Phase 5)
+│   │   ├── overlay.yaml             # UAPA / IPC §153A; IT Act §67 floor 5
+│   │   ├── normalization.yaml       # +Devanagari translit
+│   │   └── lexicons/{hi,en}.yaml
+│   ├── jp/                           # Japan (Phase 5)
+│   │   ├── overlay.yaml             # child / drug-weapon floors 5; tokushoho floor 4
+│   │   ├── normalization.yaml       # +translit_ja_v1 (romaji)
+│   │   └── lexicons/ja.yaml
 │   └── <country-code>/              # filled per-country packs
 │       ├── overlay.yaml
 │       ├── lexicons/
@@ -809,7 +829,7 @@ anti_misuse_controls:
 ├── prompts/
 │   ├── runtime_instruction.txt      # 10-rule SLM instruction
 │   ├── compiled_prompt_format.md    # compiled-prompt section reference
-│   └── compiled_examples/           # 14 reference compiled prompts (Phase 4):
+│   └── compiled_examples/           # 19 reference compiled prompts (Phase 4-5):
 │       ├── baseline_only.txt
 │       ├── community_school.txt
 │       ├── community_family.txt
@@ -823,7 +843,12 @@ anti_misuse_controls:
 │       ├── jurisdiction_strict_hate.txt
 │       ├── jurisdiction_strict_marketplace.txt
 │       ├── strict_marketplace_workplace.txt
-│       └── strict_adult_school.txt
+│       ├── strict_adult_school.txt
+│       ├── country_us.txt           # Phase 5
+│       ├── country_de.txt           # Phase 5
+│       ├── country_br.txt           # Phase 5
+│       ├── country_in.txt           # Phase 5
+│       └── country_jp.txt           # Phase 5
 │
 ├── compiler/
 │   ├── pipeline.md
@@ -835,7 +860,9 @@ anti_misuse_controls:
 │   ├── metric_validator.py           # 7-metric validator (Phase 3)
 │   ├── compiler.py                   # skill-pack compiler pipeline (Phase 4)
 │   ├── skill_passport.py             # ed25519 signing / verification (Phase 4)
-│   └── anti_misuse.py                # anti-misuse validation rules (Phase 4)
+│   ├── anti_misuse.py                # anti-misuse validation rules (Phase 4)
+│   ├── bias_audit.py                 # bias auditor (Phase 6)
+│   └── pack_lifecycle.py             # pack store / rollback / expiry (Phase 6)
 │
 ├── tests/
 │   ├── test_suite_template.yaml     # Phase 1 metrics framework
@@ -953,7 +980,107 @@ Concrete test files in this repository:
   required `[INSTRUCTION] / [GLOBAL_BASELINE] / [JURISDICTION_OVERLAY]
   / [COMMUNITY_OVERLAY] / [INPUT] / [OUTPUT]` sections, instruction
   token budget < 1800, byte-for-byte equality with what the live
-  compiler emits today (catches drift).
+  compiler emits today (catches drift). Phase 5 added the five
+  `country_us / country_de / country_br / country_in / country_jp`
+  references.
+- `kchat-skills/tests/jurisdictions/test_country_us.py`,
+  `…/test_country_de.py`, `…/test_country_br.py`,
+  `…/test_country_in.py`, `…/test_country_jp.py` — per-country
+  Phase 5 structural tests asserting the country-specific severity
+  floors, marketplace ages, protected-class enumeration, election-
+  authority references, and the shared structural invariants
+  (parent, schema_version, signers, forbidden criteria, allowed
+  contexts, expiry budget, user notice, lexicon provenance) via
+  the helpers in
+  `kchat-skills/tests/jurisdictions/_country_pack_assertions.py`.
+- `kchat-skills/tests/global/test_bias_audit.py` — Phase 6 bias
+  auditor (`kchat-skills/compiler/bias_audit.py`): per-protected-
+  class and per-minority-language false-positive rate computation,
+  disparity detection, configuration thresholds, edge cases
+  (empty / single-group / all-SAFE), and an integration test
+  running the auditor against the existing minority-language FP
+  corpus.
+- `kchat-skills/tests/global/test_pack_lifecycle.py` — Phase 6 pack-
+  lifecycle store (`kchat-skills/compiler/pack_lifecycle.py`):
+  registration / retrieval, version ordering, rollback, retention
+  cap of `MAX_RETAINED_VERSIONS = 3`, expiry checks against the
+  `EXPIRY_REVIEW_WINDOW_DAYS = 30` review window,
+  `deactivate_expired`, `needs_review`, JSON round-trip, and
+  integration with `SkillPassport`.
+
+## Bias Auditing
+
+The Phase 6 bias auditor at
+[`kchat-skills/compiler/bias_audit.py`](kchat-skills/compiler/bias_audit.py)
+provides a structured way to detect protected-class and minority-
+language skew in a signed pack's behaviour. Inputs are
+`BiasAuditCase` rows — each row carries a `case_id`,
+`protected_class`, `language`, expected and predicted taxonomy id,
+and a tuple of free-form `tags`. A row is a *false positive* when
+`expected_category == metric_validator.SAFE_CATEGORY` (0) but
+`predicted_category != SAFE_CATEGORY`.
+
+The auditor computes:
+
+- `audit_protected_class_effects(results)` — dict mapping each
+  protected class to `(false_positive_rate, sample_size)`. Cases
+  whose `expected_category` is not SAFE are excluded so the rate
+  is comparable across groups.
+- `audit_minority_language_effects(results)` — same shape, keyed
+  by language.
+- `audit_disparity(per_group_rates, max_disparity)` — returns the
+  list of group keys whose FP rate exceeds the overall mean by
+  more than `max_disparity` (default 0.05).
+- `run_audit(results, pack_id)` — wraps the above into a
+  `BiasAuditReport` carrying the per-class / per-language tables,
+  overall FP rates, the lists of flagged classes and languages,
+  and `passed` (False if any group exceeds the
+  `MAX_PER_GROUP_FP_RATE = 0.07` ceiling — bound to the
+  `minority_language_false_positive` shipping target — or shows
+  >`MAX_DISPARITY = 0.05` disparity).
+
+The compiler can call `BiasAuditor().run_audit(…)` after
+`metric_validator` so every signed pack carries evidence that its
+behaviour does not skew across protected classes or languages.
+
+## Pack Lifecycle
+
+The Phase 6 pack store at
+[`kchat-skills/compiler/pack_lifecycle.py`](kchat-skills/compiler/pack_lifecycle.py)
+is a JSON-serialisable, device-local ledger of signed pack
+versions. Each `PackVersion` records the `skill_id`,
+`skill_version`, observed `signed_on` date, `expires_on`,
+`signature_valid`, and `is_active` flags. The `PackStore` exposes:
+
+- `register(passport, signed_on=None, signature_valid=None)` —
+  register a freshly signed `SkillPassport`, mark it active, and
+  demote the previous active version. Re-registering the same
+  `skill_version` replaces in-place rather than duplicating.
+- `get_active(skill_id)` / `get_history(skill_id)` /
+  `all_active()` — inspection helpers (history is returned newest-
+  first as a defensive copy).
+- `rollback(skill_id)` — fall back to the previously signed
+  version. Per `anti_misuse_controls.technical` the device retains
+  the last `MAX_RETAINED_VERSIONS = 3` signed versions; older
+  versions are dropped on registration to keep the working set
+  bounded.
+- `check_expiry(now=None, days_ahead=EXPIRY_REVIEW_WINDOW_DAYS)`
+  — return `skill_id`s whose active version is expired or expires
+  within `days_ahead` days (default 30).
+- `deactivate_expired(now=None)` — mark every active pack whose
+  `expires_on < now` inactive. Expired packs cannot ship to
+  devices, matching PHASES.md Phase 6 ("no pack older than its
+  `expires_on` ships to devices").
+- `needs_review(days_ahead=30, now=None)` — return the active
+  versions that need legal / cultural re-review before they
+  expire. Already-expired packs are *not* included here — they
+  belong to the `deactivate_expired` cohort, not the review queue.
+- `to_json()` / `from_json(raw)` — deterministic, sorted JSON
+  serialisation for device-local persistence.
+
+The constants `MAX_RETAINED_VERSIONS` and `EXPIRY_REVIEW_WINDOW_DAYS`
+are exported from the module so callers (and tests) can reference
+the documented values rather than hard-coding them.
 
 See [`PROGRESS.md`](PROGRESS.md) and the project [`README.md`](README.md)
 for the full test toolchain and run instructions.

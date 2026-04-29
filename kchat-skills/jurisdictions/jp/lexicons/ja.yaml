@@ -1,0 +1,26 @@
+# Japanese lexicon bundle for the kchat.jurisdiction.jp.guardrail.v1
+# overlay.
+
+schema_version: 1
+lexicon_id: jp_ja_lexicon_v1
+language: ja
+locale: ja-JP
+provenance: kchat_trust_and_safety_jp_v1
+categories:
+  - 1   # CHILD_SAFETY
+  - 7   # SCAM_FRAUD
+  - 11  # DRUGS_WEAPONS
+
+terms:
+  - term_id: jp_ja_term_child_protection_v1
+    categories: [1]
+    notes: Child-protection statute indicator phrases (catalogue-only).
+  - term_id: jp_ja_term_tokushoho_v1
+    categories: [7]
+    notes: Tokutei Shouhin Torihiki Hou consumer-fraud indicator phrases.
+  - term_id: jp_ja_term_drug_marketplace_v1
+    categories: [11]
+    notes: Controlled-substance marketplace indicator phrases.
+  - term_id: jp_ja_term_firearm_sword_law_v1
+    categories: [11]
+    notes: Firearm and Sword Control Law restricted-weapon indicators.
