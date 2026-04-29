@@ -134,3 +134,43 @@ def jp_overlay(jurisdictions_dir: Path) -> dict:
 @pytest.fixture(scope="session")
 def jp_normalization(jurisdictions_dir: Path) -> dict:
     return _load(jurisdictions_dir / "jp" / "normalization.yaml")
+
+
+# ---------------------------------------------------------------------------
+# Country-specific fixtures (Phase 5 second wave — 35 additional countries).
+#
+# Generated programmatically so the fixture set stays in lock-step with the
+# canonical country list. Each entry below registers ``<cc>_overlay`` and
+# ``<cc>_normalization`` session-scoped fixtures.
+# ---------------------------------------------------------------------------
+_PHASE5_SECOND_WAVE_COUNTRY_CODES: tuple[str, ...] = (
+    # Americas
+    "mx", "ca", "ar", "co", "cl", "pe",
+    # Europe
+    "fr", "gb", "es", "it", "nl", "pl", "se", "pt", "ch", "at",
+    # Asia-Pacific
+    "kr", "id", "ph", "th", "vn", "my", "sg", "tw", "pk", "bd",
+    # Middle East & Africa
+    "ng", "za", "eg", "sa", "ae", "ke",
+    # Other
+    "au", "nz", "tr",
+)
+
+
+def _make_country_fixtures(cc: str) -> None:
+    """Register overlay + normalization fixtures for ``cc`` on this module."""
+
+    @pytest.fixture(scope="session", name=f"{cc}_overlay")
+    def _overlay(jurisdictions_dir: Path, _cc: str = cc) -> dict:
+        return _load(jurisdictions_dir / _cc / "overlay.yaml")
+
+    @pytest.fixture(scope="session", name=f"{cc}_normalization")
+    def _normalization(jurisdictions_dir: Path, _cc: str = cc) -> dict:
+        return _load(jurisdictions_dir / _cc / "normalization.yaml")
+
+    globals()[f"{cc}_overlay"] = _overlay
+    globals()[f"{cc}_normalization"] = _normalization
+
+
+for _cc in _PHASE5_SECOND_WAVE_COUNTRY_CODES:
+    _make_country_fixtures(_cc)

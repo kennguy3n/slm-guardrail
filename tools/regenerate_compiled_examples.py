@@ -50,6 +50,47 @@ COMBOS: tuple[tuple[str, str | None, str | None], ...] = (
     ("country_br", "br", None),
     ("country_in", "in", None),
     ("country_jp", "jp", None),
+    # Phase 5 second-wave country packs (35 additional countries).
+    # Americas.
+    ("country_mx", "mx", None),
+    ("country_ca", "ca", None),
+    ("country_ar", "ar", None),
+    ("country_co", "co", None),
+    ("country_cl", "cl", None),
+    ("country_pe", "pe", None),
+    # Europe.
+    ("country_fr", "fr", None),
+    ("country_gb", "gb", None),
+    ("country_es", "es", None),
+    ("country_it", "it", None),
+    ("country_nl", "nl", None),
+    ("country_pl", "pl", None),
+    ("country_se", "se", None),
+    ("country_pt", "pt", None),
+    ("country_ch", "ch", None),
+    ("country_at", "at", None),
+    # Asia-Pacific.
+    ("country_kr", "kr", None),
+    ("country_id", "id", None),
+    ("country_ph", "ph", None),
+    ("country_th", "th", None),
+    ("country_vn", "vn", None),
+    ("country_my", "my", None),
+    ("country_sg", "sg", None),
+    ("country_tw", "tw", None),
+    ("country_pk", "pk", None),
+    ("country_bd", "bd", None),
+    # Middle East & Africa.
+    ("country_ng", "ng", None),
+    ("country_za", "za", None),
+    ("country_eg", "eg", None),
+    ("country_sa", "sa", None),
+    ("country_ae", "ae", None),
+    ("country_ke", "ke", None),
+    # Other.
+    ("country_au", "au", None),
+    ("country_nz", "nz", None),
+    ("country_tr", "tr", None),
 )
 
 

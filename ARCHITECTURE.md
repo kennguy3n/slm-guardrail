@@ -788,31 +788,17 @@ anti_misuse_controls:
 │   │   ├── overlay.yaml             # severity_floor 4 on cat 11 & 12
 │   │   ├── normalization.yaml
 │   │   └── lexicons/
-│   ├── us/                           # United States (Phase 5)
-│   │   ├── overlay.yaml             # CSAM floor 5; FTO list; FTC fraud floor 3
-│   │   ├── normalization.yaml
-│   │   └── lexicons/en.yaml
-│   ├── de/                           # Germany (Phase 5)
-│   │   ├── overlay.yaml             # NetzDG / StGB §86a floor 5; §130 floor 4
-│   │   ├── normalization.yaml
-│   │   └── lexicons/de.yaml
-│   ├── br/                           # Brazil (Phase 5)
-│   │   ├── overlay.yaml             # ECA child floor 5; Lei 7.716/89 hate floor 4
-│   │   ├── normalization.yaml
-│   │   └── lexicons/pt.yaml
-│   ├── in/                           # India (Phase 5)
-│   │   ├── overlay.yaml             # UAPA / IPC §153A; IT Act §67 floor 5
-│   │   ├── normalization.yaml       # +Devanagari translit
-│   │   └── lexicons/{hi,en}.yaml
-│   ├── jp/                           # Japan (Phase 5)
-│   │   ├── overlay.yaml             # child / drug-weapon floors 5; tokushoho floor 4
-│   │   ├── normalization.yaml       # +translit_ja_v1 (romaji)
-│   │   └── lexicons/ja.yaml
-│   └── <country-code>/              # filled per-country packs
+│   ├── us/  de/  br/  in/  jp/                   # Phase 5 wave 1 (5)
+│   ├── mx/  ca/  ar/  co/  cl/  pe/               # Phase 5 wave 2 Americas (6)
+│   ├── fr/  gb/  es/  it/  nl/  pl/               # Phase 5 wave 2 Europe (10)
+│   ├── se/  pt/  ch/  at/
+│   ├── kr/  id/  ph/  th/  vn/  my/               # Phase 5 wave 2 Asia-Pacific (10)
+│   ├── sg/  tw/  pk/  bd/
+│   ├── ng/  za/  eg/  sa/  ae/  ke/               # Phase 5 wave 2 ME / Africa (6)
+│   └── au/  nz/  tr/                              # Phase 5 wave 2 Other (3)
 │       ├── overlay.yaml
-│       ├── lexicons/
-│       ├── normalization.yaml
-│       └── tests/
+│       ├── lexicons/<lang>.yaml
+│       └── normalization.yaml
 │
 ├── communities/
 │   ├── _template/
@@ -829,26 +815,12 @@ anti_misuse_controls:
 ├── prompts/
 │   ├── runtime_instruction.txt      # 10-rule SLM instruction
 │   ├── compiled_prompt_format.md    # compiled-prompt section reference
-│   └── compiled_examples/           # 19 reference compiled prompts (Phase 4-5):
+│   └── compiled_examples/           # 54 reference compiled prompts (Phase 4-5):
 │       ├── baseline_only.txt
-│       ├── community_school.txt
-│       ├── community_family.txt
-│       ├── community_workplace.txt
-│       ├── community_adult_only.txt
-│       ├── community_marketplace.txt
-│       ├── community_health_support.txt
-│       ├── community_political.txt
-│       ├── community_gaming.txt
-│       ├── jurisdiction_strict_adult.txt
-│       ├── jurisdiction_strict_hate.txt
-│       ├── jurisdiction_strict_marketplace.txt
-│       ├── strict_marketplace_workplace.txt
-│       ├── strict_adult_school.txt
-│       ├── country_us.txt           # Phase 5
-│       ├── country_de.txt           # Phase 5
-│       ├── country_br.txt           # Phase 5
-│       ├── country_in.txt           # Phase 5
-│       └── country_jp.txt           # Phase 5
+│       ├── community_*.txt                      # 8 community overlays
+│       ├── jurisdiction_strict_*.txt            # 3 archetype overlays
+│       ├── strict_*_*.txt                       # pair overlays
+│       └── country_<cc>.txt                     # 40 country packs
 │
 ├── compiler/
 │   ├── pipeline.md
@@ -862,19 +834,30 @@ anti_misuse_controls:
 │   ├── skill_passport.py             # ed25519 signing / verification (Phase 4)
 │   ├── anti_misuse.py                # anti-misuse validation rules (Phase 4)
 │   ├── bias_audit.py                 # bias auditor (Phase 6)
-│   └── pack_lifecycle.py             # pack store / rollback / expiry (Phase 6)
+│   ├── pack_lifecycle.py             # pack store / rollback / expiry (Phase 6)
+│   ├── benchmark.py                  # performance benchmark harness (Phase 6)
+│   └── appeal_flow.py                # community feedback / appeal flow (Phase 6)
 │
 ├── tests/
 │   ├── test_suite_template.yaml     # Phase 1 metrics framework
 │   ├── test_test_suite_template.py
 │   ├── global/
 │   ├── jurisdictions/
+│   ├── adversarial/                 # Phase 6 obfuscation corpus
+│   │   ├── corpus.yaml
+│   │   ├── conftest.py
+│   │   └── test_adversarial_corpus.py
 │   └── communities/
 │
 └── docs/
     ├── PROPOSAL.md
     ├── ARCHITECTURE.md
-    └── PHASES.md
+    ├── PHASES.md
+    └── regulatory/                  # Phase 6 regulatory alignment
+        ├── README.md
+        ├── eu_dsa_alignment.md
+        ├── nist_ai_rmf_alignment.md
+        └── unicef_itu_cop_alignment.md
 
 /tools
 └── regenerate_compiled_examples.py  # refresh prompts/compiled_examples
@@ -980,19 +963,40 @@ Concrete test files in this repository:
   required `[INSTRUCTION] / [GLOBAL_BASELINE] / [JURISDICTION_OVERLAY]
   / [COMMUNITY_OVERLAY] / [INPUT] / [OUTPUT]` sections, instruction
   token budget < 1800, byte-for-byte equality with what the live
-  compiler emits today (catches drift). Phase 5 added the five
-  `country_us / country_de / country_br / country_in / country_jp`
-  references.
-- `kchat-skills/tests/jurisdictions/test_country_us.py`,
-  `…/test_country_de.py`, `…/test_country_br.py`,
-  `…/test_country_in.py`, `…/test_country_jp.py` — per-country
-  Phase 5 structural tests asserting the country-specific severity
-  floors, marketplace ages, protected-class enumeration, election-
-  authority references, and the shared structural invariants
-  (parent, schema_version, signers, forbidden criteria, allowed
-  contexts, expiry budget, user notice, lexicon provenance) via
-  the helpers in
+  compiler emits today (catches drift). Phase 5 landed 35 additional
+  `country_<cc>.txt` references (54 total), plus a
+  `test_phase5_all_40_country_packs_covered` assertion that pins the
+  full 40-country set.
+- `kchat-skills/tests/jurisdictions/test_country_<cc>.py` — 40 per-
+  country structural tests (one file per country) asserting the
+  country-specific severity floors, marketplace ages, protected-class
+  enumeration, election-authority references, and the shared
+  structural invariants (parent, schema_version, signers, forbidden
+  criteria, allowed contexts, expiry budget, user notice, lexicon
+  provenance) via the helpers in
   `kchat-skills/tests/jurisdictions/_country_pack_assertions.py`.
+- `kchat-skills/tests/adversarial/test_adversarial_corpus.py` —
+  Phase 6 adversarial / obfuscation corpus
+  (`kchat-skills/tests/adversarial/corpus.yaml`). 60 cases across 6
+  evasion techniques (homoglyph, leetspeak, code-switching, unicode
+  tricks, whitespace insertion, image-text evasion). Per-technique
+  detection-rate floor ≥ 0.80; aggregate detection-rate floor ≥ 0.80.
+- `kchat-skills/tests/global/test_regulatory_docs.py` — Phase 6
+  contract test pinning that every alignment doc under
+  `kchat-skills/docs/regulatory/` exists, is non-empty, references
+  the core source artefacts it maps, and — for the UNICEF / ITU
+  doc — contains a statutory-grounding row for every one of the 40
+  country packs.
+- `kchat-skills/tests/global/test_benchmark.py` — Phase 6 latency
+  benchmark (`kchat-skills/compiler/benchmark.py`). `BenchmarkReport`
+  fails fast if p95 > 250 ms. Parametrised across all 16 taxonomy
+  categories and the full 40-country set.
+- `kchat-skills/tests/global/test_appeal_flow.py` — Phase 6
+  community-feedback / appeal-flow spec
+  (`kchat-skills/compiler/appeal_flow.py`). Pins the privacy
+  invariant (no text, hash, or embedding fields on `AppealCase` /
+  `AppealReport`), plus threshold logic, aggregation window,
+  duplicate-id rejection, multi-skill scoping, and edge cases.
 - `kchat-skills/tests/global/test_bias_audit.py` — Phase 6 bias
   auditor (`kchat-skills/compiler/bias_audit.py`): per-protected-
   class and per-minority-language false-positive rate computation,
@@ -1081,6 +1085,125 @@ versions. Each `PackVersion` records the `skill_id`,
 The constants `MAX_RETAINED_VERSIONS` and `EXPIRY_REVIEW_WINDOW_DAYS`
 are exported from the module so callers (and tests) can reference
 the documented values rather than hard-coding them.
+
+## Performance Benchmarking
+
+The Phase 6 benchmark at
+[`kchat-skills/compiler/benchmark.py`](kchat-skills/compiler/benchmark.py)
+is the structured measurement harness that pins the
+"Performance envelope" latency target. Its moving parts:
+
+- `BenchmarkCase(case_id, message, context)` — one
+  deterministically-measured invocation of the pipeline. `message`
+  and `context` match the corresponding blocks of
+  `kchat.guardrail.local_signal.v1`.
+- `PipelineBenchmark` — wraps a `GuardrailPipeline`. The
+  `with_mock_adapter(skill_bundle, threshold_policy=None)`
+  convenience constructor wires `MockSLMAdapter` for regression
+  tests. `run(cases, iterations=100, warmup=3)` records
+  `time.perf_counter` latency per iteration and returns:
+- `BenchmarkReport(total_cases, iterations, p50_ms, p95_ms, p99_ms,
+  mean_ms, max_ms, min_ms, per_case_mean_ms)` — `passed` iff
+  `p95_ms <= P95_LATENCY_TARGET_MS (=250.0)`. Percentiles use
+  nearest-rank ordering so small-N runs are stable across machines.
+- `default_benchmark_cases()` — deterministic, content-safe battery
+  of 10 cases exercising normalization, detector dispatch, and
+  adapter invocation without embedding literal harm strings.
+
+The contract test
+[`kchat-skills/tests/global/test_benchmark.py`](kchat-skills/tests/global/test_benchmark.py)
+parametrises across every taxonomy category (0..15), across the
+baseline-only / jurisdiction-only / full-stack bundle configurations,
+and across the full 40-country set — any regression that breaches
+the 250 ms p95 target fails CI immediately.
+
+## Appeal Flow
+
+The Phase 6 community-feedback / appeal-flow spec at
+[`kchat-skills/compiler/appeal_flow.py`](kchat-skills/compiler/appeal_flow.py)
+provides the on-device primitive host applications wire into their
+notice-and-action / remediation surface (DSA Art. 16, 20).
+
+Privacy invariant: `AppealCase` is a frozen dataclass whose field
+set is closed to `{appeal_id, skill_id, category, severity,
+rationale_id, user_context, timestamp}`. There is no text / message
+/ content-hash / embedding field, by design and by contract test.
+`user_context` is a closed enum — one of
+`{disagree_category, disagree_severity, false_positive,
+missing_context}`. `timestamp` must be timezone-aware.
+
+`AppealAggregator` holds appeals in memory only; persistence is the
+host's responsibility. `submit(appeal)` rejects duplicate
+`appeal_id`s and non-`AppealCase` inputs. `aggregate(skill_id,
+window_days=30)` filters by skill and window and returns an
+`AppealReport` with:
+
+- `per_category_appeal_counts` / `per_category_appeal_rates`
+- `top_rationale_ids` / `top_user_contexts` (most-common top 5 each)
+- `recommendation` ∈ `{no_action, review_suggested, urgent_review}`
+
+Recommendation rules (first match wins):
+
+1. Any appeal on `CHILD_SAFETY_CATEGORY = 1` → `urgent_review`.
+   Child-safety invariants override rate-based thresholds.
+2. A category with `count ≥ MIN_APPEALS_FOR_REVIEW (=5)` and
+   `rate ≥ URGENT_REVIEW_APPEAL_RATE (=0.15)` → `urgent_review`.
+3. A category with `count ≥ 5` and
+   `rate ≥ REVIEW_SUGGESTED_APPEAL_RATE (=0.05)` → `review_suggested`.
+4. Otherwise → `no_action`.
+
+## Supported Countries
+
+Phase 5 landed 40 country-specific jurisdiction packs. Each pack
+ships an `overlay.yaml` (severity floors, protected classes,
+listed-extremist-orgs, restricted symbols, election rules), a
+`normalization.yaml` (NFKC + case-fold + country-appropriate
+transliteration refs), and one `lexicons/<lang>.yaml` per primary
+language. Category 1 (CHILD_SAFETY) severity floor 5 is enforced on
+every pack by `anti_misuse.assert_no_relaxed_child_safety`.
+
+| ISO-3166 | Country | Primary languages | Key legal references |
+| --- | --- | --- | --- |
+| US | United States | en | 18 U.S.C. §§ 2251–2260, Patriot Act, FTC Act. |
+| DE | Germany | de | StGB § 86a / § 130, NetzDG, JuSchG. |
+| BR | Brazil | pt | ECA, Lei 7.716/89, TSE election rules. |
+| IN | India | hi, en | POCSO 2012, UAPA, IPC § 153A / § 295A, IT Act § 67. |
+| JP | Japan | ja | Child-protection statute, tokushoho, drug / weapon laws. |
+| MX | Mexico | es | LGPNNA, Ley Federal contra la Delincuencia Organizada, COFEPRIS. |
+| CA | Canada | en, fr | Criminal Code s. 163.1 / terrorism, Competition Act. |
+| AR | Argentina | es | Ley 26.061, Código Penal, Ley 23.592. |
+| CO | Colombia | es | Código de la Infancia y Adolescencia. |
+| CL | Chile | es | Ley 21.057, Ley Antiterrorista. |
+| PE | Peru | es | Código de los Niños y Adolescentes. |
+| FR | France | fr | Loi Avia, loi Gayssot, Code pénal Art. 225-1. |
+| GB | United Kingdom | en | Online Safety Act 2023, Terrorism Act 2000, Equality Act 2010. |
+| ES | Spain | es, ca, eu, gl | Ley Orgánica de Protección del Menor. |
+| IT | Italy | it | Codice Penale child protection + anti-terrorism. |
+| NL | Netherlands | nl | Wetboek van Strafrecht child protection + terrorism. |
+| PL | Poland | pl | Kodeks Karny child protection + anti-terrorism. |
+| SE | Sweden | sv | Brottsbalk child protection + terrorism. |
+| PT | Portugal | pt | Código Penal child protection + terrorism. |
+| CH | Switzerland | de, fr, it, rm | StGB child protection, StGB Art. 261bis. |
+| AT | Austria | de | StGB child protection, Verbotsgesetz 1945. |
+| KR | South Korea | ko | Act on Protection of Children and Youth, NSA. |
+| ID | Indonesia | id | UU ITE, UU Perlindungan Anak, Anti-Terrorism Law. |
+| PH | Philippines | en, tl | RA 7610, Human Security Act. |
+| TH | Thailand | th | Child Protection Act B.E. 2546, lèse-majesté, CCA. |
+| VN | Vietnam | vi | Law on Children 2016, Anti-Terrorism Law. |
+| MY | Malaysia | ms, en | Child Act 2001, SOSMA. |
+| SG | Singapore | en, zh, ms, ta | Children and Young Persons Act, ISA. |
+| TW | Taiwan | zh | Child and Youth Welfare and Protection Act. |
+| PK | Pakistan | ur, en | PPC, Anti-Terrorism Act 1997, PECA 2016. |
+| BD | Bangladesh | bn | Children Act 2013, Anti-Terrorism Act 2009. |
+| NG | Nigeria | en | Child Rights Act 2003, Terrorism Prevention Act, Cybercrimes Act. |
+| ZA | South Africa | en, af, zu | Children's Act 38/2005, POCDATARA. |
+| EG | Egypt | ar | Child Law 12/1996, Anti-Terrorism Law 94/2015. |
+| SA | Saudi Arabia | ar | Child Protection System, Anti-Terrorism Law. |
+| AE | UAE | ar, en | Wadeema's Law, Federal Decree-Law 7/2014. |
+| KE | Kenya | en, sw | Children Act 2022, Prevention of Terrorism Act. |
+| AU | Australia | en | Criminal Code Act 1995, Online Safety Act 2021. |
+| NZ | New Zealand | en, mi | FVPC Act, Terrorism Suppression Act. |
+| TR | Turkey | tr | TCK child protection, TMK anti-terrorism. |
 
 See [`PROGRESS.md`](PROGRESS.md) and the project [`README.md`](README.md)
 for the full test toolchain and run instructions.
