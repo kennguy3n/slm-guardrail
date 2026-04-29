@@ -142,16 +142,14 @@ categories have a severity floor of 5 regardless of model confidence.
 │   ├── archetype-strict-adult/
 │   ├── archetype-strict-hate/
 │   ├── archetype-strict-marketplace/
-│   ├── us/                          # United States (Phase 5)
-│   ├── de/                          # Germany (Phase 5)
-│   ├── br/                          # Brazil (Phase 5)
-│   ├── in/                          # India (Phase 5)
-│   ├── jp/                          # Japan (Phase 5)
-│   └── <country-code>/              # filled per-country packs
-│       ├── overlay.yaml
-│       ├── lexicons/
-│       ├── normalization.yaml
-│       └── tests/
+│   ├── us/  de/  br/  in/  jp/       # Phase 5 wave 1 country packs
+│   ├── mx/  ca/  ar/  co/  cl/  pe/   # Phase 5 wave 2 — Americas
+│   ├── fr/  gb/  es/  it/  nl/  pl/   # Phase 5 wave 2 — Europe
+│   ├── se/  pt/  ch/  at/             # Phase 5 wave 2 — Europe (cont.)
+│   ├── kr/  id/  ph/  th/  vn/  my/   # Phase 5 wave 2 — Asia-Pacific
+│   ├── sg/  tw/  pk/  bd/             # Phase 5 wave 2 — Asia-Pacific (cont.)
+│   ├── ng/  za/  eg/  sa/  ae/  ke/   # Phase 5 wave 2 — Middle East / Africa
+│   └── au/  nz/  tr/                  # Phase 5 wave 2 — Other
 │
 ├── communities/
 │   ├── _template/
@@ -218,8 +216,55 @@ repository today; the rest are scheduled for Phase 2.
     (child-protection statute, tokushoho, drug & weapon laws). **(landed)**
 
 These let us exercise the full bundle composition (global + jurisdiction +
-community) end-to-end across both archetypal and concrete country
-packs. Phase 5 will continue with 5–15 more country packs.
+community) end-to-end across both archetypal and concrete country packs.
+Phase 5 shipped the full 40-country set — see the
+“Supported Countries” table below for the ISO codes, primary
+languages, and key legal references.
+
+### Supported countries (40)
+
+| ISO-3166 | Country | Primary languages | Key legal references |
+| --- | --- | --- | --- |
+| US | United States | en | 18 U.S.C. §§ 2251–2260, Patriot Act, FTC Act. |
+| DE | Germany | de | StGB § 86a / § 130 (Volksverhetzung), NetzDG, JuSchG. |
+| BR | Brazil | pt | ECA (Lei 8.069/1990), Lei 7.716/89, TSE election rules. |
+| IN | India | hi, en | POCSO 2012, UAPA, IPC § 153A / § 295A, IT Act § 67. |
+| JP | Japan | ja | Child-protection statute, tokushoho, drug / weapon laws. |
+| MX | Mexico | es | LGPNNA, Ley Federal contra la Delincuencia Organizada, COFEPRIS. |
+| CA | Canada | en, fr | Criminal Code s. 163.1 / terrorism, Competition Act. |
+| AR | Argentina | es | Ley 26.061 child protection, Código Penal, Ley 23.592. |
+| CO | Colombia | es | Código de la Infancia y Adolescencia, anti-terrorism law. |
+| CL | Chile | es | Ley 21.057 child protection, Ley Antiterrorista. |
+| PE | Peru | es | Código de los Niños y Adolescentes. |
+| FR | France | fr | Loi Avia / DSA, loi Gayssot, Code pénal Art. 225-1. |
+| GB | United Kingdom | en | Online Safety Act 2023, Terrorism Act 2000, Equality Act 2010. |
+| ES | Spain | es, ca, eu, gl | Ley Orgánica de Protección del Menor, Código Penal. |
+| IT | Italy | it | Codice Penale child protection + anti-terrorism. |
+| NL | Netherlands | nl | Wetboek van Strafrecht child protection + terrorism. |
+| PL | Poland | pl | Kodeks Karny child protection + anti-terrorism. |
+| SE | Sweden | sv | Brottsbalk child protection + terrorism. |
+| PT | Portugal | pt | Código Penal child protection + terrorism. |
+| CH | Switzerland | de, fr, it, rm | StGB child protection, StGB Art. 261bis anti-racism. |
+| AT | Austria | de | StGB child protection, Verbotsgesetz 1945. |
+| KR | South Korea | ko | Act on Protection of Children and Youth, NSA. |
+| ID | Indonesia | id | UU ITE, UU Perlindungan Anak, Anti-Terrorism Law. |
+| PH | Philippines | en, tl | RA 7610, Human Security Act. |
+| TH | Thailand | th | Child Protection Act B.E. 2546, lèse-majesté, CCA. |
+| VN | Vietnam | vi | Law on Children 2016, Anti-Terrorism Law. |
+| MY | Malaysia | ms, en | Child Act 2001, SOSMA. |
+| SG | Singapore | en, zh, ms, ta | Children and Young Persons Act, ISA. |
+| TW | Taiwan | zh | Child and Youth Welfare and Protection Act, anti-terrorism. |
+| PK | Pakistan | ur, en | PPC child protection, Anti-Terrorism Act 1997, PECA 2016. |
+| BD | Bangladesh | bn | Children Act 2013, Anti-Terrorism Act 2009. |
+| NG | Nigeria | en | Child Rights Act 2003, Terrorism Prevention Act, Cybercrimes Act. |
+| ZA | South Africa | en, af, zu | Children's Act 38/2005, POCDATARA. |
+| EG | Egypt | ar | Child Law 12/1996, Anti-Terrorism Law 94/2015. |
+| SA | Saudi Arabia | ar | Child Protection System, Anti-Terrorism Law, Anti-Cyber Crime Law. |
+| AE | United Arab Emirates | ar, en | Wadeema's Law, Federal Decree-Law 7/2014. |
+| KE | Kenya | en, sw | Children Act 2022, Prevention of Terrorism Act. |
+| AU | Australia | en | Criminal Code Act 1995 (child exploitation + terrorism), Online Safety Act 2021. |
+| NZ | New Zealand | en, mi | Films, Videos and Publications Classification Act, Terrorism Suppression Act. |
+| TR | Turkey | tr | TCK child protection, TMK anti-terrorism. |
 
 ## Getting Started
 
@@ -229,12 +274,11 @@ suites, and a compiler specification.
 
 Phase 0 (foundation), Phase 1 (global baseline + community overlays),
 Phase 2 (jurisdiction archetype overlays), Phase 3 (hybrid local
-pipeline + SLM integration), and Phase 4 (skill-pack compiler +
-signing) are complete. Phase 5 (country-specific expansion) has
-shipped its first wave of 5 country packs (US, DE, BR, IN, JP), and
-Phase 6 has shipped the bias-auditing framework and the pack
-lifecycle / rollback / expiry-review store. The repository
-currently ships:
+pipeline + SLM integration), Phase 4 (skill-pack compiler + signing),
+Phase 5 (40 country-specific jurisdiction overlays) and Phase 6
+(bias auditing, pack lifecycle, adversarial / obfuscation corpus,
+regulatory alignment, performance benchmarking, community feedback /
+appeal flow) are all complete. The repository currently ships:
 
 - the complete (non-stub) global baseline
   ([`kchat-skills/global/baseline.yaml`](kchat-skills/global/baseline.yaml)),
@@ -277,21 +321,16 @@ currently ships:
   [`kchat-skills/compiler/skill_passport.schema.json`](kchat-skills/compiler/skill_passport.schema.json)),
   and the anti-misuse validator at
   [`kchat-skills/compiler/anti_misuse.py`](kchat-skills/compiler/anti_misuse.py),
-- 19 reference compiled prompts under
+- 54 reference compiled prompts under
   [`kchat-skills/prompts/compiled_examples/`](kchat-skills/prompts/compiled_examples/)
   covering the global baseline, every Phase 1–2 community and
-  jurisdiction overlay combination, and the five Phase 5 country
-  packs (`country_us.txt`, `country_de.txt`, `country_br.txt`,
-  `country_in.txt`, `country_jp.txt`),
-- the Phase 5 first-wave country packs at
-  [`kchat-skills/jurisdictions/us/`](kchat-skills/jurisdictions/us/),
-  [`/de/`](kchat-skills/jurisdictions/de/),
-  [`/br/`](kchat-skills/jurisdictions/br/),
-  [`/in/`](kchat-skills/jurisdictions/in/), and
-  [`/jp/`](kchat-skills/jurisdictions/jp/) — each with concrete
-  legal-age, protected-class, listed-extremist-org, election-rule,
-  and override values, a `normalization.yaml`, and per-language
-  lexicons under `lexicons/` — all passing
+  jurisdiction overlay combination, and the 40 Phase 5 country
+  packs (`country_us.txt` through `country_tr.txt`),
+- the 40 Phase 5 country packs under
+  [`kchat-skills/jurisdictions/<cc>/`](kchat-skills/jurisdictions/) —
+  each with concrete legal-age, protected-class, listed-extremist-org,
+  election-rule, and override values, a `normalization.yaml`, and
+  per-language lexicons under `lexicons/` — all passing
   [`anti_misuse.validate_pack`](kchat-skills/compiler/anti_misuse.py),
 - the Phase 6 bias auditor at
   [`kchat-skills/compiler/bias_audit.py`](kchat-skills/compiler/bias_audit.py)
@@ -300,7 +339,30 @@ currently ships:
 - the Phase 6 pack-lifecycle store at
   [`kchat-skills/compiler/pack_lifecycle.py`](kchat-skills/compiler/pack_lifecycle.py)
   (`PackStore` with versioning, rollback, retention cap of 3,
-  expiry / 30-day review window, JSON round-trip).
+  expiry / 30-day review window, JSON round-trip),
+- the Phase 6 adversarial / obfuscation corpus under
+  [`kchat-skills/tests/adversarial/`](kchat-skills/tests/adversarial/)
+  — 60 cases across 6 evasion techniques (homoglyph, leetspeak,
+  code-switching, unicode tricks, whitespace insertion, image-text
+  evasion) with a ≥ 0.80 detection-rate floor per technique,
+- the Phase 6 regulatory-alignment documentation under
+  [`kchat-skills/docs/regulatory/`](kchat-skills/docs/regulatory/)
+  — obligation-to-artefact maps for the EU DSA, NIST AI RMF 1.0, and
+  UNICEF / ITU Child Online Protection Guidelines, with a contract
+  test pinning that every alignment doc references the source
+  artefacts it claims to map,
+- the Phase 6 performance-optimisation benchmark harness at
+  [`kchat-skills/compiler/benchmark.py`](kchat-skills/compiler/benchmark.py)
+  — `PipelineBenchmark`, `BenchmarkReport` (p50 / p95 / p99 / mean /
+  max / min latency). The contract test
+  [`test_benchmark.py`](kchat-skills/tests/global/test_benchmark.py)
+  enforces the 250 ms p95 target across the full 40-country set,
+- the Phase 6 community-feedback / appeal-flow spec at
+  [`kchat-skills/compiler/appeal_flow.py`](kchat-skills/compiler/appeal_flow.py)
+  — `AppealCase`, `AppealAggregator`, `AppealReport` with closed-enum
+  `user_context` / `recommendation`, strict privacy invariant (no
+  content text / hashes / embeddings), and a child-safety short-circuit
+  that escalates any category-1 appeal to `urgent_review`.
 
 ### Quick start
 
@@ -357,11 +419,12 @@ kchat-skills/
 │   │   ├── overlay.yaml          # severity floor 4 on cat 11 & 12
 │   │   ├── normalization.yaml
 │   │   └── lexicons/
-│   ├── us/                       # United States (Phase 5)
-│   ├── de/                       # Germany (Phase 5)
-│   ├── br/                       # Brazil (Phase 5)
-│   ├── in/                       # India (Phase 5; +Devanagari translit)
-│   └── jp/                       # Japan (Phase 5; +translit_ja_v1)
+│   ├── us/  de/  br/  in/  jp/   # Phase 5 wave 1
+│   ├── mx/  ca/  ar/  co/  cl/  pe/  # Phase 5 wave 2 Americas
+│   ├── fr/  gb/  es/  it/  nl/  pl/  se/  pt/  ch/  at/  # Europe
+│   ├── kr/  id/  ph/  th/  vn/  my/  sg/  tw/  pk/  bd/  # Asia-Pacific
+│   ├── ng/  za/  eg/  sa/  ae/  ke/  # Middle East / Africa
+│   └── au/  nz/  tr/              # Other
 ├── communities/          # community overlay packs (Phase 1+)
 │   ├── _template/         # community overlay template
 │   ├── school.yaml        # minors-aware
@@ -375,7 +438,7 @@ kchat-skills/
 ├── prompts/              # 10-rule SLM instruction + compiled examples
 │   ├── runtime_instruction.txt
 │   ├── compiled_prompt_format.md
-│   └── compiled_examples/  # 14 reference compiled prompts (Phase 4)
+│   └── compiled_examples/  # 54 reference compiled prompts (Phase 4 + Phase 5)
 ├── compiler/             # skill-pack compiler (Phase 3-4)
 │   ├── counters.py           # device-local expiring counter store (Phase 1)
 │   ├── pipeline.py           # 7-step hybrid local pipeline (Phase 3)
@@ -387,7 +450,9 @@ kchat-skills/
 │   ├── skill_passport.schema.json  # Draft-07 passport schema (Phase 4)
 │   ├── anti_misuse.py        # anti-misuse validation rules (Phase 4)
 │   ├── bias_audit.py         # bias auditor (Phase 6)
-│   └── pack_lifecycle.py     # pack store / rollback / expiry (Phase 6)
+│   ├── pack_lifecycle.py     # pack store / rollback / expiry (Phase 6)
+│   ├── benchmark.py          # performance benchmark harness (Phase 6)
+│   └── appeal_flow.py        # community feedback / appeal flow (Phase 6)
 ├── tests/                # pytest validation suite
 │   ├── test_suite_template.yaml    # metrics framework (Phase 1)
 │   ├── test_test_suite_template.py
@@ -403,20 +468,28 @@ kchat-skills/
 │   │   ├── test_anti_misuse.py      # anti-misuse rules (Phase 4)
 │   │   ├── test_compiled_examples.py # compiled-prompt references
 │   │   ├── test_bias_audit.py       # bias auditor (Phase 6)
-│   │   └── test_pack_lifecycle.py   # pack-lifecycle store (Phase 6)
+│   │   ├── test_pack_lifecycle.py   # pack-lifecycle store (Phase 6)
+│   │   ├── test_benchmark.py        # performance benchmark (Phase 6)
+│   │   ├── test_appeal_flow.py      # appeal flow (Phase 6)
+│   │   └── test_regulatory_docs.py  # regulatory alignment docs (Phase 6)
 │   ├── jurisdictions/
 │   │   ├── test_jurisdiction_template.py
 │   │   ├── test_archetype_strict_adult.py
 │   │   ├── test_archetype_strict_hate.py
 │   │   ├── test_archetype_strict_marketplace.py
-│   │   ├── test_country_us.py       # United States pack (Phase 5)
-│   │   ├── test_country_de.py       # Germany pack (Phase 5)
-│   │   ├── test_country_br.py       # Brazil pack (Phase 5)
-│   │   ├── test_country_in.py       # India pack (Phase 5)
-│   │   ├── test_country_jp.py       # Japan pack (Phase 5)
+│   │   ├── test_country_<cc>.py     # 40 per-country test files (Phase 5)
 │   │   └── test_minority_language_fp.py
+│   ├── adversarial/                 # Phase 6 obfuscation corpus
+│   │   ├── corpus.yaml
+│   │   ├── conftest.py
+│   │   └── test_adversarial_corpus.py
 │   └── communities/
 └── docs/                 # pointers to the root-level project docs
+    └── regulatory/                  # Phase 6 regulatory alignment
+        ├── README.md                # index
+        ├── eu_dsa_alignment.md
+        ├── nist_ai_rmf_alignment.md
+        └── unicef_itu_cop_alignment.md
 
 tools/                    # repo-level utilities (run from repo root)
 └── regenerate_compiled_examples.py  # refresh compiled_examples/*.txt
@@ -512,6 +585,59 @@ versions. Each `PackVersion` records the `skill_id`,
 - `to_json()` / `from_json(raw)` — round-trip the ledger for
   device-local persistence.
 
+### Performance Benchmarking
+
+The Phase 6 benchmark harness at
+[`kchat-skills/compiler/benchmark.py`](kchat-skills/compiler/benchmark.py)
+wraps `GuardrailPipeline` plus `MockSLMAdapter` into a
+deterministic measurement loop. `PipelineBenchmark.run(cases,
+iterations=100)` records wall-clock latency per iteration using
+`time.perf_counter` and returns a `BenchmarkReport` with p50 / p95 /
+p99 / mean / max / min / per-case-mean in milliseconds. A report
+`passed` iff the aggregate p95 is ≤ `P95_LATENCY_TARGET_MS = 250` —
+the ARCHITECTURE.md “Performance envelope” target. The contract
+test at
+[`kchat-skills/tests/global/test_benchmark.py`](kchat-skills/tests/global/test_benchmark.py)
+parametrises across all 16 taxonomy categories and across the full
+40-country set to verify latency does not regress as packs grow.
+
+### Appeal Flow
+
+The Phase 6 community-feedback spec at
+[`kchat-skills/compiler/appeal_flow.py`](kchat-skills/compiler/appeal_flow.py)
+implements `AppealCase`, `AppealAggregator` and `AppealReport`.
+`AppealCase` is privacy-contract-safe by construction — there is no
+text / message / hash / embedding field; only a closed-enum
+`user_context` in `{disagree_category, disagree_severity,
+false_positive, missing_context}` and a stable `rationale_id`.
+`AppealAggregator.aggregate(skill_id, window_days=30)` returns a
+report whose `recommendation` is one of `{no_action,
+review_suggested, urgent_review}`. Rules: any CHILD_SAFETY (cat 1)
+appeal short-circuits to `urgent_review`; per-category rate ≥ 15%
+(with at least 5 appeals) promotes to `urgent_review`; ≥ 5% promotes
+to `review_suggested`.
+
+### Regulatory Alignment
+
+The Phase 6 regulatory documentation under
+[`kchat-skills/docs/regulatory/`](kchat-skills/docs/regulatory/)
+maps each obligation of the EU Digital Services Act, NIST AI Risk
+Management Framework 1.0, and UNICEF / ITU Child Online Protection
+Guidelines to the concrete artefact(s) that satisfy it:
+
+- [`eu_dsa_alignment.md`](kchat-skills/docs/regulatory/eu_dsa_alignment.md)
+  — transparency (Art. 14, 17), notice-and-action (Art. 16, 20),
+  risk assessment (Art. 34, 35), protection of minors (Art. 28),
+  transparency reporting (Art. 24).
+- [`nist_ai_rmf_alignment.md`](kchat-skills/docs/regulatory/nist_ai_rmf_alignment.md)
+  — all four core functions (Govern, Map, Measure, Manage) plus the
+  seven trustworthy-AI characteristics.
+- [`unicef_itu_cop_alignment.md`](kchat-skills/docs/regulatory/unicef_itu_cop_alignment.md)
+  — child-rights due diligence plus a per-jurisdiction statutory
+  table for all 40 country packs.
+- [`README.md`](kchat-skills/docs/regulatory/README.md) — index
+  linking to all three.
+
 ### Documentation
 
 - [`PROPOSAL.md`](PROPOSAL.md) — rationale, scope, success metrics.
@@ -520,6 +646,8 @@ versions. Each `PackVersion` records the `skill_id`,
 - [`PHASES.md`](PHASES.md) — phased roadmap from foundation through scaled
   skill library and continuous improvement.
 - [`PROGRESS.md`](PROGRESS.md) — current status and changelog.
+- [`kchat-skills/docs/regulatory/`](kchat-skills/docs/regulatory/) —
+  EU DSA / NIST AI RMF / UNICEF · ITU COP alignment.
 
 ## References
 

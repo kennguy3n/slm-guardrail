@@ -59,6 +59,47 @@ EXAMPLES: tuple[tuple[str, str | None, str | None], ...] = (
     ("country_br", "br", None),
     ("country_in", "in", None),
     ("country_jp", "jp", None),
+    # Phase 5 second-wave country packs (35 additional countries).
+    # Americas.
+    ("country_mx", "mx", None),
+    ("country_ca", "ca", None),
+    ("country_ar", "ar", None),
+    ("country_co", "co", None),
+    ("country_cl", "cl", None),
+    ("country_pe", "pe", None),
+    # Europe.
+    ("country_fr", "fr", None),
+    ("country_gb", "gb", None),
+    ("country_es", "es", None),
+    ("country_it", "it", None),
+    ("country_nl", "nl", None),
+    ("country_pl", "pl", None),
+    ("country_se", "se", None),
+    ("country_pt", "pt", None),
+    ("country_ch", "ch", None),
+    ("country_at", "at", None),
+    # Asia-Pacific.
+    ("country_kr", "kr", None),
+    ("country_id", "id", None),
+    ("country_ph", "ph", None),
+    ("country_th", "th", None),
+    ("country_vn", "vn", None),
+    ("country_my", "my", None),
+    ("country_sg", "sg", None),
+    ("country_tw", "tw", None),
+    ("country_pk", "pk", None),
+    ("country_bd", "bd", None),
+    # Middle East & Africa.
+    ("country_ng", "ng", None),
+    ("country_za", "za", None),
+    ("country_eg", "eg", None),
+    ("country_sa", "sa", None),
+    ("country_ae", "ae", None),
+    ("country_ke", "ke", None),
+    # Other.
+    ("country_au", "au", None),
+    ("country_nz", "nz", None),
+    ("country_tr", "tr", None),
 )
 
 
@@ -161,3 +202,28 @@ class TestExamplesCoverage:
             "country_jp",
         ):
             assert (EXAMPLES_DIR / f"{stem}.txt").exists(), stem
+
+    def test_phase5_all_40_country_packs_covered(self):
+        country_codes = (
+            # Wave 1.
+            "us", "de", "br", "in", "jp",
+            # Wave 2 — Americas.
+            "mx", "ca", "ar", "co", "cl", "pe",
+            # Wave 2 — Europe.
+            "fr", "gb", "es", "it", "nl", "pl", "se", "pt", "ch", "at",
+            # Wave 2 — Asia-Pacific.
+            "kr", "id", "ph", "th", "vn", "my", "sg", "tw", "pk", "bd",
+            # Wave 2 — Middle East & Africa.
+            "ng", "za", "eg", "sa", "ae", "ke",
+            # Wave 2 — Other.
+            "au", "nz", "tr",
+        )
+        assert len(country_codes) == 40, (
+            "Phase 5 delivers exactly 40 country packs; country_codes tuple "
+            "must remain in sync with tools/regenerate_compiled_examples.py."
+        )
+        for cc in country_codes:
+            path = EXAMPLES_DIR / f"country_{cc}.txt"
+            assert path.exists(), (
+                f"Phase 5 country pack {cc!r} missing compiled example {path}"
+            )
