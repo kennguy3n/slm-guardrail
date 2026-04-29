@@ -312,9 +312,9 @@ the full list of community kinds.
 | family | mixed_age | tightens HARASSMENT; loosens MISINFORMATION_HEALTH for parents |
 | workplace | adult_only | tightens HARASSMENT (workplace civility); tightens PRIVATE_DATA |
 | adult_only | adult_only | loosens SEXUAL_ADULT to label_only |
-| marketplace | adult_only | tightens SCAM_FRAUD, ILLEGAL_GOODS, MALWARE_LINK |
-| health_support | adult_only | loosens SELF_HARM (peer support); tightens MISINFORMATION_HEALTH |
-| political | mixed_age | tightens HATE, MISINFORMATION_CIVIC; tightens HARASSMENT |
+| marketplace | mixed_age | tightens SCAM_FRAUD, ILLEGAL_GOODS, MALWARE_LINK |
+| health_support | mixed_age | loosens SELF_HARM (peer support); tightens MISINFORMATION_HEALTH |
+| political | adult_only | tightens HATE, MISINFORMATION_CIVIC; tightens HARASSMENT |
 | gaming | mixed_age | tightens HARASSMENT (anti-toxicity); tightens VIOLENCE_THREAT |
 | religious | mixed_age | tightens HATE, HARASSMENT |
 | sports | mixed_age | tightens HARASSMENT (anti-pile-on), VIOLENCE_THREAT |
