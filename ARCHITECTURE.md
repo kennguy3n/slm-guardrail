@@ -777,7 +777,13 @@ anti_misuse_controls:
 │   ├── _template/
 │   │   └── overlay.yaml             # jurisdiction overlay template
 │   ├── archetype-strict-adult/
+│   │   ├── overlay.yaml             # severity_floor 5 on category 10
+│   │   ├── normalization.yaml
+│   │   └── lexicons/
 │   ├── archetype-strict-hate/
+│   │   ├── overlay.yaml             # severity_floor 5 on cat 4, 4 on cat 6
+│   │   ├── normalization.yaml
+│   │   └── lexicons/
 │   ├── archetype-strict-marketplace/
 │   └── <country-code>/              # filled per-country packs
 │       ├── overlay.yaml
@@ -804,9 +810,12 @@ anti_misuse_controls:
 │
 ├── compiler/
 │   ├── pipeline.md
-│   └── skill_passport.schema.json
+│   ├── skill_passport.schema.json
+│   └── counters.py                  # device-local expiring counter store
 │
 ├── tests/
+│   ├── test_suite_template.yaml     # Phase 1 metrics framework
+│   ├── test_test_suite_template.py
 │   ├── global/
 │   ├── jurisdictions/
 │   └── communities/
@@ -841,8 +850,30 @@ Concrete test files in this repository:
   allowed-outputs / forbidden-outputs blocks.
 - `kchat-skills/tests/global/test_prompts.py` — runtime SLM instruction
   prompt and compiled-prompt example.
+- `kchat-skills/tests/global/test_counters.py` — device-local expiring
+  counter store (`kchat-skills/compiler/counters.py`): increment /
+  retrieval, per-window expiry, threshold-based label generation,
+  per-group scoping, `counter_updates`-array consumption, encrypted
+  at-rest persistence.
+- `kchat-skills/tests/global/test_baseline_cases.py` — first round of
+  baseline test cases (input / expected-output pairs) covering all 16
+  taxonomy categories, the four protected-speech contexts, and the
+  decision-policy threshold boundaries (0.44, 0.45, 0.62, 0.78, 0.85).
+- `kchat-skills/tests/test_test_suite_template.py` — structural
+  validation of the Phase 1 metrics framework at
+  `kchat-skills/tests/test_suite_template.yaml`.
 - `kchat-skills/tests/communities/test_community_overlays.py` —
   parametrised validation of the 8 community overlays.
+- `kchat-skills/tests/jurisdictions/test_jurisdiction_template.py` —
+  jurisdiction overlay template (required keys, forbidden-criteria
+  enumeration, protected-speech allowed contexts).
+- `kchat-skills/tests/jurisdictions/test_archetype_strict_adult.py` —
+  `jurisdiction.archetype-strict-adult` overlay (severity_floor 5 on
+  category 10, all required activation / signer / language-asset
+  fields).
+- `kchat-skills/tests/jurisdictions/test_archetype_strict_hate.py` —
+  `jurisdiction.archetype-strict-hate` overlay (severity_floor 4-5 on
+  categories 4 and 6, explicit protected-speech contexts).
 
 See [`PROGRESS.md`](PROGRESS.md) and the project [`README.md`](README.md)
 for the full test toolchain and run instructions.
