@@ -361,8 +361,7 @@ Phase 5 (40 country-specific jurisdiction overlays) and Phase 6
 adversarial / obfuscation corpus, regulatory alignment, performance
 benchmarking, community feedback / appeal flow) are all complete.
 The repository currently ships **100 skills** — 59 country packs +
-38 community overlays + 3 jurisdiction archetypes. The repository
-currently ships:
+38 community overlays + 3 jurisdiction archetypes:
 
 - the complete (non-stub) global baseline
   ([`kchat-skills/global/baseline.yaml`](kchat-skills/global/baseline.yaml)),
