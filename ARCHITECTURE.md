@@ -785,6 +785,9 @@ anti_misuse_controls:
 │   │   ├── normalization.yaml
 │   │   └── lexicons/
 │   ├── archetype-strict-marketplace/
+│   │   ├── overlay.yaml             # severity_floor 4 on cat 11 & 12
+│   │   ├── normalization.yaml
+│   │   └── lexicons/
 │   └── <country-code>/              # filled per-country packs
 │       ├── overlay.yaml
 │       ├── lexicons/
@@ -811,7 +814,10 @@ anti_misuse_controls:
 ├── compiler/
 │   ├── pipeline.md
 │   ├── skill_passport.schema.json
-│   └── counters.py                  # device-local expiring counter store
+│   ├── counters.py                  # device-local expiring counter store
+│   ├── pipeline.py                  # 7-step hybrid local pipeline (Phase 3)
+│   ├── slm_adapter.py               # SLMAdapter Protocol + MockSLMAdapter (Phase 3)
+│   └── threshold_policy.py          # hard-coded threshold enforcement (Phase 3)
 │
 ├── tests/
 │   ├── test_suite_template.yaml     # Phase 1 metrics framework
@@ -874,6 +880,27 @@ Concrete test files in this repository:
 - `kchat-skills/tests/jurisdictions/test_archetype_strict_hate.py` —
   `jurisdiction.archetype-strict-hate` overlay (severity_floor 4-5 on
   categories 4 and 6, explicit protected-speech contexts).
+- `kchat-skills/tests/jurisdictions/test_archetype_strict_marketplace.py`
+  — `jurisdiction.archetype-strict-marketplace` overlay
+  (severity_floor 4 on categories 11 and 12, all required activation /
+  signer / language-asset fields, explicit protected-speech contexts).
+- `kchat-skills/tests/jurisdictions/test_minority_language_fp.py` —
+  per-archetype minority-language and code-switching false-positive
+  corpus (structural contract validation, per-archetype and per-tag
+  coverage floors, pinning of the
+  `minority_language_false_positive <= 0.07` target).
+- `kchat-skills/tests/global/test_pipeline.py` — 7-step hybrid local
+  pipeline (`kchat-skills/compiler/pipeline.py`): normalization,
+  deterministic detectors, signal packaging, end-to-end classification
+  with a mock SLM adapter, threshold-policy coercion, counter-store
+  integration.
+- `kchat-skills/tests/global/test_slm_adapter.py` — backend-agnostic
+  `SLMAdapter` Protocol and the deterministic `MockSLMAdapter`
+  reference implementation at `kchat-skills/compiler/slm_adapter.py`.
+- `kchat-skills/tests/global/test_threshold_policy.py` — hard-coded
+  threshold enforcement at `kchat-skills/compiler/threshold_policy.py`:
+  four confidence thresholds, uncertainty handling, lower-numbered-
+  category tie-break, and the CHILD_SAFETY severity-5 floor.
 
 See [`PROGRESS.md`](PROGRESS.md) and the project [`README.md`](README.md)
 for the full test toolchain and run instructions.

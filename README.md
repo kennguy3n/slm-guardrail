@@ -200,7 +200,7 @@ repository today; the rest are scheduled for Phase 2.
 11. `jurisdiction.archetype-strict-hate` — strict hate / extremism
     jurisdiction archetype. **(landed)**
 12. `jurisdiction.archetype-strict-marketplace` — strict marketplace /
-    restricted-goods jurisdiction archetype.
+    restricted-goods jurisdiction archetype. **(landed)**
 
 These let us exercise the full bundle composition (global + jurisdiction +
 community) end-to-end without committing to a specific country pack on day
@@ -212,8 +212,9 @@ This project is in **early development**. There is no runtime yet; the
 deliverables are skill *definitions* (YAML), prompt templates, schemas, test
 suites, and a compiler specification.
 
-Phase 0 (foundation) and Phase 1 (global baseline + community overlays)
-are complete; the first three Phase 2 deliverables are in place. The
+Phase 0 (foundation), Phase 1 (global baseline + community overlays),
+and Phase 2 (jurisdiction archetype overlays) are complete; Phase 3
+(hybrid local pipeline + SLM integration) is in progress. The
 repository currently ships:
 
 - the complete (non-stub) global baseline
@@ -230,13 +231,23 @@ repository currently ships:
   [`kchat-skills/communities/`](kchat-skills/communities/),
 - the device-local expiring counter implementation at
   [`kchat-skills/compiler/counters.py`](kchat-skills/compiler/counters.py),
+- the 7-step hybrid local pipeline at
+  [`kchat-skills/compiler/pipeline.py`](kchat-skills/compiler/pipeline.py),
+  the backend-agnostic SLM runtime adapter at
+  [`kchat-skills/compiler/slm_adapter.py`](kchat-skills/compiler/slm_adapter.py),
+  and the hard-coded threshold policy at
+  [`kchat-skills/compiler/threshold_policy.py`](kchat-skills/compiler/threshold_policy.py),
 - the test-suite template at
   [`kchat-skills/tests/test_suite_template.yaml`](kchat-skills/tests/test_suite_template.yaml)
   and the first round of baseline test cases at
   [`kchat-skills/tests/global/test_baseline_cases.py`](kchat-skills/tests/global/test_baseline_cases.py),
-- the jurisdiction overlay template and two archetype overlays
-  (`archetype-strict-adult`, `archetype-strict-hate`) under
-  [`kchat-skills/jurisdictions/`](kchat-skills/jurisdictions/).
+- the jurisdiction overlay template and three archetype overlays
+  (`archetype-strict-adult`, `archetype-strict-hate`,
+  `archetype-strict-marketplace`) under
+  [`kchat-skills/jurisdictions/`](kchat-skills/jurisdictions/), plus a
+  per-archetype minority-language / code-switching false-positive
+  corpus at
+  [`kchat-skills/tests/jurisdictions/test_minority_language_fp.py`](kchat-skills/tests/jurisdictions/test_minority_language_fp.py).
 
 ### Quick start
 
@@ -285,8 +296,12 @@ kchat-skills/
 │   │   ├── overlay.yaml          # severity floor 5 on category 10
 │   │   ├── normalization.yaml
 │   │   └── lexicons/
-│   └── archetype-strict-hate/
-│       ├── overlay.yaml          # severity floor 5 on cat 4, 4 on cat 6
+│   ├── archetype-strict-hate/
+│   │   ├── overlay.yaml          # severity floor 5 on cat 4, 4 on cat 6
+│   │   ├── normalization.yaml
+│   │   └── lexicons/
+│   └── archetype-strict-marketplace/
+│       ├── overlay.yaml          # severity floor 4 on cat 11 & 12
 │       ├── normalization.yaml
 │       └── lexicons/
 ├── communities/          # community overlay packs (Phase 1+)
@@ -304,17 +319,25 @@ kchat-skills/
 │   ├── compiled_prompt_format.md
 │   └── compiled_examples/
 ├── compiler/             # skill-pack compiler (Phase 4)
-│   └── counters.py       # device-local expiring counter store (Phase 1)
+│   ├── counters.py           # device-local expiring counter store (Phase 1)
+│   ├── pipeline.py           # 7-step hybrid local pipeline (Phase 3)
+│   ├── slm_adapter.py        # SLMAdapter Protocol + MockSLMAdapter (Phase 3)
+│   └── threshold_policy.py   # hard-coded threshold enforcement (Phase 3)
 ├── tests/                # pytest validation suite
 │   ├── test_suite_template.yaml    # metrics framework (Phase 1)
 │   ├── test_test_suite_template.py
 │   ├── global/
 │   │   ├── test_baseline_cases.py  # first round of baseline cases
-│   │   └── test_counters.py
+│   │   ├── test_counters.py
+│   │   ├── test_pipeline.py        # 7-step hybrid pipeline
+│   │   ├── test_slm_adapter.py     # SLMAdapter / MockSLMAdapter
+│   │   └── test_threshold_policy.py # hard-coded threshold policy
 │   ├── jurisdictions/
 │   │   ├── test_jurisdiction_template.py
 │   │   ├── test_archetype_strict_adult.py
-│   │   └── test_archetype_strict_hate.py
+│   │   ├── test_archetype_strict_hate.py
+│   │   ├── test_archetype_strict_marketplace.py
+│   │   └── test_minority_language_fp.py
 │   └── communities/
 └── docs/                 # pointers to the root-level project docs
 ```

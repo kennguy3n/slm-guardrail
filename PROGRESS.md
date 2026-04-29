@@ -1,7 +1,7 @@
 # KChat SLM Guardrail Skills — Progress
 
-**Status:** In progress | ~65%
-**Current phase:** Phase 2 — Jurisdiction Archetype Overlays (partial)
+**Status:** In progress | ~75%
+**Current phase:** Phase 3 — Hybrid Local Pipeline + SLM Integration (partial)
 **Last updated:** 2026-04-29
 
 This file tracks delivery against the phased plan in
@@ -63,10 +63,10 @@ This file tracks delivery against the phased plan in
 - [x] `kchat-skills/jurisdictions/_template/overlay.yaml`.
 - [x] `jurisdiction.archetype-strict-adult`.
 - [x] `jurisdiction.archetype-strict-hate`.
-- [ ] `jurisdiction.archetype-strict-marketplace`.
+- [x] `jurisdiction.archetype-strict-marketplace`.
 - [x] Local language asset structure (`lexicons/`, `normalization.yaml`,
-  transliteration references) — landed for both archetype overlays.
-- [ ] Per-archetype test suites including minority-language and
+  transliteration references) — landed for all three archetype overlays.
+- [x] Per-archetype test suites including minority-language and
   code-switching false-positive tests (target
   `minority_language_false_positive ≤ 0.07`).
 
@@ -74,12 +74,15 @@ This file tracks delivery against the phased plan in
 
 ## Phase 3 — Hybrid Local Pipeline + SLM Integration
 
-- [ ] 7-step hybrid pipeline implementation (normalize → detectors →
-  pack signals → SLM → thresholds → JSON → counters).
-- [ ] SLM runtime adapter interface + reference adapter.
-- [ ] Hard-coded threshold enforcement (`label_only=0.45`,
-  `warn=0.62`, `strong_warn=0.78`, `critical_intervention=0.85`).
-- [ ] Child-safety severity-floor handling.
+- [x] 7-step hybrid pipeline implementation (normalize → detectors →
+  pack signals → SLM → thresholds → JSON → counters) at
+  `kchat-skills/compiler/pipeline.py`.
+- [x] SLM runtime adapter interface + reference adapter at
+  `kchat-skills/compiler/slm_adapter.py` (Protocol + `MockSLMAdapter`).
+- [x] Hard-coded threshold enforcement (`label_only=0.45`,
+  `warn=0.62`, `strong_warn=0.78`, `critical_intervention=0.85`) at
+  `kchat-skills/compiler/threshold_policy.py`, including child-safety
+  severity-floor handling.
 - [ ] Metric validation: `child_safety_recall ≥ 0.98`,
   `protected_speech_false_positive ≤ 0.05`, p95 latency ≤ 250 ms.
 
@@ -115,6 +118,39 @@ This file tracks delivery against the phased plan in
 ---
 
 ## Changelog
+
+### 2026-04-29 — Phase 2 close + Phase 3 partial
+
+- `kchat-skills/jurisdictions/archetype-strict-marketplace/` — third
+  archetype overlay: DRUGS_WEAPONS (category 11) and ILLEGAL_GOODS
+  (category 12) at severity_floor 4, with `lexicons/`,
+  `normalization.yaml`, all 5 forbidden criteria, all 4 protected-
+  speech contexts, and `trust_and_safety + legal_review +
+  cultural_review` signers.
+- `kchat-skills/tests/jurisdictions/test_archetype_strict_marketplace.py`
+  — 18 structural tests for the new archetype.
+- `kchat-skills/tests/jurisdictions/test_minority_language_fp.py` —
+  minority-language and code-switching false-positive corpus for all
+  three archetypes, with structural contract validation against the
+  `local_signal_schema.json` / `output_schema.json` pair, per-archetype
+  / per-tag coverage floors, and a pin on the 0.07 target declared in
+  the test-suite template.
+- `kchat-skills/compiler/pipeline.py` — 7-step hybrid local pipeline
+  (normalize → deterministic detectors → signal packaging → SLM adapter
+  → threshold policy → output → counter updates) with a `SkillBundle`
+  carrier and a fully offline-capable `GuardrailPipeline.classify`
+  entry point.
+- `kchat-skills/compiler/slm_adapter.py` — backend-agnostic
+  `SLMAdapter` Protocol plus a deterministic `MockSLMAdapter` that
+  maps detector signals to all 16 taxonomy categories for end-to-end
+  pipeline tests without a real model.
+- `kchat-skills/compiler/threshold_policy.py` — immutable
+  `ThresholdPolicy` with hard-coded confidence thresholds, uncertainty
+  handling (< 0.45 → SAFE), lower-numbered-category tie-break, and the
+  CHILD_SAFETY severity-5 floor.
+- `kchat-skills/tests/global/test_pipeline.py`,
+  `test_slm_adapter.py`, `test_threshold_policy.py` — unit and end-
+  to-end tests for the new compiler modules.
 
 ### 2026-04-29 — Phase 1 close + Phase 2 partial
 
