@@ -643,7 +643,7 @@ allowed_contexts: QUOTED_SPEECH_CONTEXT, NEWS_CONTEXT, EDUCATION_CONTEXT,
                   COUNTERSPEECH_CONTEXT
 
 [COMMUNITY_OVERLAY]
-id: kchat.community.workplace.v1
+id: kchat.community.workplace.guardrail.v1
 age_mode: adult_only
 rules:
   - category 5 HARASSMENT action=warn suggest_mute=true
@@ -799,6 +799,7 @@ anti_misuse_controls:
 │
 ├── prompts/
 │   ├── runtime_instruction.txt      # 10-rule SLM instruction
+│   ├── compiled_prompt_format.md    # compiled-prompt section reference
 │   └── compiled_examples/
 │
 ├── compiler/
@@ -820,7 +821,28 @@ anti_misuse_controls:
 
 Validation tests live under `kchat-skills/tests/` and run with **pytest**
 (Python ≥ 3.10). Static skill artifacts (`taxonomy.yaml`, `severity.yaml`,
-`output_schema.json`, `baseline.yaml`, etc.) are loaded with **PyYAML**
-and validated against their schemas with **jsonschema** (Draft-07). See
-[`PROGRESS.md`](PROGRESS.md) and the project [`README.md`](README.md) for
-the full test toolchain and run instructions.
+`output_schema.json`, `baseline.yaml`, `local_signal_schema.json`,
+`privacy_contract.yaml`, etc.) are loaded with **PyYAML** and validated
+against their schemas with **jsonschema** (Draft-07).
+
+Concrete test files in this repository:
+
+- `kchat-skills/tests/global/test_taxonomy.py` — 16-category taxonomy.
+- `kchat-skills/tests/global/test_severity.py` — 0–5 severity rubric and
+  child-safety floor of 5.
+- `kchat-skills/tests/global/test_output_schema.py` — Draft-07 SLM output
+  schema (`kchat.guardrail.output.v1`).
+- `kchat-skills/tests/global/test_baseline.py` — global baseline skill
+  (Phase 1 complete).
+- `kchat-skills/tests/global/test_local_signal_schema.py` — Draft-07 SLM
+  input contract (`kchat.guardrail.local_signal.v1`).
+- `kchat-skills/tests/global/test_privacy_contract.py` — eight
+  non-negotiable privacy rules and the plaintext-handling /
+  allowed-outputs / forbidden-outputs blocks.
+- `kchat-skills/tests/global/test_prompts.py` — runtime SLM instruction
+  prompt and compiled-prompt example.
+- `kchat-skills/tests/communities/test_community_overlays.py` —
+  parametrised validation of the 8 community overlays.
+
+See [`PROGRESS.md`](PROGRESS.md) and the project [`README.md`](README.md)
+for the full test toolchain and run instructions.

@@ -1,7 +1,7 @@
 # KChat SLM Guardrail Skills — Progress
 
-**Status:** In progress | ~35%
-**Current phase:** Phase 0 — Foundation (partial)
+**Status:** In progress | ~55%
+**Current phase:** Phase 1 — Global Baseline + Community Overlays (partial)
 **Last updated:** 2026-04-29
 
 This file tracks delivery against the phased plan in
@@ -25,28 +25,28 @@ This file tracks delivery against the phased plan in
 - [x] `kchat-skills/tests/global/` — pytest validation suite for the
   files above (taxonomy, severity, output schema, baseline).
 - [x] `requirements.txt` + `pyproject.toml` (pytest, PyYAML, jsonschema).
-- [ ] `kchat-skills/global/local_signal_schema.json` — SLM input contract.
-- [ ] `kchat-skills/global/privacy_contract.yaml` — eight non-negotiable
+- [x] `kchat-skills/global/local_signal_schema.json` — SLM input contract.
+- [x] `kchat-skills/global/privacy_contract.yaml` — eight non-negotiable
   privacy rules expressed as enforceable constraints.
 
 ---
 
 ## Phase 1 — Global Baseline Skill + First Community Overlays
 
-- [ ] Complete (non-stub) `kchat.global.guardrail.baseline` with full
+- [x] Complete (non-stub) `kchat.global.guardrail.baseline` with full
   privacy rules, input contract, decision-policy, and `skill_selection`
   blocks.
-- [ ] Runtime SLM instruction prompt (10-rule instruction) +
+- [x] Runtime SLM instruction prompt (10-rule instruction) +
   compiled-prompt format reference at `kchat-skills/prompts/`.
-- [ ] 8 community overlay skills:
-  - [ ] `community.school`
-  - [ ] `community.family`
-  - [ ] `community.workplace`
-  - [ ] `community.adult_only`
-  - [ ] `community.marketplace`
-  - [ ] `community.health_support`
-  - [ ] `community.political`
-  - [ ] `community.gaming`
+- [x] 8 community overlay skills:
+  - [x] `community.school`
+  - [x] `community.family`
+  - [x] `community.workplace`
+  - [x] `community.adult_only`
+  - [x] `community.marketplace`
+  - [x] `community.health_support`
+  - [x] `community.political`
+  - [x] `community.gaming`
 - [ ] Local expiring counter implementation (device-local, no upload).
 - [ ] Test-suite template (recall, precision, false-positive, latency
   targets) + first round of test cases for the global baseline.
@@ -110,6 +110,23 @@ This file tracks delivery against the phased plan in
 ---
 
 ## Changelog
+
+### 2026-04-29 — Phase 0 complete + Phase 1 partial
+
+- `local_signal_schema.json` — SLM input contract (Draft-07 JSON Schema).
+- `privacy_contract.yaml` — eight non-negotiable privacy rules as
+  enforceable constraints.
+- Phase 0 complete: all foundation artifacts landed.
+- Complete (non-stub) `baseline.yaml` with full privacy rules, input
+  contract references.
+- Runtime SLM instruction prompt (`runtime_instruction.txt`) — 10-rule
+  instruction.
+- Compiled-prompt format reference and workplace example.
+- 8 community overlay skills: school, family, workplace, adult_only,
+  marketplace, health_support, political, gaming.
+- Community overlay template at `communities/_template/overlay.yaml`.
+- Test suites for local_signal_schema, privacy_contract, prompts, and
+  all 8 community overlays.
 
 ### 2026-04-29 — Phase 0 partial
 

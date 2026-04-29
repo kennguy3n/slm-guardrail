@@ -1,0 +1,37 @@
+# Community Overlay — kchat.community.gaming.guardrail.v1
+#
+# Large public gaming community overlay. Mixed-age default. Warns on
+# harassment, hard-warns on adult sexual content, and tracks violence
+# threats via a local expiring counter.
+
+skill_id: kchat.community.gaming.guardrail.v1
+parent: kchat.global.guardrail.baseline
+schema_version: 1
+signers: [trust_and_safety]
+
+community_profile:
+  kind: gaming
+  age_mode: mixed_age
+  visibility: public_summary
+  set_by: group_admin
+
+rules:
+  - category: 5    # HARASSMENT
+    action: warn
+    suggest_mute: true
+    note: >-
+      Targeted insults and pile-on warn before display and offer a
+      peer-mute.
+  - category: 10   # SEXUAL_ADULT
+    action: strong_warn
+    note: >-
+      Adult sexual content surfaces a hard modal warning in mixed-age
+      gaming channels.
+
+group_risk_counters:
+  - counter_id: group_violence_threats_7d
+    method: device_local_expiring_counter
+    window: 7d
+    thresholds:
+      label_at:        1
+      escalate_at:     3
