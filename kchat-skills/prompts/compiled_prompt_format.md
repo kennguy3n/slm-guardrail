@@ -65,6 +65,6 @@ Total compiled instruction budget: **< 1800 tokens**. Output budget:
 See [`compiled_examples/`](./compiled_examples/) for ready-to-feed
 compiled prompts. The current reference example is:
 
-- [`workplace_strict_marketplace.txt`](./compiled_examples/workplace_strict_marketplace.txt)
+- [`strict_marketplace_workplace.txt`](./compiled_examples/strict_marketplace_workplace.txt)
   — workplace community overlay over the strict-marketplace
   jurisdiction archetype.
