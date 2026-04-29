@@ -44,6 +44,12 @@ COMBOS: tuple[tuple[str, str | None, str | None], ...] = (
         "workplace",
     ),
     ("strict_adult_school", "archetype-strict-adult", "school"),
+    # Phase 5 first-wave country packs.
+    ("country_us", "us", None),
+    ("country_de", "de", None),
+    ("country_br", "br", None),
+    ("country_in", "in", None),
+    ("country_jp", "jp", None),
 )
 
 

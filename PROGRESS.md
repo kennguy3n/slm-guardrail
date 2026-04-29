@@ -1,7 +1,7 @@
 # KChat SLM Guardrail Skills — Progress
 
-**Status:** In progress | ~90%
-**Current phase:** Phase 4 — Skill Pack Compiler + Signing (complete)
+**Status:** In progress | ~95%
+**Current phase:** Phase 5 — Country-Specific Expansion (first wave complete) + Phase 6 partial
 **Last updated:** 2026-04-29
 
 This file tracks delivery against the phased plan in
@@ -108,17 +108,19 @@ This file tracks delivery against the phased plan in
 
 ## Phase 5 — Country-Specific Expansion
 
-- [ ] 10–20 country-specific jurisdiction overlays (first wave).
-- [ ] Localized lexicons + normalization rules per country.
-- [ ] Per-country test suites with passing metrics.
+- [x] 10–20 country-specific jurisdiction overlays (first wave) —
+  first batch of 5 landed (US, DE, BR, IN, JP); 5–15 more in the
+  next wave.
+- [x] Localized lexicons + normalization rules per country.
+- [x] Per-country test suites with passing metrics.
 
 ---
 
 ## Phase 6 — Scale, Audit, Continuous Improvement
 
 - [ ] 100–200 jurisdiction / community skills.
-- [ ] Bias auditing for protected-class and minority-language effects.
-- [ ] Versioning, rollback, and expiry-review workflows.
+- [x] Bias auditing for protected-class and minority-language effects.
+- [x] Versioning, rollback, and expiry-review workflows.
 - [ ] Adversarial / obfuscation test corpus.
 - [ ] Regulatory alignment (EU DSA, NIST AI RMF, UNICEF / ITU child
   online protection).
@@ -126,6 +128,66 @@ This file tracks delivery against the phased plan in
 ---
 
 ## Changelog
+
+### 2026-04-29 — Phase 5 first wave + Phase 6 partial
+
+- `kchat-skills/jurisdictions/us/`, `…/de/`, `…/br/`, `…/in/`,
+  `…/jp/` — first wave of five country-specific jurisdiction
+  overlays. Each ships an `overlay.yaml` (concrete legal-age,
+  protected-class, listed-extremist-org, election-rule, and
+  override values for the country), a `normalization.yaml`
+  (NFKC + case-fold + per-country transliteration refs — Devanagari
+  for IN, romaji for JP), and one `lexicons/<lang>.yaml` per
+  primary language with provenance metadata. All five overlays
+  pass `anti_misuse.validate_pack`.
+- `kchat-skills/tests/jurisdictions/test_country_us.py`,
+  `…/test_country_de.py`, `…/test_country_br.py`,
+  `…/test_country_in.py`, `…/test_country_jp.py` plus
+  `_country_pack_assertions.py` — per-country structural tests
+  asserting the country-specific severity floors, marketplace
+  ages, protected-class enumeration, election-authority
+  references, and the shared structural invariants (parent,
+  schema_version, signers, forbidden criteria, allowed contexts,
+  expiry budget, user notice, lexicon provenance).
+- `kchat-skills/tests/jurisdictions/test_minority_language_fp.py`
+  — extended with 21 new false-positive cases covering Spanish/
+  English (US), Navajo + Cherokee (US), Turkish/German + Sorbian
+  (DE), Tupi + Guarani + Portuguese/English (BR), Tamil + Bengali
+  + Urdu + Hinglish (IN), and Okinawan + Ainu + Japanese/English
+  (JP). `ARCHETYPES` now includes the 5 country codes alongside
+  the 3 archetype overlays.
+- `kchat-skills/tests/jurisdictions/conftest.py` — added
+  `<cc>_overlay` / `<cc>_normalization` fixtures for the five
+  country packs.
+- `kchat-skills/compiler/bias_audit.py` — Phase 6 bias auditor.
+  Computes per-protected-class and per-minority-language false-
+  positive rates from a list of `BiasAuditCase`, flags any group
+  exceeding the 0.07 ceiling or showing >0.05 disparity vs. the
+  overall mean, and emits a structured `BiasAuditReport`. Bound
+  to `metric_validator.SAFE_CATEGORY` and the
+  `minority_language_false_positive` shipping target.
+- `kchat-skills/compiler/pack_lifecycle.py` — Phase 6 pack-store
+  module. `PackStore` tracks signed `PackVersion` entries per
+  `skill_id`, retains the last `MAX_RETAINED_VERSIONS=3` versions
+  for rollback, exposes `register / get_active / get_history /
+  rollback / check_expiry / deactivate_expired / needs_review` +
+  `to_json / from_json` for device-local persistence, and uses
+  `EXPIRY_REVIEW_WINDOW_DAYS=30` to flag packs needing legal /
+  cultural re-review.
+- `kchat-skills/tests/global/test_bias_audit.py`,
+  `kchat-skills/tests/global/test_pack_lifecycle.py` — 47 new
+  tests covering per-class / per-language FP computation,
+  disparity detection, edge cases (empty / single-group / all-
+  SAFE), pack registration / retention cap / rollback / expiry /
+  needs-review / JSON round-trip, plus an integration test that
+  runs the bias auditor against the existing minority-language
+  FP corpus.
+- `kchat-skills/prompts/compiled_examples/country_us.txt`,
+  `…/country_de.txt`, `…/country_br.txt`, `…/country_in.txt`,
+  `…/country_jp.txt` — five new reference compiled prompts. All
+  under the 1800-token instruction budget.
+- `tools/regenerate_compiled_examples.py` — extended COMBOS to
+  include the five country packs.
 
 ### 2026-04-29 — Phase 3 close + Phase 4 complete
 

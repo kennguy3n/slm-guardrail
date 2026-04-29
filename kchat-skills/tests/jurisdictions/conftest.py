@@ -81,3 +81,56 @@ def strict_marketplace_normalization(jurisdictions_dir: Path) -> dict:
     return _load(
         jurisdictions_dir / "archetype-strict-marketplace" / "normalization.yaml"
     )
+
+
+# ---------------------------------------------------------------------------
+# Country-specific overlay / normalization fixtures (Phase 5 first wave).
+# ---------------------------------------------------------------------------
+@pytest.fixture(scope="session")
+def us_overlay(jurisdictions_dir: Path) -> dict:
+    return _load(jurisdictions_dir / "us" / "overlay.yaml")
+
+
+@pytest.fixture(scope="session")
+def us_normalization(jurisdictions_dir: Path) -> dict:
+    return _load(jurisdictions_dir / "us" / "normalization.yaml")
+
+
+@pytest.fixture(scope="session")
+def de_overlay(jurisdictions_dir: Path) -> dict:
+    return _load(jurisdictions_dir / "de" / "overlay.yaml")
+
+
+@pytest.fixture(scope="session")
+def de_normalization(jurisdictions_dir: Path) -> dict:
+    return _load(jurisdictions_dir / "de" / "normalization.yaml")
+
+
+@pytest.fixture(scope="session")
+def br_overlay(jurisdictions_dir: Path) -> dict:
+    return _load(jurisdictions_dir / "br" / "overlay.yaml")
+
+
+@pytest.fixture(scope="session")
+def br_normalization(jurisdictions_dir: Path) -> dict:
+    return _load(jurisdictions_dir / "br" / "normalization.yaml")
+
+
+@pytest.fixture(scope="session")
+def in_overlay(jurisdictions_dir: Path) -> dict:
+    return _load(jurisdictions_dir / "in" / "overlay.yaml")
+
+
+@pytest.fixture(scope="session")
+def in_normalization(jurisdictions_dir: Path) -> dict:
+    return _load(jurisdictions_dir / "in" / "normalization.yaml")
+
+
+@pytest.fixture(scope="session")
+def jp_overlay(jurisdictions_dir: Path) -> dict:
+    return _load(jurisdictions_dir / "jp" / "overlay.yaml")
+
+
+@pytest.fixture(scope="session")
+def jp_normalization(jurisdictions_dir: Path) -> dict:
+    return _load(jurisdictions_dir / "jp" / "normalization.yaml")

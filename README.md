@@ -142,6 +142,11 @@ categories have a severity floor of 5 regardless of model confidence.
 │   ├── archetype-strict-adult/
 │   ├── archetype-strict-hate/
 │   ├── archetype-strict-marketplace/
+│   ├── us/                          # United States (Phase 5)
+│   ├── de/                          # Germany (Phase 5)
+│   ├── br/                          # Brazil (Phase 5)
+│   ├── in/                          # India (Phase 5)
+│   ├── jp/                          # Japan (Phase 5)
 │   └── <country-code>/              # filled per-country packs
 │       ├── overlay.yaml
 │       ├── lexicons/
@@ -201,10 +206,20 @@ repository today; the rest are scheduled for Phase 2.
     jurisdiction archetype. **(landed)**
 12. `jurisdiction.archetype-strict-marketplace` — strict marketplace /
     restricted-goods jurisdiction archetype. **(landed)**
+13. `kchat.jurisdiction.us.guardrail.v1` — United States country pack
+    (federal CSAM, FTO list, FTC / wire-fraud floors). **(landed)**
+14. `kchat.jurisdiction.de.guardrail.v1` — Germany country pack
+    (StGB §86a / NetzDG, Volksverhetzung StGB §130, JuSchG). **(landed)**
+15. `kchat.jurisdiction.br.guardrail.v1` — Brazil country pack
+    (ECA, Lei 7.716/89, TSE election rules). **(landed)**
+16. `kchat.jurisdiction.in.guardrail.v1` — India country pack
+    (UAPA, IPC §153A / §295A, IT Act §67). **(landed)**
+17. `kchat.jurisdiction.jp.guardrail.v1` — Japan country pack
+    (child-protection statute, tokushoho, drug & weapon laws). **(landed)**
 
 These let us exercise the full bundle composition (global + jurisdiction +
-community) end-to-end without committing to a specific country pack on day
-one.
+community) end-to-end across both archetypal and concrete country
+packs. Phase 5 will continue with 5–15 more country packs.
 
 ## Getting Started
 
@@ -215,7 +230,11 @@ suites, and a compiler specification.
 Phase 0 (foundation), Phase 1 (global baseline + community overlays),
 Phase 2 (jurisdiction archetype overlays), Phase 3 (hybrid local
 pipeline + SLM integration), and Phase 4 (skill-pack compiler +
-signing) are complete. The repository currently ships:
+signing) are complete. Phase 5 (country-specific expansion) has
+shipped its first wave of 5 country packs (US, DE, BR, IN, JP), and
+Phase 6 has shipped the bias-auditing framework and the pack
+lifecycle / rollback / expiry-review store. The repository
+currently ships:
 
 - the complete (non-stub) global baseline
   ([`kchat-skills/global/baseline.yaml`](kchat-skills/global/baseline.yaml)),
@@ -258,10 +277,30 @@ signing) are complete. The repository currently ships:
   [`kchat-skills/compiler/skill_passport.schema.json`](kchat-skills/compiler/skill_passport.schema.json)),
   and the anti-misuse validator at
   [`kchat-skills/compiler/anti_misuse.py`](kchat-skills/compiler/anti_misuse.py),
-- 14 reference compiled prompts under
+- 19 reference compiled prompts under
   [`kchat-skills/prompts/compiled_examples/`](kchat-skills/prompts/compiled_examples/)
-  covering the global baseline plus every Phase 1–2 community and
-  jurisdiction overlay combination.
+  covering the global baseline, every Phase 1–2 community and
+  jurisdiction overlay combination, and the five Phase 5 country
+  packs (`country_us.txt`, `country_de.txt`, `country_br.txt`,
+  `country_in.txt`, `country_jp.txt`),
+- the Phase 5 first-wave country packs at
+  [`kchat-skills/jurisdictions/us/`](kchat-skills/jurisdictions/us/),
+  [`/de/`](kchat-skills/jurisdictions/de/),
+  [`/br/`](kchat-skills/jurisdictions/br/),
+  [`/in/`](kchat-skills/jurisdictions/in/), and
+  [`/jp/`](kchat-skills/jurisdictions/jp/) — each with concrete
+  legal-age, protected-class, listed-extremist-org, election-rule,
+  and override values, a `normalization.yaml`, and per-language
+  lexicons under `lexicons/` — all passing
+  [`anti_misuse.validate_pack`](kchat-skills/compiler/anti_misuse.py),
+- the Phase 6 bias auditor at
+  [`kchat-skills/compiler/bias_audit.py`](kchat-skills/compiler/bias_audit.py)
+  (per-protected-class and per-minority-language false-positive rates,
+  disparity detection, structured `BiasAuditReport`),
+- the Phase 6 pack-lifecycle store at
+  [`kchat-skills/compiler/pack_lifecycle.py`](kchat-skills/compiler/pack_lifecycle.py)
+  (`PackStore` with versioning, rollback, retention cap of 3,
+  expiry / 30-day review window, JSON round-trip).
 
 ### Quick start
 
@@ -314,10 +353,15 @@ kchat-skills/
 │   │   ├── overlay.yaml          # severity floor 5 on cat 4, 4 on cat 6
 │   │   ├── normalization.yaml
 │   │   └── lexicons/
-│   └── archetype-strict-marketplace/
-│       ├── overlay.yaml          # severity floor 4 on cat 11 & 12
-│       ├── normalization.yaml
-│       └── lexicons/
+│   ├── archetype-strict-marketplace/
+│   │   ├── overlay.yaml          # severity floor 4 on cat 11 & 12
+│   │   ├── normalization.yaml
+│   │   └── lexicons/
+│   ├── us/                       # United States (Phase 5)
+│   ├── de/                       # Germany (Phase 5)
+│   ├── br/                       # Brazil (Phase 5)
+│   ├── in/                       # India (Phase 5; +Devanagari translit)
+│   └── jp/                       # Japan (Phase 5; +translit_ja_v1)
 ├── communities/          # community overlay packs (Phase 1+)
 │   ├── _template/         # community overlay template
 │   ├── school.yaml        # minors-aware
@@ -341,7 +385,9 @@ kchat-skills/
 │   ├── compiler.py           # skill-pack compiler pipeline (Phase 4)
 │   ├── skill_passport.py     # ed25519 signing / verification (Phase 4)
 │   ├── skill_passport.schema.json  # Draft-07 passport schema (Phase 4)
-│   └── anti_misuse.py        # anti-misuse validation rules (Phase 4)
+│   ├── anti_misuse.py        # anti-misuse validation rules (Phase 4)
+│   ├── bias_audit.py         # bias auditor (Phase 6)
+│   └── pack_lifecycle.py     # pack store / rollback / expiry (Phase 6)
 ├── tests/                # pytest validation suite
 │   ├── test_suite_template.yaml    # metrics framework (Phase 1)
 │   ├── test_test_suite_template.py
@@ -355,12 +401,19 @@ kchat-skills/
 │   │   ├── test_compiler.py         # skill-pack compiler (Phase 4)
 │   │   ├── test_skill_passport.py   # ed25519 passport (Phase 4)
 │   │   ├── test_anti_misuse.py      # anti-misuse rules (Phase 4)
-│   │   └── test_compiled_examples.py # compiled-prompt references
+│   │   ├── test_compiled_examples.py # compiled-prompt references
+│   │   ├── test_bias_audit.py       # bias auditor (Phase 6)
+│   │   └── test_pack_lifecycle.py   # pack-lifecycle store (Phase 6)
 │   ├── jurisdictions/
 │   │   ├── test_jurisdiction_template.py
 │   │   ├── test_archetype_strict_adult.py
 │   │   ├── test_archetype_strict_hate.py
 │   │   ├── test_archetype_strict_marketplace.py
+│   │   ├── test_country_us.py       # United States pack (Phase 5)
+│   │   ├── test_country_de.py       # Germany pack (Phase 5)
+│   │   ├── test_country_br.py       # Brazil pack (Phase 5)
+│   │   ├── test_country_in.py       # India pack (Phase 5)
+│   │   ├── test_country_jp.py       # Japan pack (Phase 5)
 │   │   └── test_minority_language_fp.py
 │   └── communities/
 └── docs/                 # pointers to the root-level project docs
@@ -418,6 +471,46 @@ the runtime SLM is not listed in `model_compatibility`; or any of the
 pack missing `legal_review` / `cultural_review` signers, community
 pack missing `trust_and_safety` signer, severity floors ≥ 4 without
 protected-speech `allowed_contexts`, or lexicons without provenance).
+
+### Bias Auditing
+
+The Phase 6 bias auditor at
+[`kchat-skills/compiler/bias_audit.py`](kchat-skills/compiler/bias_audit.py)
+turns a list of `BiasAuditCase` rows (each tagged with a
+`protected_class`, `language`, expected and predicted taxonomy id)
+into a structured `BiasAuditReport`. It computes the per-protected-
+class and per-minority-language false-positive rate (a case is a
+false positive when `expected_category == SAFE` but
+`predicted_category != SAFE`), flags any group that exceeds the
+0.07 ceiling — bound to the `minority_language_false_positive`
+shipping target — or shows >0.05 disparity vs. the overall mean,
+and marks the audit `passed=False` if anything is flagged. The
+compiler can invoke the auditor after the metric validator so every
+signed pack carries evidence that its behaviour does not skew
+across protected classes or languages.
+
+### Pack Lifecycle
+
+The Phase 6 pack store at
+[`kchat-skills/compiler/pack_lifecycle.py`](kchat-skills/compiler/pack_lifecycle.py)
+is a JSON-serialisable, device-local ledger of signed pack
+versions. Each `PackVersion` records the `skill_id`,
+`skill_version`, observed `signed_on` date, `expires_on`,
+`signature_valid`, and `is_active` flags. The `PackStore` exposes:
+
+- `register(passport)` — register a freshly signed `SkillPassport`,
+  marking it active and demoting the previous version;
+- `get_active(skill_id)` / `get_history(skill_id)` — current and
+  historical versions for a given pack;
+- `rollback(skill_id)` — fall back to the previously signed
+  version. Per ARCHITECTURE.md `anti_misuse_controls.technical`,
+  `MAX_RETAINED_VERSIONS = 3` versions are retained on device;
+- `check_expiry(now=None)` / `deactivate_expired(now=None)` /
+  `needs_review(days_ahead=30, now=None)` — flag and act on
+  expired packs, and surface the review queue
+  (`EXPIRY_REVIEW_WINDOW_DAYS = 30`);
+- `to_json()` / `from_json(raw)` — round-trip the ledger for
+  device-local persistence.
 
 ### Documentation
 
