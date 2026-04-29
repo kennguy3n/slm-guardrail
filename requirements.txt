@@ -1,0 +1,6 @@
+# Test and validation dependencies for KChat SLM Guardrail Skills.
+# Runtime/skill-pack files themselves are static YAML / JSON; these
+# packages are only used by the test suite and the (Phase 4) compiler.
+pytest>=8.0
+PyYAML>=6.0
+jsonschema>=4.0

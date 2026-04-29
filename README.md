@@ -211,11 +211,66 @@ This project is in **early development**. There is no runtime yet; the
 deliverables are skill *definitions* (YAML), prompt templates, schemas, test
 suites, and a compiler specification.
 
+### Quick start
+
+```bash
+# 1. Clone
+git clone https://github.com/kennguy3n/slm-guardrail.git
+cd slm-guardrail
+
+# 2. (optional) create a virtualenv
+python3 -m venv .venv
+source .venv/bin/activate
+
+# 3. Install test dependencies
+pip install -r requirements.txt
+# or, equivalently:
+pip install -e ".[test]"
+```
+
+### How to run tests
+
+The test suite validates the structural primitives of the global
+baseline (`taxonomy.yaml`, `severity.yaml`, `output_schema.json`,
+`baseline.yaml`). It is pure Python — no SLM runtime is required.
+
+```bash
+pytest                            # run all tests
+pytest kchat-skills/tests/global  # only the global-baseline tests
+pytest -v                         # verbose
+```
+
+### Project layout
+
+The implementation tree lives under [`kchat-skills/`](kchat-skills/),
+following the recommended folder structure documented in
+[`ARCHITECTURE.md`](ARCHITECTURE.md#recommended-folder-structure):
+
+```
+kchat-skills/
+├── global/               # global baseline skill: taxonomy, severity, schemas
+├── jurisdictions/        # jurisdiction overlay packs (Phase 2+)
+│   └── _template/
+├── communities/          # community overlay packs (Phase 1+)
+│   └── _template/
+├── prompts/              # 10-rule SLM instruction + compiled examples
+│   └── compiled_examples/
+├── compiler/             # skill-pack compiler (Phase 4)
+├── tests/                # pytest validation suite
+│   ├── global/
+│   ├── jurisdictions/
+│   └── communities/
+└── docs/                 # pointers to the root-level project docs
+```
+
+### Documentation
+
 - [`PROPOSAL.md`](PROPOSAL.md) — rationale, scope, success metrics.
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — technical design: layering, privacy
   architecture, hybrid pipeline, schemas, anti-misuse controls.
 - [`PHASES.md`](PHASES.md) — phased roadmap from foundation through scaled
   skill library and continuous improvement.
+- [`PROGRESS.md`](PROGRESS.md) — current status and changelog.
 
 ## References
 
