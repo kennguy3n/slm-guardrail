@@ -196,9 +196,9 @@ repository today; the rest are scheduled for Phase 2.
 8. `community.political` — campaign / civic overlay. **(landed)**
 9. `community.gaming` — large public gaming community overlay. **(landed)**
 10. `jurisdiction.archetype-strict-adult` — strict adult-content jurisdiction
-    archetype.
+    archetype. **(landed)**
 11. `jurisdiction.archetype-strict-hate` — strict hate / extremism
-    jurisdiction archetype.
+    jurisdiction archetype. **(landed)**
 12. `jurisdiction.archetype-strict-marketplace` — strict marketplace /
     restricted-goods jurisdiction archetype.
 
@@ -212,19 +212,31 @@ This project is in **early development**. There is no runtime yet; the
 deliverables are skill *definitions* (YAML), prompt templates, schemas, test
 suites, and a compiler specification.
 
-Phase 0 (foundation) and the first three Phase 1 deliverables are now
-available: the complete (non-stub) global baseline
-([`kchat-skills/global/baseline.yaml`](kchat-skills/global/baseline.yaml)),
-the SLM input contract
-([`local_signal_schema.json`](kchat-skills/global/local_signal_schema.json))
-and privacy contract
-([`privacy_contract.yaml`](kchat-skills/global/privacy_contract.yaml)),
-the runtime SLM instruction prompt
-([`prompts/runtime_instruction.txt`](kchat-skills/prompts/runtime_instruction.txt))
-and compiled-prompt format reference
-([`prompts/compiled_prompt_format.md`](kchat-skills/prompts/compiled_prompt_format.md)),
-and the eight community overlays under
-[`kchat-skills/communities/`](kchat-skills/communities/).
+Phase 0 (foundation) and Phase 1 (global baseline + community overlays)
+are complete; the first three Phase 2 deliverables are in place. The
+repository currently ships:
+
+- the complete (non-stub) global baseline
+  ([`kchat-skills/global/baseline.yaml`](kchat-skills/global/baseline.yaml)),
+  the SLM input contract
+  ([`local_signal_schema.json`](kchat-skills/global/local_signal_schema.json))
+  and privacy contract
+  ([`privacy_contract.yaml`](kchat-skills/global/privacy_contract.yaml)),
+- the runtime SLM instruction prompt
+  ([`prompts/runtime_instruction.txt`](kchat-skills/prompts/runtime_instruction.txt))
+  and compiled-prompt format reference
+  ([`prompts/compiled_prompt_format.md`](kchat-skills/prompts/compiled_prompt_format.md)),
+- the eight community overlays under
+  [`kchat-skills/communities/`](kchat-skills/communities/),
+- the device-local expiring counter implementation at
+  [`kchat-skills/compiler/counters.py`](kchat-skills/compiler/counters.py),
+- the test-suite template at
+  [`kchat-skills/tests/test_suite_template.yaml`](kchat-skills/tests/test_suite_template.yaml)
+  and the first round of baseline test cases at
+  [`kchat-skills/tests/global/test_baseline_cases.py`](kchat-skills/tests/global/test_baseline_cases.py),
+- the jurisdiction overlay template and two archetype overlays
+  (`archetype-strict-adult`, `archetype-strict-hate`) under
+  [`kchat-skills/jurisdictions/`](kchat-skills/jurisdictions/).
 
 ### Quick start
 
@@ -250,10 +262,11 @@ baseline (`taxonomy.yaml`, `severity.yaml`, `output_schema.json`,
 `baseline.yaml`). It is pure Python — no SLM runtime is required.
 
 ```bash
-pytest                                 # run all tests
-pytest kchat-skills/tests/global       # only the global-baseline tests
-pytest kchat-skills/tests/communities  # only the community-overlay tests
-pytest -v                              # verbose
+pytest                                  # run all tests
+pytest kchat-skills/tests/global        # only the global-baseline tests
+pytest kchat-skills/tests/communities   # only the community-overlay tests
+pytest kchat-skills/tests/jurisdictions # only the jurisdiction tests
+pytest -v                               # verbose
 ```
 
 ### Project layout
@@ -266,7 +279,16 @@ following the recommended folder structure documented in
 kchat-skills/
 ├── global/               # global baseline skill: taxonomy, severity, schemas
 ├── jurisdictions/        # jurisdiction overlay packs (Phase 2+)
-│   └── _template/
+│   ├── _template/
+│   │   └── overlay.yaml
+│   ├── archetype-strict-adult/
+│   │   ├── overlay.yaml          # severity floor 5 on category 10
+│   │   ├── normalization.yaml
+│   │   └── lexicons/
+│   └── archetype-strict-hate/
+│       ├── overlay.yaml          # severity floor 5 on cat 4, 4 on cat 6
+│       ├── normalization.yaml
+│       └── lexicons/
 ├── communities/          # community overlay packs (Phase 1+)
 │   ├── _template/         # community overlay template
 │   ├── school.yaml        # minors-aware
@@ -282,9 +304,17 @@ kchat-skills/
 │   ├── compiled_prompt_format.md
 │   └── compiled_examples/
 ├── compiler/             # skill-pack compiler (Phase 4)
+│   └── counters.py       # device-local expiring counter store (Phase 1)
 ├── tests/                # pytest validation suite
+│   ├── test_suite_template.yaml    # metrics framework (Phase 1)
+│   ├── test_test_suite_template.py
 │   ├── global/
+│   │   ├── test_baseline_cases.py  # first round of baseline cases
+│   │   └── test_counters.py
 │   ├── jurisdictions/
+│   │   ├── test_jurisdiction_template.py
+│   │   ├── test_archetype_strict_adult.py
+│   │   └── test_archetype_strict_hate.py
 │   └── communities/
 └── docs/                 # pointers to the root-level project docs
 ```

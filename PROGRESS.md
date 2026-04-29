@@ -1,7 +1,7 @@
 # KChat SLM Guardrail Skills — Progress
 
-**Status:** In progress | ~55%
-**Current phase:** Phase 1 — Global Baseline + Community Overlays (partial)
+**Status:** In progress | ~65%
+**Current phase:** Phase 2 — Jurisdiction Archetype Overlays (partial)
 **Last updated:** 2026-04-29
 
 This file tracks delivery against the phased plan in
@@ -47,20 +47,25 @@ This file tracks delivery against the phased plan in
   - [x] `community.health_support`
   - [x] `community.political`
   - [x] `community.gaming`
-- [ ] Local expiring counter implementation (device-local, no upload).
-- [ ] Test-suite template (recall, precision, false-positive, latency
-  targets) + first round of test cases for the global baseline.
+- [x] Local expiring counter implementation (device-local, no upload) —
+  `kchat-skills/compiler/counters.py` with a pluggable device keystore,
+  group / counter scoping, time-windowed expiry, and
+  `counter_updates`-array consumption from the SLM output schema.
+- [x] Test-suite template (recall, precision, false-positive, latency
+  targets) + first round of test cases for the global baseline —
+  `kchat-skills/tests/test_suite_template.yaml` and
+  `kchat-skills/tests/global/test_baseline_cases.py`.
 
 ---
 
 ## Phase 2 — Jurisdiction Archetype Overlays
 
-- [ ] `kchat-skills/jurisdictions/_template/overlay.yaml`.
-- [ ] `jurisdiction.archetype-strict-adult`.
-- [ ] `jurisdiction.archetype-strict-hate`.
+- [x] `kchat-skills/jurisdictions/_template/overlay.yaml`.
+- [x] `jurisdiction.archetype-strict-adult`.
+- [x] `jurisdiction.archetype-strict-hate`.
 - [ ] `jurisdiction.archetype-strict-marketplace`.
-- [ ] Local language asset structure (`lexicons/`, `normalization.yaml`,
-  transliteration references).
+- [x] Local language asset structure (`lexicons/`, `normalization.yaml`,
+  transliteration references) — landed for both archetype overlays.
 - [ ] Per-archetype test suites including minority-language and
   code-switching false-positive tests (target
   `minority_language_false_positive ≤ 0.07`).
@@ -110,6 +115,36 @@ This file tracks delivery against the phased plan in
 ---
 
 ## Changelog
+
+### 2026-04-29 — Phase 1 close + Phase 2 partial
+
+- `kchat-skills/compiler/counters.py` — device-local, group-scoped,
+  expiring counter store. Pluggable `DeviceKeystore`, XOR-stream +
+  HMAC-SHA256 reference at-rest encryption, JSON serialisation,
+  `apply_counter_updates` that consumes the `counter_updates` array
+  from `kchat.guardrail.output.v1`.
+- `kchat-skills/tests/test_suite_template.yaml` — metrics framework
+  (child-safety recall/precision, privacy-leak precision, scam recall,
+  protected-speech / minority-language false-positive, p95 latency)
+  plus per-category coverage and threshold-boundary coverage rules.
+- `kchat-skills/tests/global/test_baseline_cases.py` — first round of
+  baseline test cases covering all 16 taxonomy categories, four
+  protected-speech contexts, child-safety floor, and the full set of
+  decision-policy threshold boundaries (0.44, 0.45, 0.62, 0.78, 0.85).
+- `kchat-skills/jurisdictions/_template/overlay.yaml` — jurisdiction
+  overlay template with all required activation / forbidden-criteria /
+  local-definitions / language-assets / overrides / allowed-contexts /
+  user-notice blocks.
+- `kchat-skills/jurisdictions/archetype-strict-adult/` — SEXUAL_ADULT
+  (category 10) severity_floor = 5 archetype, plus `lexicons/` and
+  `normalization.yaml`.
+- `kchat-skills/jurisdictions/archetype-strict-hate/` — EXTREMISM
+  (category 4) severity_floor = 5 and HATE (category 6) severity_floor
+  = 4 archetype, with explicit protected-speech contexts, plus
+  `lexicons/` and `normalization.yaml`.
+- Test suites for counters (39 tests), test-suite template (17),
+  baseline cases (100), jurisdiction template (18), and each archetype
+  (14 + 15).
 
 ### 2026-04-29 — Phase 0 complete + Phase 1 partial
 
