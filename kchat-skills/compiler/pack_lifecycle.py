@@ -149,12 +149,19 @@ class PackStore:
         *,
         signed_on: Optional[date] = None,
         signature_valid: Optional[bool] = None,
-    ) -> PackVersion:
+    ) -> Optional[PackVersion]:
         """Register a signed pack version.
 
         Marks the new version as active and demotes the previously
         active version. Trims older versions beyond
         :data:`MAX_RETAINED_VERSIONS`.
+
+        Returns the newly-registered :class:`PackVersion`, or ``None``
+        if the candidate was older than every version already retained
+        (so the retention trim drops it). In that case the existing
+        store — including which version is active — is left
+        unchanged: registering a stale pack must not silently demote
+        the current active version.
         """
         if not passport.skill_id:
             raise PackLifecycleError("passport is missing skill_id")
@@ -176,31 +183,41 @@ class PackStore:
             is_active=True,
         )
 
-        history = self.skills.setdefault(passport.skill_id, [])
-        for existing in history:
-            existing.is_active = False
+        existing_history = self.skills.get(passport.skill_id, [])
+
+        # Build the candidate history off to the side so we can decide
+        # whether the new version actually fits within
+        # MAX_RETAINED_VERSIONS *before* we mutate the live store.
         # If the same version is registered twice, replace in-place
         # (latest wins) rather than duplicating.
-        history = [
-            v for v in history if v.version != passport.skill_version
+        candidate = [
+            v for v in existing_history if v.version != passport.skill_version
         ]
-        history.insert(0, version)
+        candidate.insert(0, version)
 
         # Sort newest-first by signed_on, falling back to semver.
-        history.sort(
+        candidate.sort(
             key=lambda v: (v.signed_on, _version_tuple(v.version)),
             reverse=True,
         )
 
-        # Re-mark the newest as active (in case a prior dated version
-        # was registered out of order).
-        for i, v in enumerate(history):
+        # Cap retention at MAX_RETAINED_VERSIONS.
+        del candidate[MAX_RETAINED_VERSIONS:]
+
+        # If the candidate would be trimmed away (it's older than every
+        # version already retained), leave the store completely
+        # untouched and signal "not retained" to the caller. This
+        # preserves the current active version and avoids returning a
+        # PackVersion that is not actually in the store.
+        if version not in candidate:
+            return None
+
+        # Mark the newest as active (in case a prior dated version was
+        # registered out of order).
+        for i, v in enumerate(candidate):
             v.is_active = i == 0
 
-        # Cap retention at MAX_RETAINED_VERSIONS.
-        del history[MAX_RETAINED_VERSIONS:]
-
-        self.skills[passport.skill_id] = history
+        self.skills[passport.skill_id] = candidate
         return version
 
     def get_active(self, skill_id: str) -> Optional[PackVersion]:

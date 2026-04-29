@@ -205,6 +205,46 @@ class TestRetentionCap:
         assert MAX_RETAINED_VERSIONS == 3
         assert EXPIRY_REVIEW_WINDOW_DAYS == 30
 
+    def test_register_stale_version_when_full_returns_none(self):
+        """If the store is already at MAX_RETAINED_VERSIONS and the
+        caller registers a version older than every retained one, the
+        new entry must NOT be silently dropped while still being
+        returned, and the existing active version must NOT be
+        demoted.
+        """
+        store = PackStore()
+        # Fill the store with 3 newer versions (signed today).
+        for v in ("1.1.0", "1.2.0", "1.3.0"):
+            store.register(_passport(skill_version=v))
+        assert (
+            store.get_active("kchat.global.guardrail.baseline").version
+            == "1.3.0"
+        )
+
+        # Register an older version dated yesterday so it sorts to the
+        # tail of the candidate list and is dropped by the trim.
+        stale = store.register(
+            _passport(skill_version="1.0.0"),
+            signed_on=date.today() - timedelta(days=1),
+        )
+
+        # Caller is told the version was not retained.
+        assert stale is None
+
+        # The active version is unchanged — we did not silently
+        # demote 1.3.0 just because a stale pack was offered.
+        active = store.get_active("kchat.global.guardrail.baseline")
+        assert active is not None
+        assert active.version == "1.3.0"
+        assert active.is_active
+
+        # The store still holds exactly the 3 newer versions, in
+        # newest-first order.
+        history = store.get_history("kchat.global.guardrail.baseline")
+        assert [v.version for v in history] == ["1.3.0", "1.2.0", "1.1.0"]
+        # And the stale version is definitely not in the store.
+        assert "1.0.0" not in [v.version for v in history]
+
 
 # ---------------------------------------------------------------------------
 # Expiry checks.
