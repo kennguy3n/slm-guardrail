@@ -1,7 +1,7 @@
 # KChat SLM Guardrail Skills — Progress
 
 **Status:** Complete | 100%
-**Current phase:** Phase 5 complete (40 country packs) + Phase 6 complete (adversarial corpus, regulatory alignment, benchmarking, appeal flow)
+**Current phase:** Phase 6 complete — 100 jurisdiction/community skills
 **Last updated:** 2026-04-29
 
 This file tracks delivery against the phased plan in
@@ -108,10 +108,12 @@ This file tracks delivery against the phased plan in
 
 ## Phase 5 — Country-Specific Expansion
 
-- [x] 40 country-specific jurisdiction overlays landed — wave 1
-  (US, DE, BR, IN, JP) plus wave 2 (MX, CA, AR, CO, CL, PE, FR,
-  GB, ES, IT, NL, PL, SE, PT, CH, AT, KR, ID, PH, TH, VN, MY, SG,
-  TW, PK, BD, NG, ZA, EG, SA, AE, KE, AU, NZ, TR).
+- [x] 59 country-specific jurisdiction overlays landed — Phase 5
+  wave 1 (US, DE, BR, IN, JP), Phase 5 wave 2 (MX, CA, AR, CO, CL,
+  PE, FR, GB, ES, IT, NL, PL, SE, PT, CH, AT, KR, ID, PH, TH, VN,
+  MY, SG, TW, PK, BD, NG, ZA, EG, SA, AE, KE, AU, NZ, TR), and
+  Phase 6 expansion (RU, UA, RO, GR, CZ, HU, DK, FI, NO, IE, IL,
+  IQ, MA, DZ, GH, TZ, ET, EC, UY).
 - [x] Localized lexicons + normalization rules per country.
 - [x] Per-country test suites with passing metrics.
 
@@ -119,9 +121,8 @@ This file tracks delivery against the phased plan in
 
 ## Phase 6 — Scale, Audit, Continuous Improvement
 
-- [x] 100–200 jurisdiction / community skills — 40 country packs
-  + 8 community overlays + 3 archetype overlays = 51 packs landed;
-  ongoing expansion toward 100+ under the same authoring pattern.
+- [x] 100–200 jurisdiction / community skills — 59 country packs
+  + 38 community overlays + 3 archetype overlays = 100 packs landed.
 - [x] Bias auditing for protected-class and minority-language effects.
 - [x] Versioning, rollback, and expiry-review workflows.
 - [x] Adversarial / obfuscation test corpus — 60 cases across 6
@@ -144,6 +145,39 @@ This file tracks delivery against the phased plan in
 ---
 
 ## Changelog
+
+### 2026-04-29 — Phase 6 skill expansion to 100 packs
+
+- `kchat-skills/communities/` — 30 additional community overlays
+  (religious, sports, creative_arts, education_higher, volunteer,
+  neighborhood, parenting, dating, fitness, travel, book_club, music,
+  photography, cooking, tech_support, language_learning, pet_owners,
+  environmental, journalism, legal_support, mental_health, startup,
+  nonprofit, seniors, lgbtq_support, veterans, hobbyist, science,
+  open_source, emergency_response). Each passes
+  `anti_misuse.validate_pack`.
+- `kchat-skills/jurisdictions/` — 19 additional country packs
+  (RU, UA, RO, GR, CZ, HU, DK, FI, NO, IE, IL, IQ, MA, GH, TZ,
+  ET, DZ, EC, UY). Each ships overlay.yaml + normalization.yaml +
+  per-language lexicons.
+- Per-pack test files for all 49 new skills under
+  `kchat-skills/tests/communities/test_community_overlays.py` and
+  `kchat-skills/tests/jurisdictions/test_country_<cc>.py`.
+- `kchat-skills/tests/jurisdictions/test_minority_language_fp.py`
+  — 76 new minority-language / code-switching false-positive cases
+  (4 per new country); `ARCHETYPES` extended to 62 archetypes;
+  `MIN_MINORITY_LANGUAGE_CASES` raised to 118 and
+  `MIN_CODE_SWITCHING_CASES` raised to 98.
+- 19 new compiled-prompt references at
+  `kchat-skills/prompts/compiled_examples/country_<cc>.txt`
+  (73 total). `tools/regenerate_compiled_examples.py` COMBOS and
+  `kchat-skills/tests/global/test_compiled_examples.py` updated;
+  new `test_phase6_all_19_country_packs_covered` and
+  `test_total_compiled_example_count_is_73` assertions pin the set.
+- `kchat-skills/docs/regulatory/unicef_itu_cop_alignment.md`
+  per-jurisdiction table extended to 59 rows; the regulatory-doc
+  contract test is renamed to
+  `test_unicef_itu_references_core_artefacts_and_all_59_countries`.
 
 ### 2026-04-29 — Phase 5 full expansion + Phase 6 complete
 

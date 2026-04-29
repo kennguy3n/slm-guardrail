@@ -174,3 +174,32 @@ def _make_country_fixtures(cc: str) -> None:
 
 for _cc in _PHASE5_SECOND_WAVE_COUNTRY_CODES:
     _make_country_fixtures(_cc)
+
+
+# ---------------------------------------------------------------------------
+# Country-specific fixtures (Phase 6 expansion — 19 additional countries).
+#
+# Generated programmatically so the fixture set stays in lock-step with the
+# canonical country list. Each entry below registers ``<cc>_overlay`` and
+# ``<cc>_normalization`` session-scoped fixtures.
+# ---------------------------------------------------------------------------
+_PHASE6_COUNTRY_CODES: tuple[str, ...] = (
+    # Eastern Europe
+    "ru", "ua", "ro", "gr", "cz", "hu",
+    # Nordics
+    "dk", "fi", "no",
+    # Western Europe / Atlantic
+    "ie",
+    # Middle East
+    "il", "iq",
+    # North Africa
+    "ma", "dz",
+    # Sub-Saharan Africa
+    "gh", "tz", "et",
+    # Latin America
+    "ec", "uy",
+)
+
+
+for _cc in _PHASE6_COUNTRY_CODES:
+    _make_country_fixtures(_cc)

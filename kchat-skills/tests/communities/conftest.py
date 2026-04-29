@@ -9,6 +9,7 @@ import yaml
 COMMUNITIES_DIR = Path(__file__).resolve().parents[2] / "communities"
 
 COMMUNITY_FILES = (
+    # Phase 1 — original 8 community overlays.
     "school.yaml",
     "family.yaml",
     "workplace.yaml",
@@ -17,6 +18,37 @@ COMMUNITY_FILES = (
     "health_support.yaml",
     "political.yaml",
     "gaming.yaml",
+    # Phase 6 expansion — 30 additional community overlays.
+    "religious.yaml",
+    "sports.yaml",
+    "creative_arts.yaml",
+    "education_higher.yaml",
+    "volunteer.yaml",
+    "neighborhood.yaml",
+    "parenting.yaml",
+    "dating.yaml",
+    "fitness.yaml",
+    "travel.yaml",
+    "book_club.yaml",
+    "music.yaml",
+    "photography.yaml",
+    "cooking.yaml",
+    "tech_support.yaml",
+    "language_learning.yaml",
+    "pet_owners.yaml",
+    "environmental.yaml",
+    "journalism.yaml",
+    "legal_support.yaml",
+    "mental_health.yaml",
+    "startup.yaml",
+    "nonprofit.yaml",
+    "seniors.yaml",
+    "lgbtq_support.yaml",
+    "veterans.yaml",
+    "hobbyist.yaml",
+    "science.yaml",
+    "open_source.yaml",
+    "emergency_response.yaml",
 )
 
 
@@ -32,7 +64,11 @@ def communities_dir() -> Path:
 
 @pytest.fixture(scope="session")
 def community_overlays(communities_dir: Path) -> dict[str, dict]:
-    """Return all 8 community overlays as a dict keyed by file name."""
+    """Return every community overlay as a dict keyed by file name.
+
+    Covers the original 8 Phase 1 overlays plus the 30 Phase 6
+    expansion overlays — 38 total.
+    """
     return {name: _load(communities_dir / name) for name in COMMUNITY_FILES}
 
 

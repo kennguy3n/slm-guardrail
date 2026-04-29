@@ -1,4 +1,7 @@
-"""Validation tests for the 8 community overlays in kchat-skills/communities/.
+"""Validation tests for the 38 community overlays in kchat-skills/communities/.
+
+8 Phase 1 overlays (school, family, workplace, adult_only, marketplace,
+health_support, political, gaming) plus 30 Phase 6 expansion overlays.
 
 See ARCHITECTURE.md "Community Overlay Template" (lines 491-535).
 """
@@ -167,6 +170,110 @@ def test_family_age_mode_mixed_and_strong_warn_sexual_adult(community_overlays):
     assert family["community_profile"]["age_mode"] == "mixed_age"
     sex = _find_rule(family, 10)
     assert sex is not None and sex["action"] == "strong_warn"
+
+
+# --- Phase 6 expansion overlays ------------------------------------------
+
+
+def test_dating_age_mode_adult_only(community_overlays):
+    dating = community_overlays["dating.yaml"]
+    assert dating["community_profile"]["age_mode"] == "adult_only"
+    sex = _find_rule(dating, 10)
+    assert sex is not None and sex["action"] == "label_only"
+    scam = _find_rule(dating, 7)
+    assert scam is not None and scam["action"] == "strong_warn"
+
+
+def test_mental_health_loosens_self_harm_for_peer_support(community_overlays):
+    mh = community_overlays["mental_health.yaml"]
+    assert mh["community_profile"]["age_mode"] == "adult_only"
+    sh = _find_rule(mh, 2)
+    assert sh is not None and sh["action"] == "label_only", (
+        "mental_health peer-support context loosens SELF_HARM (cat 2) "
+        "to label_only — mirrors the existing health_support pattern."
+    )
+
+
+def test_journalism_loosens_extremism_for_news_context(community_overlays):
+    j = community_overlays["journalism.yaml"]
+    assert j["community_profile"]["age_mode"] == "adult_only"
+    ext = _find_rule(j, 4)
+    assert ext is not None and ext["action"] == "label_only", (
+        "journalism overlay relies on the NEWS_CONTEXT carve-out and "
+        "loosens EXTREMISM (cat 4) to a label so news coverage is "
+        "preserved."
+    )
+
+
+def test_seniors_tightens_scam(community_overlays):
+    s = community_overlays["seniors.yaml"]
+    assert s["community_profile"]["age_mode"] == "adult_only"
+    scam = _find_rule(s, 7)
+    assert scam is not None and scam["action"] == "strong_warn"
+    pii = _find_rule(s, 9)
+    assert pii is not None and pii["action"] == "strong_warn"
+
+
+def test_religious_tightens_hate(community_overlays):
+    rel = community_overlays["religious.yaml"]
+    hate = _find_rule(rel, 6)
+    assert hate is not None and hate["action"] == "strong_warn"
+
+
+def test_lgbtq_support_strengthens_hate_and_harassment(community_overlays):
+    lgbtq = community_overlays["lgbtq_support.yaml"]
+    assert lgbtq["community_profile"]["age_mode"] == "adult_only"
+    hate = _find_rule(lgbtq, 6)
+    assert hate is not None and hate["action"] == "strong_warn"
+    har = _find_rule(lgbtq, 5)
+    assert har is not None and har["action"] == "strong_warn"
+
+
+def test_emergency_response_tightens_health_misinformation(community_overlays):
+    er = community_overlays["emergency_response.yaml"]
+    health = _find_rule(er, 13)
+    assert health is not None and health["action"] == "strong_warn"
+
+
+def test_phase6_expansion_overlays_pass_anti_misuse_validation(
+    community_overlays,
+):
+    """Every Phase 6 expansion overlay must pass anti_misuse.validate_pack."""
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(
+        0,
+        str(
+            Path(__file__).resolve().parents[2]
+            / "compiler"
+        ),
+    )
+    from anti_misuse import validate_pack  # type: ignore
+
+    phase6 = [
+        n for n in community_overlays if n not in {
+            "school.yaml", "family.yaml", "workplace.yaml",
+            "adult_only.yaml", "marketplace.yaml", "health_support.yaml",
+            "political.yaml", "gaming.yaml",
+        }
+    ]
+    assert len(phase6) == 30, (
+        f"expected 30 Phase 6 expansion overlays; got {len(phase6)}"
+    )
+    for name in phase6:
+        report = validate_pack(community_overlays[name])
+        assert report.passed, (
+            f"{name} failed anti-misuse validation: {report.errors}"
+        )
+
+
+def test_total_community_overlay_count(community_overlays):
+    """Phase 6 target: 38 community overlays total (8 + 30)."""
+    assert len(community_overlays) == 38, (
+        f"expected 38 community overlays (8 Phase 1 + 30 Phase 6); "
+        f"got {len(community_overlays)}"
+    )
 
 
 # --- Template -------------------------------------------------------------

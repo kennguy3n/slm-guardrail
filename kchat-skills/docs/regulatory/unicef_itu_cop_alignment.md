@@ -113,6 +113,25 @@ header docstring of each overlay (`kchat-skills/jurisdictions/<cc>/overlay.yaml`
 | AU | Criminal Code Act 1995 (Cth), Division 273. |
 | NZ | Films, Videos, and Publications Classification Act 1993. |
 | TR | Türk Ceza Kanunu Art. 103, 226. |
+| RU | Federal Law 124-FZ "On Basic Guarantees of the Rights of the Child" (1998); Criminal Code Art. 242.1-242.2. |
+| UA | Law of Ukraine "On Protection of Childhood" (2001); Criminal Code Art. 301-1. |
+| RO | Legea 272/2004 privind protecția și promovarea drepturilor copilului. |
+| GR | Greek Penal Code Art. 348A-348B (child sexual abuse material). |
+| CZ | Trestní zákoník §§ 192-193 (výroba a zneužití dětské pornografie). |
+| HU | Btk. § 204 (gyermekpornográfia). |
+| DK | Straffeloven § 235 (børnepornografi). |
+| FI | Rikoslaki 17 luku 18-19 § (lapsipornografia). |
+| NO | Straffeloven § 311 (fremstilling av seksuelle overgrep mot barn). |
+| IE | Online Safety and Media Regulation Act 2022; Child Trafficking and Pornography Act 1998. |
+| IL | Penal Law 5737-1977 § 214 (publication and possession of obscene material involving minors). |
+| IQ | Juvenile Welfare Law No. 76/1983; Penal Code Art. 403. |
+| MA | Code Pénal Art. 503-1 to 503-2 (exploitation pornographique des enfants). |
+| DZ | Loi 15-12 relative à la protection de l'enfant; Code Pénal Art. 333 bis. |
+| GH | Children's Act 1998 (Act 560); Criminal Offences Act §§ 101A-101B. |
+| TZ | Law of the Child Act 2009; Sexual Offences Special Provisions Act 1998. |
+| ET | Criminal Code of Ethiopia Art. 644 (child sexual abuse material). |
+| EC | Código de la Niñez y Adolescencia (CONA); COIP Art. 103-104. |
+| UY | Código de la Niñez y la Adolescencia (CNA); Ley 17.815 anti-explotación sexual. |
 
 Every cell above maps to a specific overlay that enforces category 1
 severity floor 5 via the compiler's `assert_no_relaxed_child_safety`

@@ -795,12 +795,18 @@ anti_misuse_controls:
 │   ├── kr/  id/  ph/  th/  vn/  my/               # Phase 5 wave 2 Asia-Pacific (10)
 │   ├── sg/  tw/  pk/  bd/
 │   ├── ng/  za/  eg/  sa/  ae/  ke/               # Phase 5 wave 2 ME / Africa (6)
-│   └── au/  nz/  tr/                              # Phase 5 wave 2 Other (3)
+│   ├── au/  nz/  tr/                              # Phase 5 wave 2 Other (3)
+│   ├── ru/  ua/  ro/  gr/  cz/  hu/               # Phase 6 — Eastern Europe (6)
+│   ├── dk/  fi/  no/                              # Phase 6 — Nordics (3)
+│   ├── ie/                                        # Phase 6 — W. Europe (1)
+│   ├── il/  iq/  ma/  dz/                         # Phase 6 — MENA (4)
+│   ├── gh/  tz/  et/                              # Phase 6 — Sub-Saharan (3)
+│   └── ec/  uy/                                   # Phase 6 — Latin America (2)
 │       ├── overlay.yaml
 │       ├── lexicons/<lang>.yaml
 │       └── normalization.yaml
 │
-├── communities/
+├── communities/                     # 38 community overlays (Phase 1 + 6)
 │   ├── _template/
 │   │   └── overlay.yaml             # community overlay template
 │   ├── school.yaml
@@ -810,17 +816,27 @@ anti_misuse_controls:
 │   ├── marketplace.yaml
 │   ├── health_support.yaml
 │   ├── political.yaml
-│   └── gaming.yaml
+│   ├── gaming.yaml                  # ↑ 8 Phase 1 originals
+│   ├── religious.yaml  sports.yaml  creative_arts.yaml
+│   ├── education_higher.yaml  volunteer.yaml  neighborhood.yaml
+│   ├── parenting.yaml  dating.yaml  fitness.yaml  travel.yaml
+│   ├── book_club.yaml  music.yaml  photography.yaml  cooking.yaml
+│   ├── tech_support.yaml  language_learning.yaml  pet_owners.yaml
+│   ├── environmental.yaml  journalism.yaml  legal_support.yaml
+│   ├── mental_health.yaml  startup.yaml  nonprofit.yaml
+│   ├── seniors.yaml  lgbtq_support.yaml  veterans.yaml
+│   ├── hobbyist.yaml  science.yaml  open_source.yaml
+│   └── emergency_response.yaml      # ↑ 30 Phase 6 expansion overlays
 │
 ├── prompts/
 │   ├── runtime_instruction.txt      # 10-rule SLM instruction
 │   ├── compiled_prompt_format.md    # compiled-prompt section reference
-│   └── compiled_examples/           # 54 reference compiled prompts (Phase 4-5):
+│   └── compiled_examples/           # 73 reference compiled prompts (Phase 4-6):
 │       ├── baseline_only.txt
 │       ├── community_*.txt                      # 8 community overlays
 │       ├── jurisdiction_strict_*.txt            # 3 archetype overlays
 │       ├── strict_*_*.txt                       # pair overlays
-│       └── country_<cc>.txt                     # 40 country packs
+│       └── country_<cc>.txt                     # 59 country packs
 │
 ├── compiler/
 │   ├── pipeline.md
@@ -900,7 +916,8 @@ Concrete test files in this repository:
   validation of the Phase 1 metrics framework at
   `kchat-skills/tests/test_suite_template.yaml`.
 - `kchat-skills/tests/communities/test_community_overlays.py` —
-  parametrised validation of the 8 community overlays.
+  parametrised validation of the 38 community overlays (8 Phase 1
+  originals + 30 Phase 6 additions).
 - `kchat-skills/tests/jurisdictions/test_jurisdiction_template.py` —
   jurisdiction overlay template (required keys, forbidden-criteria
   enumeration, protected-speech allowed contexts).
@@ -964,10 +981,11 @@ Concrete test files in this repository:
   / [COMMUNITY_OVERLAY] / [INPUT] / [OUTPUT]` sections, instruction
   token budget < 1800, byte-for-byte equality with what the live
   compiler emits today (catches drift). Phase 5 landed 35 additional
-  `country_<cc>.txt` references (54 total), plus a
-  `test_phase5_all_40_country_packs_covered` assertion that pins the
-  full 40-country set.
-- `kchat-skills/tests/jurisdictions/test_country_<cc>.py` — 40 per-
+  `country_<cc>.txt` references (54 total) and Phase 6 added 19 more
+  (73 total), plus a `test_phase5_all_40_country_packs_covered` and
+  a `test_phase6_all_19_country_packs_covered` assertion that pin
+  the full 59-country set.
+- `kchat-skills/tests/jurisdictions/test_country_<cc>.py` — 59 per-
   country structural tests (one file per country) asserting the
   country-specific severity floors, marketplace ages, protected-class
   enumeration, election-authority references, and the shared
@@ -1154,8 +1172,9 @@ Recommendation rules (first match wins):
 
 ## Supported Countries
 
-Phase 5 landed 40 country-specific jurisdiction packs. Each pack
-ships an `overlay.yaml` (severity floors, protected classes,
+Phase 5 landed 40 country-specific jurisdiction packs and Phase 6
+added 19 more for a total of **59 country packs**. Each pack ships
+an `overlay.yaml` (severity floors, protected classes,
 listed-extremist-orgs, restricted symbols, election rules), a
 `normalization.yaml` (NFKC + case-fold + country-appropriate
 transliteration refs), and one `lexicons/<lang>.yaml` per primary
@@ -1204,6 +1223,25 @@ every pack by `anti_misuse.assert_no_relaxed_child_safety`.
 | AU | Australia | en | Criminal Code Act 1995, Online Safety Act 2021. |
 | NZ | New Zealand | en, mi | FVPC Act, Terrorism Suppression Act. |
 | TR | Turkey | tr | TCK child protection, TMK anti-terrorism. |
+| RU | Russia | ru | Federal Law 124-FZ child protection, 114-FZ anti-extremism, Roskomnadzor. |
+| UA | Ukraine | uk, ru | Law on Child Protection (1995), Law on Combating Terrorism (2003). |
+| RO | Romania | ro | Legea 272/2004, Legea 535/2004 anti-terrorism. |
+| GR | Greece | el | Greek Penal Code child protection, Law 3251/2004 anti-terrorism. |
+| CZ | Czech Republic | cs | Trestní zákoník §§ 192-193, § 311 anti-terrorism. |
+| HU | Hungary | hu | Btk. § 204, §§ 314-318 terrorism offences. |
+| DK | Denmark | da | Straffeloven § 235, § 114 anti-terrorism. |
+| FI | Finland | fi | Rikoslaki 17:18-19, 34a luku terrorism. |
+| NO | Norway | no, nb | Straffeloven § 311, § 131 anti-terrorism. |
+| IE | Ireland | en, ga | Online Safety and Media Regulation Act 2022, Child Trafficking and Pornography Act 1998. |
+| IL | Israel | he, ar | Penal Code § 214, Counter-Terrorism Law 5776-2016. |
+| IQ | Iraq | ar, ku | Juvenile Welfare Law 76/1983, Anti-Terrorism Law 13/2005. |
+| MA | Morocco | ar, fr | Code Pénal Art. 503, Loi 03-03 anti-terrorism. |
+| DZ | Algeria | ar, fr | Loi 15-12 child protection, Code Pénal Art. 87 bis anti-terrorism. |
+| GH | Ghana | en | Children's Act 1998 (Act 560), Anti-Terrorism Act 2008 (Act 762). |
+| TZ | Tanzania | sw, en | Law of the Child Act 2009, Prevention of Terrorism Act 2002. |
+| ET | Ethiopia | am, en | Criminal Code Art. 644, Anti-Terrorism Proclamation 1176/2020. |
+| EC | Ecuador | es | Código de la Niñez y Adolescencia (CONA), COIP Art. 366. |
+| UY | Uruguay | es | Código de la Niñez y la Adolescencia (CNA), Ley 19.293. |
 
 See [`PROGRESS.md`](PROGRESS.md) and the project [`README.md`](README.md)
 for the full test toolchain and run instructions.
