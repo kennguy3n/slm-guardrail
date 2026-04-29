@@ -815,3 +815,12 @@ anti_misuse_controls:
     ├── ARCHITECTURE.md
     └── PHASES.md
 ```
+
+### Test Tooling
+
+Validation tests live under `kchat-skills/tests/` and run with **pytest**
+(Python ≥ 3.10). Static skill artifacts (`taxonomy.yaml`, `severity.yaml`,
+`output_schema.json`, `baseline.yaml`, etc.) are loaded with **PyYAML**
+and validated against their schemas with **jsonschema** (Draft-07). See
+[`PROGRESS.md`](PROGRESS.md) and the project [`README.md`](README.md) for
+the full test toolchain and run instructions.

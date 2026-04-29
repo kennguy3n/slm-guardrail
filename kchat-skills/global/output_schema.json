@@ -1,0 +1,96 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "kchat.guardrail.output.v1",
+  "title": "KChat Guardrail SLM Output",
+  "description": "Constrained JSON output schema emitted by the on-device SLM. The runtime rejects any output that does not validate against this schema. See ARCHITECTURE.md 'Output Schema'.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "severity",
+    "category",
+    "confidence",
+    "actions",
+    "reason_codes",
+    "rationale_id"
+  ],
+  "properties": {
+    "severity": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5,
+      "description": "Severity level per the 0-5 severity rubric."
+    },
+    "category": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 15,
+      "description": "Taxonomy category id (see taxonomy.yaml)."
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Model confidence in [0.0, 1.0]."
+    },
+    "actions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label_only",
+        "warn",
+        "strong_warn",
+        "critical_intervention",
+        "suggest_redact"
+      ],
+      "properties": {
+        "label_only": { "type": "boolean" },
+        "warn": { "type": "boolean" },
+        "strong_warn": { "type": "boolean" },
+        "critical_intervention": { "type": "boolean" },
+        "suggest_redact": { "type": "boolean" }
+      }
+    },
+    "reason_codes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "LEXICON_HIT",
+          "SCAM_PATTERN",
+          "PRIVATE_DATA_PATTERN",
+          "URL_RISK",
+          "QUOTED_SPEECH_CONTEXT",
+          "NEWS_CONTEXT",
+          "EDUCATION_CONTEXT",
+          "COUNTERSPEECH_CONTEXT",
+          "GROUP_AGE_MODE",
+          "JURISDICTION_OVERRIDE",
+          "COMMUNITY_RULE",
+          "CHILD_SAFETY_FLOOR"
+        ]
+      }
+    },
+    "rationale_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Closed-phrasebook id mapping to a public rationale phrase. No free text."
+    },
+    "resource_link_id": {
+      "type": ["string", "null"],
+      "description": "Localized resource link id (e.g. crisis hotline, electoral authority). The runtime resolves the URL locally; the SLM never emits a resolved URL."
+    },
+    "counter_updates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["counter_id", "delta"],
+        "properties": {
+          "counter_id": { "type": "string", "minLength": 1 },
+          "delta": { "type": "integer" }
+        }
+      }
+    }
+  }
+}

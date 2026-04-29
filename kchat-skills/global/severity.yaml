@@ -1,0 +1,57 @@
+# Severity Rubric — kchat.global.guardrail.baseline
+#
+# 0–5 severity rubric. Severity is computed by the SLM under a hard-coded
+# thresholds policy (see ARCHITECTURE.md "Decision Policy"). Overlays may
+# RAISE the severity floor for a given category but may not lower it below
+# the global baseline.
+#
+# Child-safety categories carry a severity floor of 5 regardless of model
+# confidence. See ARCHITECTURE.md "Child Safety Policy".
+#
+# Source of truth: ARCHITECTURE.md "Severity Rubric" table.
+schema_version: 1
+severity_id: kchat.guardrail.severity.v1
+
+levels:
+  - level: 0
+    name: None
+    meaning: No risk detected.
+    action: None.
+
+  - level: 1
+    name: Informational
+    meaning: Minor signal, useful as label only.
+    action: Soft label; no interruption.
+
+  - level: 2
+    name: Caution
+    meaning: Possible issue; user benefit from awareness.
+    action: Inline label; expandable explanation.
+
+  - level: 3
+    name: Warn
+    meaning: Likely policy / safety risk.
+    action: Modal warning before display or send.
+
+  - level: 4
+    name: Strong warn
+    meaning: High-confidence harm to user or third party.
+    action: Hard modal; require explicit acknowledge to view.
+
+  - level: 5
+    name: Critical
+    meaning: Imminent harm, child safety, or jurisdictional illegality.
+    action: Block preview; surface report / crisis resources.
+
+# Child-safety severity floor: any positive CHILD_SAFETY (taxonomy id 1)
+# signal at confidence >= 0.45 produces severity 5 and
+# `critical_intervention`. This floor is enforced by the runtime decision
+# policy and cannot be relaxed by any jurisdiction or community overlay.
+child_safety_floor:
+  category_id: 1
+  category_name: CHILD_SAFETY
+  severity_floor: 5
+  note: >-
+    Any positive CHILD_SAFETY signal pins severity to 5 regardless of
+    overlay configuration or model confidence (when at or above the
+    label_only threshold of 0.45).
