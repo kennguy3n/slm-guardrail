@@ -88,10 +88,35 @@ def test_p95_target_is_positive():
 
 def test_percentile_nearest_rank_is_deterministic():
     values = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
-    assert _percentile(values, 50.0) in {5.0, 6.0}
+    # p50 nearest-rank with N=10 → rank = ceil(50/100 * 10) = 5 → 5th value.
+    assert _percentile(values, 50.0) == 5.0
     assert _percentile(values, 95.0) == 10.0
     # Identical inputs produce identical outputs.
     assert _percentile(list(values), 75.0) == _percentile(list(values), 75.0)
+
+
+def test_percentile_nearest_rank_exact_integer_boundary():
+    """When ``pct/100 * N`` is an exact integer, nearest-rank must return
+    the ``ceil(pct/100 * N)``-th value, not the next one.
+
+    Regression test for a bug where ``int(round(pct/100 * N + 0.5))``
+    triggered Python's banker's rounding at the integer boundary and
+    produced a rank one too high (e.g. p50 of 10 observations returned
+    the 6th value instead of the 5th).
+    """
+    # p50 of N=10 → rank 5.
+    vals10 = [float(i) for i in range(1, 11)]
+    assert _percentile(vals10, 50.0) == 5.0
+    # p95 of N=20 → rank 19.
+    vals20 = [float(i) for i in range(1, 21)]
+    assert _percentile(vals20, 95.0) == 19.0
+    # p99 of N=100 → rank 99.
+    vals100 = [float(i) for i in range(1, 101)]
+    assert _percentile(vals100, 99.0) == 99.0
+    # Non-integer boundary — ceil rule still holds.
+    vals7 = [float(i) for i in range(1, 8)]
+    # p50 of N=7 → rank ceil(3.5) = 4 → 4th value.
+    assert _percentile(vals7, 50.0) == 4.0
 
 
 def test_benchmark_rejects_empty_cases(small_benchmark: PipelineBenchmark):

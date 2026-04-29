@@ -264,6 +264,32 @@ def test_child_safety_single_appeal_triggers_urgent_review():
     assert r.recommendation == "urgent_review"
 
 
+def test_child_safety_escalates_when_diluted_by_high_volume():
+    """A single CHILD_SAFETY appeal still escalates even when the
+    overall appeal volume is high enough that the child-safety rate
+    falls below URGENT_CHILD_SAFETY_RATE and the count is below
+    MIN_APPEALS_FOR_REVIEW.
+
+    Regression test for a bug where the child-safety short-circuit
+    was guarded on ``rate >= URGENT_CHILD_SAFETY_RATE or count >=
+    MIN_APPEALS_FOR_REVIEW`` and so failed to escalate in this
+    dilution regime, contradicting the spec that every category-1
+    appeal is material regardless of count.
+    """
+    agg = AppealAggregator(now=NOW)
+    # 1 child-safety appeal out of 200 total — rate = 0.5% < 1%.
+    agg.submit(_case("cs-0", category=CHILD_SAFETY_CATEGORY, severity=5))
+    for i in range(199):
+        agg.submit(_case(f"bg-{i}", category=0))
+    r = agg.aggregate("kchat.jurisdiction.us.guardrail.v1")
+    assert r.per_category_appeal_counts[CHILD_SAFETY_CATEGORY] == 1
+    assert (
+        r.per_category_appeal_rates[CHILD_SAFETY_CATEGORY]
+        < 0.01  # URGENT_CHILD_SAFETY_RATE
+    )
+    assert r.recommendation == "urgent_review"
+
+
 def test_low_volume_does_not_escalate_below_min_appeals():
     """Below ``MIN_APPEALS_FOR_REVIEW`` a single category can't drive urgent."""
     agg = AppealAggregator(now=NOW)

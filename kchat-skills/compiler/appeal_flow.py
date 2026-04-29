@@ -284,7 +284,7 @@ def _classify_recommendation(
 
     Rules (checked in order — first match wins):
 
-    1. Any category-1 (CHILD_SAFETY) appeal with rate >= 1% → urgent_review.
+    1. Any category-1 (CHILD_SAFETY) appeal → urgent_review (unconditional).
     2. Any category with rate >= 15% → urgent_review.
     3. Any category with rate >= 5% → review_suggested.
     4. Otherwise → no_action.
@@ -299,15 +299,11 @@ def _classify_recommendation(
     if total == 0:
         return "no_action"
 
-    # Child-safety short-circuit — any appeal is material.
+    # Child-safety short-circuit — any appeal on CHILD_SAFETY_CATEGORY is
+    # material, regardless of rate or count. On-device child-safety
+    # invariants override every rate-based threshold below.
     if per_category_counts.get(CHILD_SAFETY_CATEGORY, 0) > 0:
-        child_rate = per_category_rates.get(CHILD_SAFETY_CATEGORY, 0.0)
-        # Low-volume: still escalate when rate indicates user friction.
-        if child_rate >= URGENT_CHILD_SAFETY_RATE or (
-            per_category_counts.get(CHILD_SAFETY_CATEGORY, 0)
-            >= MIN_APPEALS_FOR_REVIEW
-        ):
-            return "urgent_review"
+        return "urgent_review"
 
     # Any category at or above the urgent threshold.
     for cat, rate in per_category_rates.items():

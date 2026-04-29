@@ -85,9 +85,13 @@ def _percentile(values: list[float], pct: float) -> float:
     if not 0.0 <= pct <= 100.0:
         raise ValueError(f"pct must be in [0, 100]; got {pct}")
     ordered = sorted(values)
-    # Nearest-rank: rank = ceil(pct/100 * N).
-    rank = max(1, int(round(pct / 100.0 * len(ordered) + 0.5)) - 1)
-    rank = min(rank, len(ordered) - 1)
+    n = len(ordered)
+    # Nearest-rank (1-indexed): rank = ceil(pct / 100 * N).
+    # Compute ceil(pct * N / 100) via integer arithmetic to avoid any
+    # floating-point or banker's-rounding edge cases when pct * N / 100
+    # is an exact integer.
+    rank_1indexed = max(1, -(-int(pct * n) // 100))
+    rank = min(rank_1indexed - 1, n - 1)
     return ordered[rank]
 
 
