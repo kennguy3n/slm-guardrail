@@ -285,12 +285,12 @@ Steps (1)–(7) are entirely on-device; no step requires network access.
 Step 4 (the SLM contextual classifier) is intentionally
 backend-agnostic. The pipeline talks to whatever object is passed in
 through
-[`SLMAdapter`](../kchat-skills/compiler/slm_adapter.py) — the Protocol
+[`SLMAdapter`](kchat-skills/compiler/slm_adapter.py) — the Protocol
 freezes a single `classify(input) -> dict` method so backends can be
 swapped without touching skill packs or the threshold policy.
 
 The reference real-SLM backend is
-[`LlamaCppSLMAdapter`](../kchat-skills/compiler/llama_cpp_adapter.py)
+[`LlamaCppSLMAdapter`](kchat-skills/compiler/llama_cpp_adapter.py)
 (Phase 6):
 
 - **Backend.** A running `llama-server` from
@@ -321,10 +321,10 @@ The reference real-SLM backend is
   the compiler module.
 
 End-to-end demonstration and benchmarking happens through
-[`tools/run_guardrail_demo.py`](../tools/run_guardrail_demo.py); see
-[`kchat-skills/samples/README.md`](../kchat-skills/samples/README.md)
+[`tools/run_guardrail_demo.py`](tools/run_guardrail_demo.py); see
+[`kchat-skills/samples/README.md`](kchat-skills/samples/README.md)
 and
-[`kchat-skills/benchmarks/README.md`](../kchat-skills/benchmarks/README.md).
+[`kchat-skills/benchmarks/README.md`](kchat-skills/benchmarks/README.md).
 
 ## Output Schema
 

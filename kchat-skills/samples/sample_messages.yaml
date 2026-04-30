@@ -171,7 +171,7 @@
     community_overlay_id: null
     is_offline: false
   expected_category: 9
-  expected_severity: 1
+  expected_severity: 3
   description: "Outbound message containing an email-shaped pattern — PRIVATE_DATA."
 
 - case_id: pii-phone-01
@@ -192,7 +192,7 @@
     community_overlay_id: null
     is_offline: false
   expected_category: 9
-  expected_severity: 1
+  expected_severity: 3
   description: "Outbound phone-shaped pattern — PRIVATE_DATA."
 
 - case_id: pii-credit-card-01
@@ -213,7 +213,7 @@
     community_overlay_id: null
     is_offline: false
   expected_category: 9
-  expected_severity: 1
+  expected_severity: 3
   description: "Credit-card-shaped digits pattern — PRIVATE_DATA + suggest_redact."
 
 - case_id: child-safety-context-01
@@ -476,7 +476,7 @@
     community_overlay_id: kchat.community.workplace.guardrail.v1
     is_offline: false
   expected_category: 9
-  expected_severity: 1
+  expected_severity: 3
   description: >-
     Outbound message with email-shaped pattern + attachment — PRIVATE_DATA
     pre-send warning. Workplace overlay applies.
@@ -530,7 +530,7 @@
     community_overlay_id: kchat.community.adult_only.guardrail.v1
     is_offline: false
   expected_category: 10
-  expected_severity: 2
+  expected_severity: 3
   description: >-
     NSFW image descriptor in an explicit adult-only community — labelled
     SEXUAL_ADULT, gated by group age mode + community overlay.
