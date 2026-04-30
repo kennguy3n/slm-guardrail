@@ -931,7 +931,11 @@ anti_misuse_controls:
         └── unicef_itu_cop_alignment.md
 
 /tools
-└── regenerate_compiled_examples.py  # refresh prompts/compiled_examples
+├── regenerate_compiled_examples.py  # refresh prompts/compiled_examples
+├── run_guardrail_demo.py            # sample-data demo (mock or llama.cpp)
+└── demo_guardrail.py                # cross-community / cross-country demo
+
+/results                             # demo run outputs (JSON + Markdown)
 ```
 
 ### Test Tooling

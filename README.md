@@ -532,6 +532,19 @@ pytest kchat-skills/tests/jurisdictions # only the jurisdiction tests
 pytest -v                               # verbose
 ```
 
+### Running the demo
+
+The demo script exercises the guardrail pipeline across multiple
+community types, countries, and language scenarios:
+
+```bash
+python tools/demo_guardrail.py
+```
+
+Results are written to `results/` as both JSON (structured) and
+Markdown (human-readable) with ISO-8601 timestamps. See
+[`results/`](results/) for the latest run.
+
 ### Project layout
 
 The implementation tree lives under [`kchat-skills/`](kchat-skills/),
@@ -636,7 +649,11 @@ kchat-skills/
         └── unicef_itu_cop_alignment.md
 
 tools/                    # repo-level utilities (run from repo root)
-└── regenerate_compiled_examples.py  # refresh compiled_examples/*.txt
+├── regenerate_compiled_examples.py  # refresh compiled_examples/*.txt
+├── run_guardrail_demo.py            # sample-data demo (mock or llama.cpp)
+└── demo_guardrail.py                # cross-community / cross-country demo
+
+results/                  # demo run outputs (JSON + Markdown reports)
 ```
 
 ### Compiling a skill pack

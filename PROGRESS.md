@@ -146,6 +146,21 @@ This file tracks delivery against the phased plan in
 
 ## Changelog
 
+### 2026-04-30 — Cross-community / cross-country demo + results
+
+- `tools/demo_guardrail.py` — end-to-end demo script exercising the
+  guardrail pipeline across 8+ community types, 10+ countries with
+  core-language messages, and 8+ mixed-language / code-switching
+  scenarios. Captures classification results (category, severity,
+  confidence, actions, reason_codes), per-group latency metrics
+  (p50 / p95 / p99 / mean / max / min), and pass/fail against the
+  250 ms p95 target.
+- `results/demo_results_<timestamp>.json` — structured JSON results
+  with per-scenario classification output and aggregate latency.
+- `results/demo_results_<timestamp>.md` — human-readable Markdown
+  report with summary tables, per-community, per-country, and
+  mixed-language breakdowns, and performance metrics.
+
 ### 2026-04-30 — Sample data layer + real SLM integration (Bonsai-1.7B)
 
 - `kchat-skills/compiler/llama_cpp_adapter.py` — `LlamaCppSLMAdapter`
