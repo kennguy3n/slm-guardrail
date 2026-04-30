@@ -1,8 +1,8 @@
 # KChat SLM Guardrail Skills — Progress
 
-**Status:** Complete | 100%
-**Current phase:** Phase 6 complete — 100 jurisdiction/community skills
-**Last updated:** 2026-04-29
+**Status:** Complete | 100% + demo layer
+**Current phase:** Phase 6 complete — 100 jurisdiction/community skills + Bonsai-1.7B SLM integration
+**Last updated:** 2026-04-30
 
 This file tracks delivery against the phased plan in
 [`PHASES.md`](PHASES.md). Each phase ends with a tagged release
@@ -145,6 +145,48 @@ This file tracks delivery against the phased plan in
 ---
 
 ## Changelog
+
+### 2026-04-30 — Sample data layer + real SLM integration (Bonsai-1.7B)
+
+- `kchat-skills/compiler/llama_cpp_adapter.py` — `LlamaCppSLMAdapter`
+  implementing the `SLMAdapter` Protocol against a llama.cpp server
+  (kennguy3n/llama.cpp, branch prism). Connects via HTTP to the
+  OpenAI-compatible `/v1/chat/completions` endpoint with constrained
+  JSON output (`response_format: {"type": "json_object"}`,
+  `temperature: 0.0`). Uses Bonsai-1.7B-gguf from
+  https://huggingface.co/prism-ml/Bonsai-1.7B-gguf. Stdlib-only
+  (`urllib.request` + `json`); falls back to a SAFE output when the
+  server is unreachable, returns malformed JSON, or returns
+  out-of-range fields.
+- `kchat-skills/samples/sample_messages.yaml` — curated sample data
+  layer with 27 messages covering safe / scam / PII / child-safety /
+  hate / harassment / health-misinfo / civic-misinfo / marketplace /
+  sexual-adult / extremism / self-harm / drugs / community-rule
+  contexts plus multi-language samples (English, Vietnamese, Spanish,
+  German, en↔vi code-switching). All cases comply with the privacy
+  contract — no real PII, no live phishing domains, no CSAM-adjacent
+  text.
+- `kchat-skills/samples/README.md` — sample-data format reference,
+  privacy contract, and usage examples.
+- `tools/run_guardrail_demo.py` — end-to-end demo script: health-checks
+  llama-server, loads samples, compiles a prompt via `SkillPackCompiler`
+  (with optional `--jurisdiction` / `--community`), runs the pipeline
+  with either `LlamaCppSLMAdapter` or `MockSLMAdapter` (`--mock`),
+  prints a results table, optionally runs `PipelineBenchmark`
+  (`--benchmark`) and commits results (`--commit-results`).
+- `kchat-skills/benchmarks/` — committed benchmark results directory
+  with reproduction instructions; `bonsai_1.7b_results.json` is
+  generated on demand by the demo script.
+- `kchat-skills/tests/global/test_llama_cpp_adapter.py` — adapter
+  Protocol conformance, fallback behaviour, JSON parsing, output
+  schema coercion, request-shape constraints (temperature 0.0,
+  `response_format: json_object`).
+- `kchat-skills/tests/global/test_sample_messages.py` — sample data
+  structural validation (required keys, taxonomy range,
+  case-id uniqueness, multi-language coverage) and MockSLMAdapter
+  smoke tests.
+- `pyproject.toml` — adds optional `[project.optional-dependencies].demo`
+  group (PyYAML only).
 
 ### 2026-04-29 — Phase 6 skill expansion to 100 packs
 
