@@ -304,8 +304,12 @@ class XLMRMiniLMAdapter:
             )
 
         try:
-            self._tokenizer = AutoTokenizer.from_pretrained(path)
-            self._model = AutoModel.from_pretrained(path)
+            self._tokenizer = AutoTokenizer.from_pretrained(
+                path, local_files_only=True
+            )
+            self._model = AutoModel.from_pretrained(
+                path, local_files_only=True
+            )
             self._model.eval()
         except Exception as exc:  # noqa: BLE001 — model load failed
             self._load_failed = True
