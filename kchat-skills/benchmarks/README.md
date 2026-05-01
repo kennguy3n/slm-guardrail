@@ -47,7 +47,46 @@ The committed JSON contains:
   whether the actual category matched the expected category.
 - **Pass / fail** — `report.passed = (p95_ms <= 250 ms)`.
 
-## How to reproduce
+## Quick run
+
+The end-to-end benchmark + record + commit workflow is wrapped by
+[`tools/run_benchmark.sh`](../../tools/run_benchmark.sh):
+
+```bash
+# Mock adapter (no server needed) — record + commit
+./tools/run_benchmark.sh --mock
+
+# Real Bonsai-1.7B — record + commit
+./tools/run_benchmark.sh
+
+# Record only, no git commit
+./tools/run_benchmark.sh --mock --no-commit
+
+# Record, commit, and push
+./tools/run_benchmark.sh --mock --push
+```
+
+The script:
+
+- Verifies Python deps are importable and probes `/health` on
+  `llama-server` (defaults to `http://localhost:8080`).
+- Falls back to `--mock` automatically if no server is reachable
+  (and the real Bonsai-1.7B run is skipped with a warning).
+- Runs `tools/run_guardrail_demo.py` with `--benchmark
+  --commit-results --benchmark-iterations 100 --benchmark-warmup 5`,
+  writing `bonsai_1.7b_results.json` and/or
+  `bonsai_1.7b_mock_results.json` here.
+- Runs `tools/demo_guardrail.py` to write timestamped JSON +
+  Markdown to `results/`.
+- Prints a summary of every recorded run with its `p95_ms` against
+  the 250 ms target, and **exits non-zero if the target is breached**
+  on any run.
+- Unless `--no-commit` is passed, runs `git add
+  kchat-skills/benchmarks/*.json results/` and commits with message
+  `bench: record benchmark results <ISO-8601 UTC>`. Pass `--push` to
+  also `git push` the new commit.
+
+## How to reproduce manually
 
 ```bash
 # 1. Build kennguy3n/llama.cpp (branch: prism)
