@@ -105,10 +105,15 @@ def is_model_available(model_path: str) -> bool:
     except Exception:  # noqa: BLE001 — transformers not installed
         return False
     try:
-        cached_file(model_path, "config.json", _raise_exceptions_for_missing_entries=False)
+        result = cached_file(
+            model_path,
+            "config.json",
+            _raise_exceptions_for_missing_entries=False,
+            local_files_only=True,
+        )
     except Exception:  # noqa: BLE001 — anything fishy → not available
         return False
-    return True
+    return result is not None
 
 
 def load_samples(path: Path) -> list[dict[str, Any]]:
