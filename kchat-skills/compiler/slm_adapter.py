@@ -129,8 +129,11 @@ class MockSLMAdapter:
         scam_hits = signals.get("scam_patterns_hit") or []
         url_risk = float(signals.get("url_risk") or 0.0)
         media = signals.get("media_descriptors") or []
+        context_hints = list(signals.get("context_hints") or [])
 
-        # CHILD_SAFETY — any lexicon hit on category 1.
+        # CHILD_SAFETY — any lexicon hit on category 1. Wins over every
+        # other signal, including protected-speech context hints — the
+        # threshold policy preserves the floor above all else.
         child_lex = [h for h in lexicon_hits if h.get("category") == CAT_CHILD_SAFETY]
         if child_lex:
             weight = max(float(h.get("weight", 0.5)) for h in child_lex)
@@ -148,6 +151,16 @@ class MockSLMAdapter:
                 "resource_link_id": "child_safety_resources_v1",
             }
 
+        # Helper: append protected-speech context hints to a reason
+        # code list. The threshold policy uses these to demote the
+        # verdict back to SAFE — see ``threshold_policy.py``.
+        def _with_context(codes: list[str]) -> list[str]:
+            merged = list(codes)
+            for hint in context_hints:
+                if hint not in merged:
+                    merged.append(hint)
+            return merged
+
         # PRIVATE_DATA — any PII pattern.
         if pii_hits:
             confidence = min(0.95, 0.55 + 0.1 * len(pii_hits))
@@ -160,7 +173,7 @@ class MockSLMAdapter:
                     "warn": True,
                     "suggest_redact": True,
                 },
-                "reason_codes": ["PRIVATE_DATA_PATTERN"],
+                "reason_codes": _with_context(["PRIVATE_DATA_PATTERN"]),
                 "rationale_id": "private_data_pii_v1",
             }
 
@@ -178,7 +191,7 @@ class MockSLMAdapter:
                 "category": CAT_SCAM_FRAUD,
                 "confidence": confidence,
                 "actions": {**_zero_actions(), "warn": True},
-                "reason_codes": reason_codes,
+                "reason_codes": _with_context(reason_codes),
                 "rationale_id": "scam_credential_phish_v1",
             }
 
@@ -195,7 +208,7 @@ class MockSLMAdapter:
                 "category": category,
                 "confidence": confidence,
                 "actions": {**_zero_actions(), "warn": True},
-                "reason_codes": ["LEXICON_HIT"],
+                "reason_codes": _with_context(["LEXICON_HIT"]),
                 "rationale_id": f"lexicon_category_{category}_v1",
             }
 
@@ -209,7 +222,7 @@ class MockSLMAdapter:
                     "category": CAT_SEXUAL_ADULT,
                     "confidence": confidence,
                     "actions": {**_zero_actions(), "warn": True},
-                    "reason_codes": [],
+                    "reason_codes": _with_context([]),
                     "rationale_id": "sexual_adult_media_v1",
                 }
 

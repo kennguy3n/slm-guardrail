@@ -99,7 +99,8 @@
         "pii_patterns_hit",
         "scam_patterns_hit",
         "lexicon_hits",
-        "media_descriptors"
+        "media_descriptors",
+        "context_hints"
       ],
       "properties": {
         "url_risk": {
@@ -189,6 +190,20 @@
               }
             }
           }
+        },
+        "context_hints": {
+          "type": "array",
+          "description": "Pipeline-derived protected-speech / context flags. Forwarded by the classifier into output.reason_codes; the threshold policy demotes non-CHILD_SAFETY non-SAFE verdicts carrying these hints back to SAFE.",
+          "items": {
+            "type": "string",
+            "enum": [
+              "NEWS_CONTEXT",
+              "EDUCATION_CONTEXT",
+              "COUNTERSPEECH_CONTEXT",
+              "QUOTED_SPEECH_CONTEXT"
+            ]
+          },
+          "uniqueItems": true
         }
       }
     },

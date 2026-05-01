@@ -14,6 +14,14 @@ the device.
 Child-safety floor: any positive CHILD_SAFETY signal at confidence
 ``>= 0.45`` is pinned to severity 5 with ``critical_intervention=True``
 per ARCHITECTURE.md line 373.
+
+Protected-speech demotion: when ``reason_codes`` carries one of
+``NEWS_CONTEXT`` / ``EDUCATION_CONTEXT`` / ``COUNTERSPEECH_CONTEXT`` /
+``QUOTED_SPEECH_CONTEXT`` (forwarded from ``local_signals.context_hints``
+by the classifier) and the verdict is non-SAFE / non-CHILD_SAFETY, the
+output is demoted to SAFE — protecting news coverage, education, and
+counterspeech from false positives. CHILD_SAFETY always wins because
+its floor is evaluated first.
 """
 from __future__ import annotations
 
@@ -25,6 +33,19 @@ from typing import Any
 # kchat-skills/global/taxonomy.yaml.
 CHILD_SAFETY_CATEGORY = 1
 SAFE_CATEGORY = 0
+
+# Reason codes that signal the message lives in a protected-speech
+# context. Any non-SAFE / non-CHILD_SAFETY verdict carrying one of
+# these is demoted to SAFE by :meth:`ThresholdPolicy.apply`. Kept in
+# sync with ``local_signal_schema.json`` ``context_hints`` enum.
+PROTECTED_SPEECH_REASON_CODES: frozenset[str] = frozenset(
+    {
+        "NEWS_CONTEXT",
+        "EDUCATION_CONTEXT",
+        "COUNTERSPEECH_CONTEXT",
+        "QUOTED_SPEECH_CONTEXT",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -68,19 +89,25 @@ class ThresholdPolicy:
         1. Child-safety floor: CHILD_SAFETY with confidence ``>=
            LABEL_ONLY`` is pinned to severity 5 and
            ``critical_intervention=True``.
-        2. Uncertainty handling: any non-zero category with confidence
+        2. Protected-speech demotion: any non-SAFE / non-CHILD_SAFETY
+           verdict whose ``reason_codes`` include one of
+           ``NEWS_CONTEXT`` / ``EDUCATION_CONTEXT`` /
+           ``COUNTERSPEECH_CONTEXT`` / ``QUOTED_SPEECH_CONTEXT`` is
+           demoted to SAFE. The protected-speech reason codes are
+           preserved on the demoted output so reviewers can see why.
+        3. Uncertainty handling: any non-zero category with confidence
            ``< LABEL_ONLY`` is coerced to SAFE (category 0, severity 0,
            all actions false).
-        3. Action flags are recomputed from confidence — the
+        4. Action flags are recomputed from confidence — the
            classifier cannot assert ``warn`` at confidence 0.10.
-        4. ``suggest_redact`` from the raw output is preserved (it is
+        5. ``suggest_redact`` from the raw output is preserved (it is
            a content-type hint, not a confidence-driven flag).
         """
         out = _deepcopy_output(raw_output)
         category = int(out.get("category", SAFE_CATEGORY))
         confidence = float(out.get("confidence", 0.0))
 
-        # Rule 1: Child-safety floor.
+        # Rule 1: Child-safety floor — wins over every other rule.
         if category == CHILD_SAFETY_CATEGORY and confidence >= self.LABEL_ONLY:
             out["severity"] = 5
             out["actions"] = _blank_actions(critical_intervention=True)
@@ -89,7 +116,23 @@ class ThresholdPolicy:
             out["reason_codes"] = sorted(reasons)
             return out
 
-        # Rule 2: Uncertainty handling.
+        # Rule 2: Protected-speech demotion. Applies only to non-SAFE
+        # categories; CHILD_SAFETY is already handled by rule 1.
+        reason_codes_in = list(out.get("reason_codes") or [])
+        protected_present = [
+            r for r in reason_codes_in if r in PROTECTED_SPEECH_REASON_CODES
+        ]
+        if category != SAFE_CATEGORY and protected_present:
+            return {
+                "severity": 0,
+                "category": SAFE_CATEGORY,
+                "confidence": confidence,
+                "actions": _blank_actions(),
+                "reason_codes": sorted(set(protected_present)),
+                "rationale_id": "safe_protected_speech_v1",
+            }
+
+        # Rule 3: Uncertainty handling.
         if category != SAFE_CATEGORY and confidence < self.LABEL_ONLY:
             return {
                 "severity": 0,
@@ -100,7 +143,7 @@ class ThresholdPolicy:
                 "rationale_id": out.get("rationale_id") or "safe_benign_v1",
             }
 
-        # Rule 3: Re-derive action flags from confidence for non-SAFE
+        # Rule 4: Re-derive action flags from confidence for non-SAFE
         # categories.
         if category != SAFE_CATEGORY:
             suggest_redact = bool(
@@ -179,4 +222,9 @@ def _deepcopy_output(raw: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-__all__ = ["ThresholdPolicy", "CHILD_SAFETY_CATEGORY", "SAFE_CATEGORY"]
+__all__ = [
+    "ThresholdPolicy",
+    "CHILD_SAFETY_CATEGORY",
+    "SAFE_CATEGORY",
+    "PROTECTED_SPEECH_REASON_CODES",
+]

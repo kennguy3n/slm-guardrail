@@ -12,6 +12,7 @@ import pytest
 
 from threshold_policy import (  # type: ignore[import-not-found]
     CHILD_SAFETY_CATEGORY,
+    PROTECTED_SPEECH_REASON_CODES,
     SAFE_CATEGORY,
     ThresholdPolicy,
 )
@@ -273,3 +274,165 @@ def test_suggest_redact_is_preserved():
     )
     assert out["actions"]["suggest_redact"] is True
     assert out["actions"]["warn"] is True
+
+
+# ---------------------------------------------------------------------------
+# Protected-speech demotion (NEWS_CONTEXT / EDUCATION_CONTEXT /
+# COUNTERSPEECH_CONTEXT / QUOTED_SPEECH_CONTEXT).
+# ---------------------------------------------------------------------------
+def test_protected_speech_reason_codes_constant():
+    assert PROTECTED_SPEECH_REASON_CODES == frozenset(
+        {
+            "NEWS_CONTEXT",
+            "EDUCATION_CONTEXT",
+            "COUNTERSPEECH_CONTEXT",
+            "QUOTED_SPEECH_CONTEXT",
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    "protected_code",
+    sorted(PROTECTED_SPEECH_REASON_CODES),
+)
+def test_protected_speech_demotes_violence_threat_to_safe(protected_code):
+    """News quotes / educational refs / counterspeech / user quotes
+    must demote a non-CHILD_SAFETY non-SAFE verdict back to SAFE."""
+    p = ThresholdPolicy()
+    out = p.apply(
+        _raw(
+            category=3,  # VIOLENCE_THREAT
+            severity=2,
+            confidence=0.50,
+            actions={
+                "label_only": True,
+                "warn": False,
+                "strong_warn": False,
+                "critical_intervention": False,
+                "suggest_redact": False,
+            },
+            reason_codes=[protected_code],
+        )
+    )
+    assert out["category"] == SAFE_CATEGORY
+    assert out["severity"] == 0
+    assert out["actions"] == {
+        "label_only": False,
+        "warn": False,
+        "strong_warn": False,
+        "critical_intervention": False,
+        "suggest_redact": False,
+    }
+    assert protected_code in out["reason_codes"]
+    assert out["rationale_id"] == "safe_protected_speech_v1"
+
+
+def test_protected_speech_demotes_extremism_to_safe():
+    p = ThresholdPolicy()
+    out = p.apply(
+        _raw(
+            category=4,  # EXTREMISM
+            severity=2,
+            confidence=0.62,
+            reason_codes=["NEWS_CONTEXT"],
+        )
+    )
+    assert out["category"] == SAFE_CATEGORY
+    assert "NEWS_CONTEXT" in out["reason_codes"]
+
+
+def test_protected_speech_preserves_multiple_protected_codes():
+    """When multiple protected-speech reason codes are present (e.g. a
+    news quote that's also user-quoted), all of them are kept on the
+    demoted output for review traceability."""
+    p = ThresholdPolicy()
+    out = p.apply(
+        _raw(
+            category=3,
+            severity=2,
+            confidence=0.55,
+            reason_codes=[
+                "NEWS_CONTEXT",
+                "QUOTED_SPEECH_CONTEXT",
+                "LEXICON_HIT",
+            ],
+        )
+    )
+    assert out["category"] == SAFE_CATEGORY
+    assert "NEWS_CONTEXT" in out["reason_codes"]
+    assert "QUOTED_SPEECH_CONTEXT" in out["reason_codes"]
+    # Non-protected codes (LEXICON_HIT) are dropped from the demoted
+    # output — only the protected-speech reason codes are preserved.
+    assert "LEXICON_HIT" not in out["reason_codes"]
+
+
+def test_child_safety_floor_wins_over_news_context():
+    """CHILD_SAFETY at >= LABEL_ONLY confidence is non-negotiable —
+    even a news quote does not demote it. Public-interest reporting
+    of CSAM must still surface the floor."""
+    p = ThresholdPolicy()
+    out = p.apply(
+        _raw(
+            category=CHILD_SAFETY_CATEGORY,
+            severity=5,
+            confidence=0.90,
+            reason_codes=["NEWS_CONTEXT", "QUOTED_SPEECH_CONTEXT"],
+        )
+    )
+    assert out["category"] == CHILD_SAFETY_CATEGORY
+    assert out["severity"] == 5
+    assert out["actions"]["critical_intervention"] is True
+    assert "CHILD_SAFETY_FLOOR" in out["reason_codes"]
+
+
+def test_safe_with_protected_speech_stays_safe():
+    """Already-SAFE verdict carrying a protected-speech code is left
+    alone (rule 2 only fires for non-SAFE categories)."""
+    p = ThresholdPolicy()
+    out = p.apply(
+        _raw(
+            category=SAFE_CATEGORY,
+            severity=0,
+            confidence=0.20,
+            reason_codes=["NEWS_CONTEXT"],
+        )
+    )
+    assert out["category"] == SAFE_CATEGORY
+    assert out["severity"] == 0
+
+
+def test_non_protected_reason_code_does_not_demote():
+    """Sanity: the demotion only triggers on the protected-speech
+    enum members. Other reason codes (e.g. LEXICON_HIT) leave the
+    verdict intact."""
+    p = ThresholdPolicy()
+    out = p.apply(
+        _raw(
+            category=6,  # HATE
+            severity=3,
+            confidence=0.70,
+            reason_codes=["LEXICON_HIT"],
+        )
+    )
+    assert out["category"] == 6
+    assert out["actions"]["warn"] is True
+
+
+def test_protected_speech_at_low_confidence_still_demotes():
+    """Demotion happens regardless of confidence, since rule 2 sits
+    above rule 3 (uncertainty handling). A low-confidence VIOLENCE
+    verdict carrying NEWS_CONTEXT becomes SAFE with the protected
+    reason code preserved (not the empty reason_codes that rule 3
+    would otherwise produce)."""
+    p = ThresholdPolicy()
+    out = p.apply(
+        _raw(
+            category=3,
+            severity=2,
+            confidence=0.20,  # below LABEL_ONLY
+            reason_codes=["NEWS_CONTEXT"],
+        )
+    )
+    assert out["category"] == SAFE_CATEGORY
+    assert "NEWS_CONTEXT" in out["reason_codes"]
+    assert out["rationale_id"] == "safe_protected_speech_v1"

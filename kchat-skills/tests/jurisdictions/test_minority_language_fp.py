@@ -67,6 +67,7 @@ def _base_input(
             "scam_patterns_hit": [],
             "lexicon_hits": lexicon_hits or [],
             "media_descriptors": [],
+            "context_hints": [],
         },
         "constraints": {
             "max_output_tokens": 600,

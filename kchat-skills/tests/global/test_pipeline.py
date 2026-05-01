@@ -19,6 +19,7 @@ from pipeline import (  # type: ignore[import-not-found]
     GuardrailPipeline,
     LexiconEntry,
     SkillBundle,
+    derive_context_hints,
     detect_pii,
     detect_scam,
     extract_media_descriptors,
@@ -153,6 +154,7 @@ def _empty_local_signals() -> dict[str, Any]:
         "scam_patterns_hit": [],
         "lexicon_hits": [],
         "media_descriptors": [],
+        "context_hints": [],
     }
 
 
@@ -377,3 +379,157 @@ def test_bundle_jurisdiction_id_flows_into_packed_context():
         "kchat.jurisdiction.archetype-strict-marketplace.guardrail.v1"
     )
     assert ctx["community_overlay_id"] == "kchat.community.workplace.guardrail.v1"
+
+
+# ---------------------------------------------------------------------------
+# Step 2 (auxiliary) — derive_context_hints
+# ---------------------------------------------------------------------------
+class TestDeriveContextHints:
+    @staticmethod
+    def _msg(quoted: bool = False) -> dict[str, Any]:
+        return {
+            "text": "x",
+            "lang_hint": "en",
+            "has_attachment": False,
+            "attachment_kinds": [],
+            "quoted_from_user": quoted,
+            "is_outbound": False,
+        }
+
+    @staticmethod
+    def _ctx(overlay: str | None) -> dict[str, Any]:
+        return {
+            "group_kind": "small_group",
+            "group_age_mode": "mixed_age",
+            "user_role": "member",
+            "relationship_known": True,
+            "locale": "en-US",
+            "jurisdiction_id": None,
+            "community_overlay_id": overlay,
+            "is_offline": False,
+        }
+
+    def test_journalism_overlay_emits_news_context(self):
+        hints = derive_context_hints(
+            message=self._msg(quoted=False),
+            context=self._ctx("kchat.community.journalism.guardrail.v1"),
+        )
+        assert "NEWS_CONTEXT" in hints
+
+    def test_quoted_from_user_emits_quoted_speech_context(self):
+        hints = derive_context_hints(
+            message=self._msg(quoted=True),
+            context=self._ctx(None),
+        )
+        assert "QUOTED_SPEECH_CONTEXT" in hints
+
+    def test_education_overlay_emits_education_context(self):
+        hints = derive_context_hints(
+            message=self._msg(quoted=False),
+            context=self._ctx("kchat.community.education_higher.guardrail.v1"),
+        )
+        assert "EDUCATION_CONTEXT" in hints
+
+    def test_lgbtq_support_overlay_emits_counterspeech_context(self):
+        hints = derive_context_hints(
+            message=self._msg(quoted=False),
+            context=self._ctx("kchat.community.lgbtq_support.guardrail.v1"),
+        )
+        assert "COUNTERSPEECH_CONTEXT" in hints
+
+    def test_journalism_plus_quoted_emits_both(self):
+        hints = derive_context_hints(
+            message=self._msg(quoted=True),
+            context=self._ctx("kchat.community.journalism.guardrail.v1"),
+        )
+        assert "NEWS_CONTEXT" in hints
+        assert "QUOTED_SPEECH_CONTEXT" in hints
+
+    def test_unrelated_overlay_emits_nothing(self):
+        hints = derive_context_hints(
+            message=self._msg(quoted=False),
+            context=self._ctx("kchat.community.gaming.guardrail.v1"),
+        )
+        assert hints == []
+
+    def test_no_overlay_no_quoted_emits_nothing(self):
+        hints = derive_context_hints(
+            message=self._msg(quoted=False),
+            context=self._ctx(None),
+        )
+        assert hints == []
+
+
+# ---------------------------------------------------------------------------
+# Pipeline-level: protected-speech context + non-SAFE encoder verdict
+# round-trips to SAFE via threshold demotion.
+# ---------------------------------------------------------------------------
+class _AlwaysViolenceAdapter:
+    """Adapter that mimics an encoder that classifies anything as
+    VIOLENCE_THREAT (3) at confidence 0.50 — used to exercise the
+    protected-speech demotion path end-to-end."""
+
+    def classify(self, input: dict[str, Any]) -> dict[str, Any]:
+        signals = input.get("local_signals") or {}
+        context_hints = list(signals.get("context_hints") or [])
+        return {
+            "severity": 2,
+            "category": 3,
+            "confidence": 0.50,
+            "actions": {
+                "label_only": True,
+                "warn": False,
+                "strong_warn": False,
+                "critical_intervention": False,
+                "suggest_redact": False,
+            },
+            "reason_codes": list(context_hints),
+            "rationale_id": "test_violence_v1",
+        }
+
+
+def test_pipeline_news_quote_demotes_violence_to_safe():
+    """End-to-end: a quoted news message ends up SAFE even when the
+    encoder labels it VIOLENCE_THREAT."""
+    p = GuardrailPipeline(
+        skill_bundle=SkillBundle(
+            community_overlay_id="kchat.community.journalism.guardrail.v1"
+        ),
+        slm_adapter=_AlwaysViolenceAdapter(),
+    )
+    msg = {"text": "Reuters reports an attack.", "quoted_from_user": True}
+    out = p.classify(msg, _context())
+    assert out["category"] == 0
+    assert out["severity"] == 0
+    assert "NEWS_CONTEXT" in out["reason_codes"]
+    assert "QUOTED_SPEECH_CONTEXT" in out["reason_codes"]
+    assert out["rationale_id"] == "safe_protected_speech_v1"
+
+
+def test_pipeline_no_overlay_keeps_violence_label():
+    """Sanity: same encoder, no protected-speech context — verdict
+    survives the threshold policy at label_only."""
+    p = GuardrailPipeline(
+        skill_bundle=SkillBundle(),
+        slm_adapter=_AlwaysViolenceAdapter(),
+    )
+    out = p.classify({"text": "i will hurt them"}, _context())
+    assert out["category"] == 3  # VIOLENCE_THREAT
+    assert out["actions"]["label_only"] is True
+
+
+def test_pipeline_packs_context_hints_into_local_signals():
+    """The packaged input passed to the adapter must include
+    context_hints in local_signals — the schema requires it."""
+    adapter = _RecordingAdapter()
+    bundle = SkillBundle(
+        community_overlay_id="kchat.community.journalism.guardrail.v1"
+    )
+    p = GuardrailPipeline(skill_bundle=bundle, slm_adapter=adapter)
+    p.classify(
+        {"text": "headline", "quoted_from_user": True}, _context()
+    )
+    assert adapter.last_input is not None
+    hints = adapter.last_input["local_signals"]["context_hints"]
+    assert "NEWS_CONTEXT" in hints
+    assert "QUOTED_SPEECH_CONTEXT" in hints

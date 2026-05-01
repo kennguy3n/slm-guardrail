@@ -400,9 +400,22 @@ class XLMRMiniLMAdapter:
         scam_hits = signals.get("scam_patterns_hit") or []
         url_risk = float(signals.get("url_risk") or 0.0)
         media = signals.get("media_descriptors") or []
+        context_hints = list(signals.get("context_hints") or [])
+
+        # Helper: append protected-speech context hints to a reason
+        # code list. The threshold policy uses these to demote the
+        # verdict back to SAFE — see ``threshold_policy.py``. Only
+        # applied to non-CHILD_SAFETY branches.
+        def _with_context(codes: list[str]) -> list[str]:
+            merged = list(codes)
+            for hint in context_hints:
+                if hint not in merged:
+                    merged.append(hint)
+            return merged
 
         # CHILD_SAFETY — any lexicon hit on category 1 hits the
-        # severity-5 floor regardless of embedding similarity.
+        # severity-5 floor regardless of embedding similarity *and*
+        # regardless of any protected-speech context hints.
         child_lex = [
             h for h in lexicon_hits if h.get("category") == CAT_CHILD_SAFETY
         ]
@@ -434,7 +447,7 @@ class XLMRMiniLMAdapter:
                     "warn": True,
                     "suggest_redact": True,
                 },
-                "reason_codes": ["PRIVATE_DATA_PATTERN"],
+                "reason_codes": _with_context(["PRIVATE_DATA_PATTERN"]),
                 "rationale_id": "private_data_pii_v1",
             }
 
@@ -452,7 +465,7 @@ class XLMRMiniLMAdapter:
                 "category": CAT_SCAM_FRAUD,
                 "confidence": confidence,
                 "actions": {**_zero_actions(), "warn": True},
-                "reason_codes": reason_codes,
+                "reason_codes": _with_context(reason_codes),
                 "rationale_id": "scam_credential_phish_v1",
             }
 
@@ -470,7 +483,7 @@ class XLMRMiniLMAdapter:
                     "category": category,
                     "confidence": confidence,
                     "actions": {**_zero_actions(), "warn": True},
-                    "reason_codes": ["LEXICON_HIT"],
+                    "reason_codes": _with_context(["LEXICON_HIT"]),
                     "rationale_id": f"lexicon_category_{category}_v1",
                 }
 
@@ -484,7 +497,7 @@ class XLMRMiniLMAdapter:
                     "category": CAT_SEXUAL_ADULT,
                     "confidence": confidence,
                     "actions": {**_zero_actions(), "warn": True},
-                    "reason_codes": [],
+                    "reason_codes": _with_context([]),
                     "rationale_id": "sexual_adult_media_v1",
                 }
 
@@ -535,14 +548,16 @@ class XLMRMiniLMAdapter:
 
         # Otherwise return the predicted category at default severity 2
         # (label only) — the threshold policy and severity rubric
-        # downstream will promote / demote based on context.
+        # downstream will promote / demote based on context. Protected-
+        # speech context hints are forwarded so the threshold policy
+        # can demote false positives like a news quote about violence.
         confidence = max(0.05, min(0.95, float(best_prob)))
         return {
             "severity": 2,
             "category": best_idx,
             "confidence": confidence,
             "actions": {**_zero_actions(), "label_only": True},
-            "reason_codes": [],
+            "reason_codes": _with_context([]),
             "rationale_id": f"xlmr_minilm_category_{best_idx}_v1",
         }
 

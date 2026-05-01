@@ -43,6 +43,7 @@ KNOWN_GOOD_INPUT: dict = {
             {"lexicon_id": "global.scam.en.v1", "category": 7, "weight": 0.78}
         ],
         "media_descriptors": [],
+        "context_hints": [],
     },
     "constraints": {
         "max_output_tokens": 600,

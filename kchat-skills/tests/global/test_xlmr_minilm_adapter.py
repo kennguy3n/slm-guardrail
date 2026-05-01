@@ -48,6 +48,7 @@ def _input(text: str = "hi", **signals: Any) -> dict[str, Any]:
         "scam_patterns_hit": [],
         "lexicon_hits": [],
         "media_descriptors": [],
+        "context_hints": [],
     }
     local_signals.update(signals)
     return {
