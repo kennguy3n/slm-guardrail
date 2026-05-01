@@ -210,6 +210,58 @@ COMMUNITY_SCENARIOS: tuple[Scenario, ...] = (
         group_kind="small_group",
         age_mode="adult_only",
     ),
+    Scenario(
+        "community_vn_school_homework",
+        "Các bạn ơi, ai có bài tập toán của cô Hương không? Mình quên "
+        "làm rồi.",
+        "vi",
+        "vi-VN",
+        "vn",
+        "school",
+        "community",
+        "VN (vi) school (minor_present) — benign forgotten-homework chatter.",
+        group_kind="small_group",
+        age_mode="minor_present",
+    ),
+    Scenario(
+        "community_vn_workplace_q3report",
+        "Anh chị xem lại báo cáo quý 3 giúp em nhé. Cuộc họp với khách "
+        "hàng lúc 3 giờ chiều.",
+        "vi",
+        "vi-VN",
+        "vn",
+        "workplace",
+        "community",
+        "VN (vi) workplace — benign Q3-report + client-meeting reminder.",
+        group_kind="small_group",
+        age_mode="adult_only",
+    ),
+    Scenario(
+        "community_vn_marketplace_iphone",
+        "Bán iPhone 13 cũ giá 5 triệu. Ai quan tâm inbox mình nhé. Giao "
+        "dịch trực tiếp tại Hà Nội.",
+        "vi",
+        "vi-VN",
+        "vn",
+        "marketplace",
+        "community",
+        "VN (vi) marketplace — benign Hà Nội iPhone 13 sale listing.",
+        group_kind="open_group",
+        age_mode="mixed_age",
+    ),
+    Scenario(
+        "community_vn_health_support_tired",
+        "Dạo này mình cảm thấy rất mệt mỏi và không biết nói chuyện với "
+        "ai. Có ai từng trải qua điều này không?",
+        "vi",
+        "vi-VN",
+        "vn",
+        "health_support",
+        "community",
+        "VN (vi) health-support — peer-support disclosure.",
+        group_kind="small_group",
+        age_mode="mixed_age",
+    ),
 )
 
 
@@ -477,6 +529,32 @@ MIXED_SCENARIOS: tuple[Scenario, ...] = (
         "mixed",
         "NG (en+yo Pidgin) — friends planning to meet up.",
     ),
+    Scenario(
+        "mixed_vn_vi_en_hotpot",
+        "Ê mọi người, tối nay mình đi ăn hotpot nhé! The new place near "
+        "Bến Thành is really good.",
+        "vi",
+        "vi-VN",
+        "vn",
+        None,
+        "mixed",
+        "VN (vi+en) — benign hotpot plan near Bến Thành.",
+        group_kind="small_group",
+        age_mode="mixed_age",
+    ),
+    Scenario(
+        "mixed_vn_vi_en_url_top",
+        "Mọi người check cái link này đi, sale khủng luôn: "
+        "https://super-deal.top/giamgia free shipping nha!",
+        "vi",
+        "vi-VN",
+        "vn",
+        "marketplace",
+        "mixed",
+        "VN (vi+en) marketplace — sale link with .top TLD (URL risk).",
+        group_kind="open_group",
+        age_mode="mixed_age",
+    ),
 )
 
 
@@ -571,6 +649,32 @@ HARMFUL_SCENARIOS: tuple[Scenario, ...] = (
         "Cyrillic-homoglyph scam URL targeting a school context.",
         group_kind="small_group",
         age_mode="minor_present",
+    ),
+    Scenario(
+        "harmful_vn_scam_giveaway",
+        "CHÚC MỪNG! Bạn đã trúng thưởng 100 triệu đồng! Nhấn vào đây để "
+        "nhận giải: http://trung-thuong.xyz/nhan-giai",
+        "vi",
+        "vi-VN",
+        "vn",
+        "marketplace",
+        "harmful",
+        "VN (vi) scam giveaway with .xyz TLD — fake-prize + URL risk.",
+        group_kind="open_group",
+        age_mode="mixed_age",
+    ),
+    Scenario(
+        "harmful_vn_pii_card_email",
+        "Số thẻ tín dụng của mình là 4532-1234-5678-9012, email mình là "
+        "nguyen.van.a@gmail.com",
+        "vi",
+        "vi-VN",
+        "vn",
+        "marketplace",
+        "harmful",
+        "VN (vi) PII leak — credit card pattern + email pattern.",
+        group_kind="small_group",
+        age_mode="adult_only",
     ),
 )
 

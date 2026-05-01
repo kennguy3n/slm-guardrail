@@ -146,6 +146,38 @@ This file tracks delivery against the phased plan in
 
 ## Changelog
 
+### 2026-04-30 — Vietnam (vi-VN) demo expansion
+
+- `tools/demo_guardrail.py` — adds 8 Vietnam scenarios on top of the
+  existing demo matrix:
+  - 4 benign Vietnamese-language community scenarios (school /
+    workplace / marketplace / health_support, each with
+    `jurisdiction_cc="vn"`, `locale="vi-VN"`, `lang_hint="vi"`).
+  - 2 harmful Vietnamese-language scenarios — a `.xyz` fake-prize
+    scam and a credit-card + email PII leak — both now flag as
+    `SCAM_FRAUD` (cat 7) and `PRIVATE_DATA` (cat 9) respectively
+    with `critical_intervention` actions, exactly matching the
+    behaviour of the equivalent English scenarios.
+  - 2 Vietnamese ↔ English code-switching scenarios — a benign
+    Bến Thành hotpot plan and a `.top` TLD discount-link with
+    "free shipping" mixed copy. The `.top` link flags as
+    `SCAM_FRAUD`, confirming the URL detector fires on
+    code-switched messages.
+- Total demo coverage: **51 scenarios** across 11+ countries
+  (US, DE, JP, BR, FR, SA, IN, KR, MX, EG, ID, TH, **VN**, TR, PL,
+  NG), 8+ community types (school / workplace / gaming / dating /
+  health_support / marketplace / political / journalism / family /
+  adult_only), and 10+ mixed-language / code-switching scenarios
+  (US en+es, DE de+tr, IN hi+en, SG en+zh, CA en+fr, MY ms+en,
+  PH en+tl, CH de+fr, NG en+yo, **VN vi+en**).
+- `results/demo_results_<timestamp>.json/.md` — regenerated reports
+  show Vietnam in both the Per-scenario tables and the
+  Per-(jurisdiction, community) latency table
+  (`vn/school`, `vn/workplace`, `vn/marketplace`,
+  `vn/health_support`, `vn/none`).
+- 250 ms p95 target — still PASS at 51-case corpus
+  (overall p95 ≪ 1 ms with `MockSLMAdapter`).
+
 ### 2026-04-30 — Cross-community / cross-country demo + results
 
 - `tools/demo_guardrail.py` — end-to-end demo script exercising the

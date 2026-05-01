@@ -1,0 +1,2041 @@
+{
+  "timestamp": "2026-04-30T23:45:07Z",
+  "summary": {
+    "total_messages": 51,
+    "flagged": 13,
+    "safe": 38,
+    "per_category": {
+      "SAFE": 38,
+      "SCAM_FRAUD": 9,
+      "PRIVATE_DATA": 4
+    },
+    "per_bucket": {
+      "community": 14,
+      "country": 16,
+      "mixed": 11,
+      "harmful": 10
+    }
+  },
+  "per_scenario": [
+    {
+      "scenario_id": "community_school_homework",
+      "bucket": "community",
+      "description": "School (minor_present) — benign homework chatter.",
+      "message_text": "Hey does anyone have the homework for Ms. Johnson's class? I totally forgot about it lol",
+      "lang_hint": "en",
+      "locale": "en-US",
+      "jurisdiction_cc": "us",
+      "community": "school",
+      "group_kind": "small_group",
+      "age_mode": "minor_present",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.089
+    },
+    {
+      "scenario_id": "community_workplace_q3budget",
+      "bucket": "community",
+      "description": "Workplace — routine professional coordination.",
+      "message_text": "Please review the Q3 budget spreadsheet I shared. The client meeting is at 3pm.",
+      "lang_hint": "en",
+      "locale": "en-US",
+      "jurisdiction_cc": "us",
+      "community": "workplace",
+      "group_kind": "small_group",
+      "age_mode": "adult_only",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.138
+    },
+    {
+      "scenario_id": "community_gaming_queue",
+      "bucket": "community",
+      "description": "Gaming — post-match social chatter.",
+      "message_text": "GG everyone! That last round was insane. Anyone want to queue up for another match?",
+      "lang_hint": "en",
+      "locale": "en-US",
+      "jurisdiction_cc": "us",
+      "community": "gaming",
+      "group_kind": "large_room",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.043
+    },
+    {
+      "scenario_id": "community_dating_dinner",
+      "bucket": "community",
+      "description": "Dating (adult_only) — benign post-date follow-up.",
+      "message_text": "Had a great time last night! Would love to grab dinner again this weekend.",
+      "lang_hint": "en",
+      "locale": "en-US",
+      "jurisdiction_cc": "us",
+      "community": "dating",
+      "group_kind": "dyadic",
+      "age_mode": "adult_only",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.035
+    },
+    {
+      "scenario_id": "community_health_support_down",
+      "bucket": "community",
+      "description": "Health support — peer-support disclosure.",
+      "message_text": "I've been feeling really down lately and don't know who to talk to. Has anyone else dealt with this?",
+      "lang_hint": "en",
+      "locale": "en-US",
+      "jurisdiction_cc": "us",
+      "community": "health_support",
+      "group_kind": "large_room",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.044
+    },
+    {
+      "scenario_id": "community_marketplace_iphone",
+      "bucket": "community",
+      "description": "Marketplace — benign sale listing.",
+      "message_text": "Selling my old iPhone 13 for $200. DM me if interested. Local pickup only.",
+      "lang_hint": "en",
+      "locale": "en-US",
+      "jurisdiction_cc": "us",
+      "community": "marketplace",
+      "group_kind": "large_room",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.037
+    },
+    {
+      "scenario_id": "community_political_broadband",
+      "bucket": "community",
+      "description": "Political — civic policy discussion.",
+      "message_text": "The new infrastructure bill has some interesting provisions for rural broadband access.",
+      "lang_hint": "en",
+      "locale": "en-US",
+      "jurisdiction_cc": "us",
+      "community": "political",
+      "group_kind": "large_room",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.038
+    },
+    {
+      "scenario_id": "community_journalism_transit",
+      "bucket": "community",
+      "description": "Journalism — neutral news bulletin.",
+      "message_text": "Breaking: City council votes 7-2 to approve the new transit expansion plan.",
+      "lang_hint": "en",
+      "locale": "en-US",
+      "jurisdiction_cc": "us",
+      "community": "journalism",
+      "group_kind": "large_room",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.036
+    },
+    {
+      "scenario_id": "community_family_dinner",
+      "bucket": "community",
+      "description": "Family — household coordination.",
+      "message_text": "Don't forget Grandma's birthday dinner on Sunday — bring the photo album!",
+      "lang_hint": "en",
+      "locale": "en-US",
+      "jurisdiction_cc": "us",
+      "community": "family",
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.052
+    },
+    {
+      "scenario_id": "community_adult_only_party",
+      "bucket": "community",
+      "description": "Adult-only — adult-gated social plan.",
+      "message_text": "After-party at my place — drinks on me. 21+ only please.",
+      "lang_hint": "en",
+      "locale": "en-US",
+      "jurisdiction_cc": "us",
+      "community": "adult_only",
+      "group_kind": "small_group",
+      "age_mode": "adult_only",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.031
+    },
+    {
+      "scenario_id": "community_vn_school_homework",
+      "bucket": "community",
+      "description": "VN (vi) school (minor_present) — benign forgotten-homework chatter.",
+      "message_text": "Các bạn ơi, ai có bài tập toán của cô Hương không? Mình quên làm rồi.",
+      "lang_hint": "vi",
+      "locale": "vi-VN",
+      "jurisdiction_cc": "vn",
+      "community": "school",
+      "group_kind": "small_group",
+      "age_mode": "minor_present",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.036
+    },
+    {
+      "scenario_id": "community_vn_workplace_q3report",
+      "bucket": "community",
+      "description": "VN (vi) workplace — benign Q3-report + client-meeting reminder.",
+      "message_text": "Anh chị xem lại báo cáo quý 3 giúp em nhé. Cuộc họp với khách hàng lúc 3 giờ chiều.",
+      "lang_hint": "vi",
+      "locale": "vi-VN",
+      "jurisdiction_cc": "vn",
+      "community": "workplace",
+      "group_kind": "small_group",
+      "age_mode": "adult_only",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.04
+    },
+    {
+      "scenario_id": "community_vn_marketplace_iphone",
+      "bucket": "community",
+      "description": "VN (vi) marketplace — benign Hà Nội iPhone 13 sale listing.",
+      "message_text": "Bán iPhone 13 cũ giá 5 triệu. Ai quan tâm inbox mình nhé. Giao dịch trực tiếp tại Hà Nội.",
+      "lang_hint": "vi",
+      "locale": "vi-VN",
+      "jurisdiction_cc": "vn",
+      "community": "marketplace",
+      "group_kind": "open_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.042
+    },
+    {
+      "scenario_id": "community_vn_health_support_tired",
+      "bucket": "community",
+      "description": "VN (vi) health-support — peer-support disclosure.",
+      "message_text": "Dạo này mình cảm thấy rất mệt mỏi và không biết nói chuyện với ai. Có ai từng trải qua điều này không?",
+      "lang_hint": "vi",
+      "locale": "vi-VN",
+      "jurisdiction_cc": "vn",
+      "community": "health_support",
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.045
+    },
+    {
+      "scenario_id": "country_us_scam_xyz",
+      "bucket": "country",
+      "description": "US (en) — fake giveaway with .xyz TLD (should flag).",
+      "message_text": "Check out this amazing deal at www.totally-legit-prizes.xyz — you won a free iPhone!",
+      "lang_hint": "en",
+      "locale": "en-US",
+      "jurisdiction_cc": "us",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 3,
+        "category": 7,
+        "confidence": 0.9,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": true,
+          "suggest_redact": false
+        },
+        "reason_codes": [
+          "URL_RISK",
+          "SCAM_PATTERN"
+        ],
+        "rationale_id": "scam_credential_phish_v1"
+      },
+      "flagged": true,
+      "latency_ms": 0.065
+    },
+    {
+      "scenario_id": "country_de_bike",
+      "bucket": "country",
+      "description": "DE (de) — benign marketplace listing.",
+      "message_text": "Verkaufe mein altes Fahrrad für 50 Euro. Abholung in Berlin möglich.",
+      "lang_hint": "de",
+      "locale": "de-DE",
+      "jurisdiction_cc": "de",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.062
+    },
+    {
+      "scenario_id": "country_jp_meeting",
+      "bucket": "country",
+      "description": "JP (ja) — benign meeting reminder.",
+      "message_text": "今日の会議は午後3時からです。資料を事前に確認してください。",
+      "lang_hint": "ja",
+      "locale": "ja-JP",
+      "jurisdiction_cc": "jp",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.127
+    },
+    {
+      "scenario_id": "country_br_restaurant",
+      "bucket": "country",
+      "description": "BR (pt) — benign question about restaurants.",
+      "message_text": "Alguém sabe onde posso encontrar um bom restaurante no centro?",
+      "lang_hint": "pt",
+      "locale": "pt-BR",
+      "jurisdiction_cc": "br",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.04
+    },
+    {
+      "scenario_id": "country_fr_meeting",
+      "bucket": "country",
+      "description": "FR (fr) — benign meeting reschedule.",
+      "message_text": "Bonjour à tous, la réunion de demain est reportée à jeudi.",
+      "lang_hint": "fr",
+      "locale": "fr-FR",
+      "jurisdiction_cc": "fr",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.032
+    },
+    {
+      "scenario_id": "country_sa_meeting",
+      "bucket": "country",
+      "description": "SA (ar) — benign meeting reschedule.",
+      "message_text": "مرحبا بالجميع، اجتماع الغد تم تأجيله إلى يوم الخميس",
+      "lang_hint": "ar",
+      "locale": "ar-SA",
+      "jurisdiction_cc": "sa",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.129
+    },
+    {
+      "scenario_id": "country_in_phone_email",
+      "bucket": "country",
+      "description": "IN (hi+en) — Hinglish PII request (email pattern triggers).",
+      "message_text": "Kya aap mujhe apna phone number de sakte hain? Mera email hai test@example.com",
+      "lang_hint": "hi",
+      "locale": "hi-IN",
+      "jurisdiction_cc": "in",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 3,
+        "category": 9,
+        "confidence": 0.65,
+        "actions": {
+          "label_only": false,
+          "warn": true,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": true
+        },
+        "reason_codes": [
+          "PRIVATE_DATA_PATTERN"
+        ],
+        "rationale_id": "private_data_pii_v1"
+      },
+      "flagged": true,
+      "latency_ms": 0.051
+    },
+    {
+      "scenario_id": "country_kr_dinner",
+      "bucket": "country",
+      "description": "KR (ko) — benign dinner-plan question.",
+      "message_text": "오늘 저녁에 같이 밥 먹을 사람 있나요?",
+      "lang_hint": "ko",
+      "locale": "ko-KR",
+      "jurisdiction_cc": "kr",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.023
+    },
+    {
+      "scenario_id": "country_mx_football",
+      "bucket": "country",
+      "description": "MX (es) — benign weekend plans.",
+      "message_text": "¿Alguien quiere ir al partido de fútbol este fin de semana?",
+      "lang_hint": "es",
+      "locale": "es-MX",
+      "jurisdiction_cc": "mx",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.032
+    },
+    {
+      "scenario_id": "country_eg_doctor",
+      "bucket": "country",
+      "description": "EG (ar) — benign request for help finding a doctor.",
+      "message_text": "هل يمكن لأحد مساعدتي في العثور على طبيب جيد في القاهرة؟",
+      "lang_hint": "ar",
+      "locale": "ar-EG",
+      "jurisdiction_cc": "eg",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.031
+    },
+    {
+      "scenario_id": "country_id_lunch",
+      "bucket": "country",
+      "description": "ID (id) — benign lunch plan.",
+      "message_text": "Ada yang mau makan siang bareng nanti? Saya di kantor pusat.",
+      "lang_hint": "id",
+      "locale": "id-ID",
+      "jurisdiction_cc": "id",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.029
+    },
+    {
+      "scenario_id": "country_th_weather",
+      "bucket": "country",
+      "description": "TH (th) — benign weather advice.",
+      "message_text": "วันนี้ฝนตกหนักมาก อย่าลืมพกร่มออกไปข้างนอกนะ",
+      "lang_hint": "th",
+      "locale": "th-TH",
+      "jurisdiction_cc": "th",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.062
+    },
+    {
+      "scenario_id": "country_vn_dinner",
+      "bucket": "country",
+      "description": "VN (vi) — benign dinner-plan question.",
+      "message_text": "Tối nay mọi người có muốn đi ăn phở cùng nhau không?",
+      "lang_hint": "vi",
+      "locale": "vi-VN",
+      "jurisdiction_cc": "vn",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.055
+    },
+    {
+      "scenario_id": "country_tr_meeting",
+      "bucket": "country",
+      "description": "TR (tr) — benign meeting reschedule.",
+      "message_text": "Yarınki toplantıyı saat üçe ertelediğimizi unutmayın.",
+      "lang_hint": "tr",
+      "locale": "tr-TR",
+      "jurisdiction_cc": "tr",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.061
+    },
+    {
+      "scenario_id": "country_pl_holiday",
+      "bucket": "country",
+      "description": "PL (pl) — benign weekend trip carpool.",
+      "message_text": "Czy ktoś planuje weekendowy wyjazd w góry? Mam jedno wolne miejsce w samochodzie.",
+      "lang_hint": "pl",
+      "locale": "pl-PL",
+      "jurisdiction_cc": "pl",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.04
+    },
+    {
+      "scenario_id": "country_ng_event",
+      "bucket": "country",
+      "description": "NG (en Pidgin) — benign meet-up reminder.",
+      "message_text": "Make una no forget say the meet-up dey hold for Lagos this Saturday by 4pm sharp.",
+      "lang_hint": "en",
+      "locale": "en-NG",
+      "jurisdiction_cc": "ng",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.038
+    },
+    {
+      "scenario_id": "mixed_us_en_es",
+      "bucket": "mixed",
+      "description": "US (en+es) — bilingual friends-and-food chatter.",
+      "message_text": "Hey amigos, the fiesta is at mi casa tonight. Bring some comida!",
+      "lang_hint": "en",
+      "locale": "en-US",
+      "jurisdiction_cc": "us",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.031
+    },
+    {
+      "scenario_id": "mixed_de_de_tr",
+      "bucket": "mixed",
+      "description": "DE (de+tr) — Turkish-German diaspora coordination.",
+      "message_text": "Morgen treffen wir uns im Café, tamam mı? Bring deine Freunde mit.",
+      "lang_hint": "de",
+      "locale": "de-DE",
+      "jurisdiction_cc": "de",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.032
+    },
+    {
+      "scenario_id": "mixed_in_hi_en_hinglish",
+      "bucket": "mixed",
+      "description": "IN (hi+en) — Hinglish workplace banter.",
+      "message_text": "Yaar, ye meeting bahut boring thi. Let's grab chai after work.",
+      "lang_hint": "hi",
+      "locale": "hi-IN",
+      "jurisdiction_cc": "in",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.034
+    },
+    {
+      "scenario_id": "mixed_sg_en_zh",
+      "bucket": "mixed",
+      "description": "SG (en+zh) — Singlish hotpot plan.",
+      "message_text": "Eh later we go makan at that new 火锅 place near MRT lah",
+      "lang_hint": "en",
+      "locale": "en-SG",
+      "jurisdiction_cc": "sg",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.059
+    },
+    {
+      "scenario_id": "mixed_ca_en_fr",
+      "bucket": "mixed",
+      "description": "CA (en+fr) — bilingual workplace reminder.",
+      "message_text": "The meeting est à trois heures. Don't forget your rapport.",
+      "lang_hint": "en",
+      "locale": "en-CA",
+      "jurisdiction_cc": "ca",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.033
+    },
+    {
+      "scenario_id": "mixed_my_ms_en",
+      "bucket": "mixed",
+      "description": "MY (ms+en) — Malay-English food recommendation.",
+      "message_text": "Jom pergi lunch dekat that new restaurant. The food memang sedap!",
+      "lang_hint": "ms",
+      "locale": "ms-MY",
+      "jurisdiction_cc": "my",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.031
+    },
+    {
+      "scenario_id": "mixed_ph_en_tl",
+      "bucket": "mixed",
+      "description": "PH (en+tl) — Taglish meet-up plan.",
+      "message_text": "Guys, let's meet sa mall later. Dala na kayo ng mga gamit niyo.",
+      "lang_hint": "en",
+      "locale": "en-PH",
+      "jurisdiction_cc": "ph",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.029
+    },
+    {
+      "scenario_id": "mixed_ch_de_fr",
+      "bucket": "mixed",
+      "description": "CH (de+fr) — Swiss bilingual workplace reminder.",
+      "message_text": "Das Meeting ist um drei Uhr. N'oubliez pas vos documents.",
+      "lang_hint": "de",
+      "locale": "de-CH",
+      "jurisdiction_cc": "ch",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.028
+    },
+    {
+      "scenario_id": "mixed_ng_en_yo",
+      "bucket": "mixed",
+      "description": "NG (en+yo Pidgin) — friends planning to meet up.",
+      "message_text": "How far now? E don tey we no see. Make we link up this evening.",
+      "lang_hint": "en",
+      "locale": "en-NG",
+      "jurisdiction_cc": "ng",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.03
+    },
+    {
+      "scenario_id": "mixed_vn_vi_en_hotpot",
+      "bucket": "mixed",
+      "description": "VN (vi+en) — benign hotpot plan near Bến Thành.",
+      "message_text": "Ê mọi người, tối nay mình đi ăn hotpot nhé! The new place near Bến Thành is really good.",
+      "lang_hint": "vi",
+      "locale": "vi-VN",
+      "jurisdiction_cc": "vn",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.05,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [],
+        "rationale_id": "safe_benign_v1"
+      },
+      "flagged": false,
+      "latency_ms": 0.041
+    },
+    {
+      "scenario_id": "mixed_vn_vi_en_url_top",
+      "bucket": "mixed",
+      "description": "VN (vi+en) marketplace — sale link with .top TLD (URL risk).",
+      "message_text": "Mọi người check cái link này đi, sale khủng luôn: https://super-deal.top/giamgia free shipping nha!",
+      "lang_hint": "vi",
+      "locale": "vi-VN",
+      "jurisdiction_cc": "vn",
+      "community": "marketplace",
+      "group_kind": "open_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 3,
+        "category": 7,
+        "confidence": 0.9,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": true,
+          "suggest_redact": false
+        },
+        "reason_codes": [
+          "URL_RISK"
+        ],
+        "rationale_id": "scam_credential_phish_v1"
+      },
+      "flagged": true,
+      "latency_ms": 0.061
+    },
+    {
+      "scenario_id": "harmful_scam_giveaway",
+      "bucket": "harmful",
+      "description": "Scam giveaway with .xyz TLD — fake-giveaway + URL risk.",
+      "message_text": "CONGRATULATIONS! You have won $10,000! Click here to claim your prize: http://scam-site.xyz/claim",
+      "lang_hint": "en",
+      "locale": "en-US",
+      "jurisdiction_cc": "us",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 3,
+        "category": 7,
+        "confidence": 0.9,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": true,
+          "suggest_redact": false
+        },
+        "reason_codes": [
+          "URL_RISK",
+          "SCAM_PATTERN"
+        ],
+        "rationale_id": "scam_credential_phish_v1"
+      },
+      "flagged": true,
+      "latency_ms": 0.054
+    },
+    {
+      "scenario_id": "harmful_pii_card_ssn",
+      "bucket": "harmful",
+      "description": "PII leak — credit card pattern + phone-style SSN trigger.",
+      "message_text": "My credit card number is 4532-1234-5678-9012 and my SSN is 123-45-6789",
+      "lang_hint": "en",
+      "locale": "en-US",
+      "jurisdiction_cc": "us",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 3,
+        "category": 9,
+        "confidence": 0.75,
+        "actions": {
+          "label_only": false,
+          "warn": true,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": true
+        },
+        "reason_codes": [
+          "PRIVATE_DATA_PATTERN"
+        ],
+        "rationale_id": "private_data_pii_v1"
+      },
+      "flagged": true,
+      "latency_ms": 0.041
+    },
+    {
+      "scenario_id": "harmful_phishing_password",
+      "bucket": "harmful",
+      "description": "Phishing — credential-harvest pattern + .top TLD.",
+      "message_text": "Please verify your account password immediately at https://secure-login.top/verify",
+      "lang_hint": "en",
+      "locale": "en-US",
+      "jurisdiction_cc": "us",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 3,
+        "category": 7,
+        "confidence": 0.9,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": true,
+          "suggest_redact": false
+        },
+        "reason_codes": [
+          "URL_RISK",
+          "SCAM_PATTERN"
+        ],
+        "rationale_id": "scam_credential_phish_v1"
+      },
+      "flagged": true,
+      "latency_ms": 0.047
+    },
+    {
+      "scenario_id": "harmful_de_url_risk",
+      "bucket": "harmful",
+      "description": "DE phishing URL with .click TLD + login keyword.",
+      "message_text": "Klicken Sie hier um Ihr Konto zu aktualisieren: https://bank-verify.click/login",
+      "lang_hint": "de",
+      "locale": "de-DE",
+      "jurisdiction_cc": "de",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 3,
+        "category": 7,
+        "confidence": 0.9,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": true,
+          "suggest_redact": false
+        },
+        "reason_codes": [
+          "URL_RISK",
+          "SCAM_PATTERN"
+        ],
+        "rationale_id": "scam_credential_phish_v1"
+      },
+      "flagged": true,
+      "latency_ms": 0.047
+    },
+    {
+      "scenario_id": "harmful_mixed_es_en_scam",
+      "bucket": "harmful",
+      "description": "Mixed (es+en) advance-fee scam — wire/transfer/fee pattern.",
+      "message_text": "¡Felicidades! You won a premio. Send your datos to claim: wire transfer fee of $50",
+      "lang_hint": "es",
+      "locale": "es-MX",
+      "jurisdiction_cc": "mx",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 3,
+        "category": 7,
+        "confidence": 0.75,
+        "actions": {
+          "label_only": false,
+          "warn": true,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": false
+        },
+        "reason_codes": [
+          "SCAM_PATTERN"
+        ],
+        "rationale_id": "scam_credential_phish_v1"
+      },
+      "flagged": true,
+      "latency_ms": 0.041
+    },
+    {
+      "scenario_id": "harmful_email_phone_pii",
+      "bucket": "harmful",
+      "description": "PII — email + phone patterns in routine outbound message.",
+      "message_text": "Please contact me at john.doe@example.com or call +1-415-555-0199 anytime.",
+      "lang_hint": "en",
+      "locale": "en-US",
+      "jurisdiction_cc": "us",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 3,
+        "category": 9,
+        "confidence": 0.75,
+        "actions": {
+          "label_only": false,
+          "warn": true,
+          "strong_warn": false,
+          "critical_intervention": false,
+          "suggest_redact": true
+        },
+        "reason_codes": [
+          "PRIVATE_DATA_PATTERN"
+        ],
+        "rationale_id": "private_data_pii_v1"
+      },
+      "flagged": true,
+      "latency_ms": 0.038
+    },
+    {
+      "scenario_id": "harmful_url_login_top",
+      "bucket": "harmful",
+      "description": "Phishing — credential-harvest pattern + .top TLD + login keyword.",
+      "message_text": "Important: re-confirm your account at https://account-secure.top/login before midnight.",
+      "lang_hint": "en",
+      "locale": "en-US",
+      "jurisdiction_cc": "us",
+      "community": null,
+      "group_kind": "small_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 3,
+        "category": 7,
+        "confidence": 0.9,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": true,
+          "suggest_redact": false
+        },
+        "reason_codes": [
+          "URL_RISK",
+          "SCAM_PATTERN"
+        ],
+        "rationale_id": "scam_credential_phish_v1"
+      },
+      "flagged": true,
+      "latency_ms": 0.051
+    },
+    {
+      "scenario_id": "harmful_school_homoglyph",
+      "bucket": "harmful",
+      "description": "Cyrillic-homoglyph scam URL targeting a school context.",
+      "message_text": "Hey kids, claim your prize at www.frеe-iphоnе.click — limited time only!",
+      "lang_hint": "en",
+      "locale": "en-US",
+      "jurisdiction_cc": "us",
+      "community": "school",
+      "group_kind": "small_group",
+      "age_mode": "minor_present",
+      "classification": {
+        "severity": 3,
+        "category": 7,
+        "confidence": 0.9,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": true,
+          "suggest_redact": false
+        },
+        "reason_codes": [
+          "URL_RISK",
+          "SCAM_PATTERN"
+        ],
+        "rationale_id": "scam_credential_phish_v1"
+      },
+      "flagged": true,
+      "latency_ms": 0.047
+    },
+    {
+      "scenario_id": "harmful_vn_scam_giveaway",
+      "bucket": "harmful",
+      "description": "VN (vi) scam giveaway with .xyz TLD — fake-prize + URL risk.",
+      "message_text": "CHÚC MỪNG! Bạn đã trúng thưởng 100 triệu đồng! Nhấn vào đây để nhận giải: http://trung-thuong.xyz/nhan-giai",
+      "lang_hint": "vi",
+      "locale": "vi-VN",
+      "jurisdiction_cc": "vn",
+      "community": "marketplace",
+      "group_kind": "open_group",
+      "age_mode": "mixed_age",
+      "classification": {
+        "severity": 3,
+        "category": 7,
+        "confidence": 0.9,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": true,
+          "suggest_redact": false
+        },
+        "reason_codes": [
+          "URL_RISK"
+        ],
+        "rationale_id": "scam_credential_phish_v1"
+      },
+      "flagged": true,
+      "latency_ms": 0.06
+    },
+    {
+      "scenario_id": "harmful_vn_pii_card_email",
+      "bucket": "harmful",
+      "description": "VN (vi) PII leak — credit card pattern + email pattern.",
+      "message_text": "Số thẻ tín dụng của mình là 4532-1234-5678-9012, email mình là nguyen.van.a@gmail.com",
+      "lang_hint": "vi",
+      "locale": "vi-VN",
+      "jurisdiction_cc": "vn",
+      "community": "marketplace",
+      "group_kind": "small_group",
+      "age_mode": "adult_only",
+      "classification": {
+        "severity": 3,
+        "category": 9,
+        "confidence": 0.8500000000000001,
+        "actions": {
+          "label_only": false,
+          "warn": false,
+          "strong_warn": false,
+          "critical_intervention": true,
+          "suggest_redact": true
+        },
+        "reason_codes": [
+          "PRIVATE_DATA_PATTERN"
+        ],
+        "rationale_id": "private_data_pii_v1"
+      },
+      "flagged": true,
+      "latency_ms": 0.044
+    }
+  ],
+  "latency_report": {
+    "overall": {
+      "total_cases": 51,
+      "iterations": 100,
+      "p50_ms": 0.032,
+      "p95_ms": 0.062,
+      "p99_ms": 0.099,
+      "mean_ms": 0.035,
+      "max_ms": 0.691,
+      "min_ms": 0.015
+    },
+    "per_group": {
+      "br/none": {
+        "jurisdiction_cc": "br",
+        "community": null,
+        "scenario_ids": [
+          "country_br_restaurant"
+        ],
+        "total_cases": 1,
+        "iterations": 100,
+        "p50_ms": 0.026,
+        "p95_ms": 0.051,
+        "p99_ms": 0.071,
+        "mean_ms": 0.03,
+        "max_ms": 0.174,
+        "min_ms": 0.026
+      },
+      "ca/none": {
+        "jurisdiction_cc": "ca",
+        "community": null,
+        "scenario_ids": [
+          "mixed_ca_en_fr"
+        ],
+        "total_cases": 1,
+        "iterations": 100,
+        "p50_ms": 0.025,
+        "p95_ms": 0.056,
+        "p99_ms": 0.091,
+        "mean_ms": 0.031,
+        "max_ms": 0.244,
+        "min_ms": 0.024
+      },
+      "ch/none": {
+        "jurisdiction_cc": "ch",
+        "community": null,
+        "scenario_ids": [
+          "mixed_ch_de_fr"
+        ],
+        "total_cases": 1,
+        "iterations": 100,
+        "p50_ms": 0.024,
+        "p95_ms": 0.044,
+        "p99_ms": 0.052,
+        "mean_ms": 0.027,
+        "max_ms": 0.137,
+        "min_ms": 0.024
+      },
+      "de/none": {
+        "jurisdiction_cc": "de",
+        "community": null,
+        "scenario_ids": [
+          "country_de_bike",
+          "mixed_de_de_tr",
+          "harmful_de_url_risk"
+        ],
+        "total_cases": 3,
+        "iterations": 100,
+        "p50_ms": 0.03,
+        "p95_ms": 0.06,
+        "p99_ms": 0.082,
+        "mean_ms": 0.035,
+        "max_ms": 0.178,
+        "min_ms": 0.027
+      },
+      "eg/none": {
+        "jurisdiction_cc": "eg",
+        "community": null,
+        "scenario_ids": [
+          "country_eg_doctor"
+        ],
+        "total_cases": 1,
+        "iterations": 100,
+        "p50_ms": 0.027,
+        "p95_ms": 0.046,
+        "p99_ms": 0.06,
+        "mean_ms": 0.028,
+        "max_ms": 0.062,
+        "min_ms": 0.026
+      },
+      "fr/none": {
+        "jurisdiction_cc": "fr",
+        "community": null,
+        "scenario_ids": [
+          "country_fr_meeting"
+        ],
+        "total_cases": 1,
+        "iterations": 100,
+        "p50_ms": 0.025,
+        "p95_ms": 0.047,
+        "p99_ms": 0.057,
+        "mean_ms": 0.027,
+        "max_ms": 0.06,
+        "min_ms": 0.025
+      },
+      "id/none": {
+        "jurisdiction_cc": "id",
+        "community": null,
+        "scenario_ids": [
+          "country_id_lunch"
+        ],
+        "total_cases": 1,
+        "iterations": 100,
+        "p50_ms": 0.025,
+        "p95_ms": 0.048,
+        "p99_ms": 0.059,
+        "mean_ms": 0.027,
+        "max_ms": 0.061,
+        "min_ms": 0.025
+      },
+      "in/none": {
+        "jurisdiction_cc": "in",
+        "community": null,
+        "scenario_ids": [
+          "country_in_phone_email",
+          "mixed_in_hi_en_hinglish"
+        ],
+        "total_cases": 2,
+        "iterations": 100,
+        "p50_ms": 0.031,
+        "p95_ms": 0.056,
+        "p99_ms": 0.071,
+        "mean_ms": 0.032,
+        "max_ms": 0.098,
+        "min_ms": 0.026
+      },
+      "jp/none": {
+        "jurisdiction_cc": "jp",
+        "community": null,
+        "scenario_ids": [
+          "country_jp_meeting"
+        ],
+        "total_cases": 1,
+        "iterations": 100,
+        "p50_ms": 0.018,
+        "p95_ms": 0.022,
+        "p99_ms": 0.041,
+        "mean_ms": 0.019,
+        "max_ms": 0.047,
+        "min_ms": 0.018
+      },
+      "kr/none": {
+        "jurisdiction_cc": "kr",
+        "community": null,
+        "scenario_ids": [
+          "country_kr_dinner"
+        ],
+        "total_cases": 1,
+        "iterations": 100,
+        "p50_ms": 0.015,
+        "p95_ms": 0.016,
+        "p99_ms": 0.035,
+        "mean_ms": 0.015,
+        "max_ms": 0.036,
+        "min_ms": 0.014
+      },
+      "mx/none": {
+        "jurisdiction_cc": "mx",
+        "community": null,
+        "scenario_ids": [
+          "country_mx_football",
+          "harmful_mixed_es_en_scam"
+        ],
+        "total_cases": 2,
+        "iterations": 100,
+        "p50_ms": 0.033,
+        "p95_ms": 0.057,
+        "p99_ms": 0.071,
+        "mean_ms": 0.033,
+        "max_ms": 0.163,
+        "min_ms": 0.025
+      },
+      "my/none": {
+        "jurisdiction_cc": "my",
+        "community": null,
+        "scenario_ids": [
+          "mixed_my_ms_en"
+        ],
+        "total_cases": 1,
+        "iterations": 100,
+        "p50_ms": 0.026,
+        "p95_ms": 0.046,
+        "p99_ms": 0.059,
+        "mean_ms": 0.029,
+        "max_ms": 0.09,
+        "min_ms": 0.026
+      },
+      "ng/none": {
+        "jurisdiction_cc": "ng",
+        "community": null,
+        "scenario_ids": [
+          "country_ng_event",
+          "mixed_ng_en_yo"
+        ],
+        "total_cases": 2,
+        "iterations": 100,
+        "p50_ms": 0.032,
+        "p95_ms": 0.053,
+        "p99_ms": 0.062,
+        "mean_ms": 0.033,
+        "max_ms": 0.077,
+        "min_ms": 0.027
+      },
+      "ph/none": {
+        "jurisdiction_cc": "ph",
+        "community": null,
+        "scenario_ids": [
+          "mixed_ph_en_tl"
+        ],
+        "total_cases": 1,
+        "iterations": 100,
+        "p50_ms": 0.026,
+        "p95_ms": 0.046,
+        "p99_ms": 0.059,
+        "mean_ms": 0.028,
+        "max_ms": 0.094,
+        "min_ms": 0.026
+      },
+      "pl/none": {
+        "jurisdiction_cc": "pl",
+        "community": null,
+        "scenario_ids": [
+          "country_pl_holiday"
+        ],
+        "total_cases": 1,
+        "iterations": 100,
+        "p50_ms": 0.033,
+        "p95_ms": 0.056,
+        "p99_ms": 0.07,
+        "mean_ms": 0.037,
+        "max_ms": 0.124,
+        "min_ms": 0.033
+      },
+      "sa/none": {
+        "jurisdiction_cc": "sa",
+        "community": null,
+        "scenario_ids": [
+          "country_sa_meeting"
+        ],
+        "total_cases": 1,
+        "iterations": 100,
+        "p50_ms": 0.024,
+        "p95_ms": 0.025,
+        "p99_ms": 0.043,
+        "mean_ms": 0.025,
+        "max_ms": 0.047,
+        "min_ms": 0.024
+      },
+      "sg/none": {
+        "jurisdiction_cc": "sg",
+        "community": null,
+        "scenario_ids": [
+          "mixed_sg_en_zh"
+        ],
+        "total_cases": 1,
+        "iterations": 100,
+        "p50_ms": 0.024,
+        "p95_ms": 0.054,
+        "p99_ms": 0.136,
+        "mean_ms": 0.032,
+        "max_ms": 0.367,
+        "min_ms": 0.024
+      },
+      "th/none": {
+        "jurisdiction_cc": "th",
+        "community": null,
+        "scenario_ids": [
+          "country_th_weather"
+        ],
+        "total_cases": 1,
+        "iterations": 100,
+        "p50_ms": 0.023,
+        "p95_ms": 0.03,
+        "p99_ms": 0.045,
+        "mean_ms": 0.024,
+        "max_ms": 0.054,
+        "min_ms": 0.022
+      },
+      "tr/none": {
+        "jurisdiction_cc": "tr",
+        "community": null,
+        "scenario_ids": [
+          "country_tr_meeting"
+        ],
+        "total_cases": 1,
+        "iterations": 100,
+        "p50_ms": 0.024,
+        "p95_ms": 0.042,
+        "p99_ms": 0.058,
+        "mean_ms": 0.027,
+        "max_ms": 0.163,
+        "min_ms": 0.024
+      },
+      "us/adult_only": {
+        "jurisdiction_cc": "us",
+        "community": "adult_only",
+        "scenario_ids": [
+          "community_adult_only_party"
+        ],
+        "total_cases": 1,
+        "iterations": 100,
+        "p50_ms": 0.026,
+        "p95_ms": 0.037,
+        "p99_ms": 0.063,
+        "mean_ms": 0.029,
+        "max_ms": 0.168,
+        "min_ms": 0.025
+      },
+      "us/dating": {
+        "jurisdiction_cc": "us",
+        "community": "dating",
+        "scenario_ids": [
+          "community_dating_dinner"
+        ],
+        "total_cases": 1,
+        "iterations": 100,
+        "p50_ms": 0.03,
+        "p95_ms": 0.053,
+        "p99_ms": 0.099,
+        "mean_ms": 0.033,
+        "max_ms": 0.103,
+        "min_ms": 0.029
+      },
+      "us/family": {
+        "jurisdiction_cc": "us",
+        "community": "family",
+        "scenario_ids": [
+          "community_family_dinner"
+        ],
+        "total_cases": 1,
+        "iterations": 100,
+        "p50_ms": 0.031,
+        "p95_ms": 0.057,
+        "p99_ms": 0.071,
+        "mean_ms": 0.034,
+        "max_ms": 0.092,
+        "min_ms": 0.03
+      },
+      "us/gaming": {
+        "jurisdiction_cc": "us",
+        "community": "gaming",
+        "scenario_ids": [
+          "community_gaming_queue"
+        ],
+        "total_cases": 1,
+        "iterations": 100,
+        "p50_ms": 0.032,
+        "p95_ms": 0.053,
+        "p99_ms": 0.101,
+        "mean_ms": 0.036,
+        "max_ms": 0.135,
+        "min_ms": 0.032
+      },
+      "us/health_support": {
+        "jurisdiction_cc": "us",
+        "community": "health_support",
+        "scenario_ids": [
+          "community_health_support_down"
+        ],
+        "total_cases": 1,
+        "iterations": 100,
+        "p50_ms": 0.038,
+        "p95_ms": 0.08,
+        "p99_ms": 0.331,
+        "mean_ms": 0.079,
+        "max_ms": 3.189,
+        "min_ms": 0.038
+      },
+      "us/journalism": {
+        "jurisdiction_cc": "us",
+        "community": "journalism",
+        "scenario_ids": [
+          "community_journalism_transit"
+        ],
+        "total_cases": 1,
+        "iterations": 100,
+        "p50_ms": 0.031,
+        "p95_ms": 0.034,
+        "p99_ms": 0.055,
+        "mean_ms": 0.033,
+        "max_ms": 0.062,
+        "min_ms": 0.031
+      },
+      "us/marketplace": {
+        "jurisdiction_cc": "us",
+        "community": "marketplace",
+        "scenario_ids": [
+          "community_marketplace_iphone"
+        ],
+        "total_cases": 1,
+        "iterations": 100,
+        "p50_ms": 0.031,
+        "p95_ms": 0.047,
+        "p99_ms": 0.059,
+        "mean_ms": 0.033,
+        "max_ms": 0.073,
+        "min_ms": 0.031
+      },
+      "us/none": {
+        "jurisdiction_cc": "us",
+        "community": null,
+        "scenario_ids": [
+          "country_us_scam_xyz",
+          "mixed_us_en_es",
+          "harmful_scam_giveaway",
+          "harmful_pii_card_ssn",
+          "harmful_phishing_password",
+          "harmful_email_phone_pii",
+          "harmful_url_login_top"
+        ],
+        "total_cases": 7,
+        "iterations": 100,
+        "p50_ms": 0.04,
+        "p95_ms": 0.068,
+        "p99_ms": 0.12,
+        "mean_ms": 0.041,
+        "max_ms": 0.207,
+        "min_ms": 0.026
+      },
+      "us/political": {
+        "jurisdiction_cc": "us",
+        "community": "political",
+        "scenario_ids": [
+          "community_political_broadband"
+        ],
+        "total_cases": 1,
+        "iterations": 100,
+        "p50_ms": 0.033,
+        "p95_ms": 0.076,
+        "p99_ms": 0.192,
+        "mean_ms": 0.047,
+        "max_ms": 0.718,
+        "min_ms": 0.032
+      },
+      "us/school": {
+        "jurisdiction_cc": "us",
+        "community": "school",
+        "scenario_ids": [
+          "community_school_homework",
+          "harmful_school_homoglyph"
+        ],
+        "total_cases": 2,
+        "iterations": 100,
+        "p50_ms": 0.036,
+        "p95_ms": 0.057,
+        "p99_ms": 0.072,
+        "mean_ms": 0.038,
+        "max_ms": 0.124,
+        "min_ms": 0.034
+      },
+      "us/workplace": {
+        "jurisdiction_cc": "us",
+        "community": "workplace",
+        "scenario_ids": [
+          "community_workplace_q3budget"
+        ],
+        "total_cases": 1,
+        "iterations": 100,
+        "p50_ms": 0.032,
+        "p95_ms": 0.057,
+        "p99_ms": 0.095,
+        "mean_ms": 0.035,
+        "max_ms": 0.107,
+        "min_ms": 0.031
+      },
+      "vn/health_support": {
+        "jurisdiction_cc": "vn",
+        "community": "health_support",
+        "scenario_ids": [
+          "community_vn_health_support_tired"
+        ],
+        "total_cases": 1,
+        "iterations": 100,
+        "p50_ms": 0.04,
+        "p95_ms": 0.061,
+        "p99_ms": 0.116,
+        "mean_ms": 0.044,
+        "max_ms": 0.145,
+        "min_ms": 0.039
+      },
+      "vn/marketplace": {
+        "jurisdiction_cc": "vn",
+        "community": "marketplace",
+        "scenario_ids": [
+          "community_vn_marketplace_iphone",
+          "mixed_vn_vi_en_url_top",
+          "harmful_vn_scam_giveaway",
+          "harmful_vn_pii_card_email"
+        ],
+        "total_cases": 4,
+        "iterations": 100,
+        "p50_ms": 0.045,
+        "p95_ms": 0.068,
+        "p99_ms": 0.108,
+        "mean_ms": 0.045,
+        "max_ms": 0.167,
+        "min_ms": 0.036
+      },
+      "vn/none": {
+        "jurisdiction_cc": "vn",
+        "community": null,
+        "scenario_ids": [
+          "country_vn_dinner",
+          "mixed_vn_vi_en_hotpot"
+        ],
+        "total_cases": 2,
+        "iterations": 100,
+        "p50_ms": 0.035,
+        "p95_ms": 0.05,
+        "p99_ms": 0.075,
+        "mean_ms": 0.032,
+        "max_ms": 0.099,
+        "min_ms": 0.023
+      },
+      "vn/school": {
+        "jurisdiction_cc": "vn",
+        "community": "school",
+        "scenario_ids": [
+          "community_vn_school_homework"
+        ],
+        "total_cases": 1,
+        "iterations": 100,
+        "p50_ms": 0.03,
+        "p95_ms": 0.049,
+        "p99_ms": 0.061,
+        "mean_ms": 0.031,
+        "max_ms": 0.072,
+        "min_ms": 0.029
+      },
+      "vn/workplace": {
+        "jurisdiction_cc": "vn",
+        "community": "workplace",
+        "scenario_ids": [
+          "community_vn_workplace_q3report"
+        ],
+        "total_cases": 1,
+        "iterations": 100,
+        "p50_ms": 0.035,
+        "p95_ms": 0.068,
+        "p99_ms": 0.162,
+        "mean_ms": 0.043,
+        "max_ms": 0.338,
+        "min_ms": 0.034
+      }
+    }
+  },
+  "performance_summary": {
+    "p95_target_ms": 250.0,
+    "p95_actual_ms": 0.062,
+    "passed": true
+  }
+}
