@@ -325,7 +325,7 @@ def test_pipeline_skips_counter_updates_without_group_id():
 
 
 # ---------------------------------------------------------------------------
-# SLM receives original text (not normalized form)
+# Classifier adapter receives original text (not normalized form)
 # ---------------------------------------------------------------------------
 class _RecordingAdapter:
     def __init__(self) -> None:

@@ -213,7 +213,7 @@ def test_apply_produces_valid_output_schema(
 # Input does not override thresholds
 # ---------------------------------------------------------------------------
 def test_slm_cannot_assert_warn_below_warn_threshold():
-    """An SLM that tries to emit warn=true at confidence 0.10 must be re-coerced."""
+    """A classifier output that asserts warn=true at confidence 0.10 must be re-coerced."""
     p = ThresholdPolicy()
     out = p.apply(
         _raw(

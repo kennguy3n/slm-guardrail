@@ -16,7 +16,7 @@ Key properties:
   Keystore, iOS Keychain, etc.). The reference implementation in this
   module keeps the encryption contract exercised by tests without
   adding a runtime ``cryptography`` dependency.
-* **SLM output schema aware.** :py:meth:`CounterStore.apply_counter_updates`
+* **Classifier output schema aware.** :py:meth:`CounterStore.apply_counter_updates`
   consumes the ``counter_updates`` array defined in
   ``kchat-skills/global/output_schema.json``.
 
@@ -243,7 +243,7 @@ class CounterStore:
         counter_updates: Iterable[Mapping[str, object]],
         ts: float | None = None,
     ) -> None:
-        """Apply a batch of ``counter_updates`` from the SLM output.
+        """Apply a batch of ``counter_updates`` from the encoder classifier output.
 
         ``counter_updates`` items must match the shape defined by
         ``kchat-skills/global/output_schema.json``: each entry has a

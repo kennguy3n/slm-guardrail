@@ -1,8 +1,8 @@
-"""Validation tests for the runtime SLM instruction prompt and the
-compiled-prompt format reference + example.
+"""Validation tests for the runtime classifier-bundle instruction prompt
+and the compiled-prompt format reference + example.
 
-See ARCHITECTURE.md "Runtime SLM Instruction Prompt" (lines 595-619) and
-"Compiled Prompt Example" (lines 621-660).
+See ARCHITECTURE.md "Runtime Classifier-Bundle Instruction Prompt" and
+"Compiled Prompt Example".
 """
 from __future__ import annotations
 

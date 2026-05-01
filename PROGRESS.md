@@ -1,8 +1,8 @@
-# KChat SLM Guardrail Skills — Progress
+# KChat Guardrail Skills — Progress
 
 **Status:** Complete | 100% + demo layer
-**Current phase:** Phase 6 complete — 100 jurisdiction/community skills + Bonsai-1.7B SLM integration
-**Last updated:** 2026-04-30
+**Current phase:** Phase 6 complete — 100 jurisdiction/community skills + XLM-R MiniLM-L6 encoder classifier integration
+**Last updated:** 2026-05-01
 
 This file tracks delivery against the phased plan in
 [`PHASES.md`](PHASES.md). Each phase ends with a tagged release
@@ -20,12 +20,12 @@ This file tracks delivery against the phased plan in
 - [x] `kchat-skills/global/taxonomy.yaml` — 16-category global taxonomy.
 - [x] `kchat-skills/global/severity.yaml` — 0–5 severity rubric with
   child-safety floor of 5.
-- [x] `kchat-skills/global/output_schema.json` — constrained SLM JSON
-  output schema (Draft-07 JSON Schema).
+- [x] `kchat-skills/global/output_schema.json` — constrained encoder
+  classifier JSON output schema (Draft-07 JSON Schema).
 - [x] `kchat-skills/tests/global/` — pytest validation suite for the
   files above (taxonomy, severity, output schema, baseline).
 - [x] `requirements.txt` + `pyproject.toml` (pytest, PyYAML, jsonschema).
-- [x] `kchat-skills/global/local_signal_schema.json` — SLM input contract.
+- [x] `kchat-skills/global/local_signal_schema.json` — encoder classifier input contract.
 - [x] `kchat-skills/global/privacy_contract.yaml` — eight non-negotiable
   privacy rules expressed as enforceable constraints.
 
@@ -36,8 +36,8 @@ This file tracks delivery against the phased plan in
 - [x] Complete (non-stub) `kchat.global.guardrail.baseline` with full
   privacy rules, input contract, decision-policy, and `skill_selection`
   blocks.
-- [x] Runtime SLM instruction prompt (10-rule instruction) +
-  compiled-prompt format reference at `kchat-skills/prompts/`.
+- [x] Runtime classifier-bundle instruction prompt (10-rule instruction)
+  + compiled-prompt format reference at `kchat-skills/prompts/`.
 - [x] 8 community overlay skills:
   - [x] `community.school`
   - [x] `community.family`
@@ -50,7 +50,7 @@ This file tracks delivery against the phased plan in
 - [x] Local expiring counter implementation (device-local, no upload) —
   `kchat-skills/compiler/counters.py` with a pluggable device keystore,
   group / counter scoping, time-windowed expiry, and
-  `counter_updates`-array consumption from the SLM output schema.
+  `counter_updates`-array consumption from the classifier output schema.
 - [x] Test-suite template (recall, precision, false-positive, latency
   targets) + first round of test cases for the global baseline —
   `kchat-skills/tests/test_suite_template.yaml` and
@@ -72,13 +72,13 @@ This file tracks delivery against the phased plan in
 
 ---
 
-## Phase 3 — Hybrid Local Pipeline + SLM Integration
+## Phase 3 — Hybrid Local Pipeline + Encoder Classifier Integration
 
 - [x] 7-step hybrid pipeline implementation (normalize → detectors →
-  pack signals → SLM → thresholds → JSON → counters) at
+  pack signals → encoder classifier → thresholds → JSON → counters) at
   `kchat-skills/compiler/pipeline.py`.
-- [x] SLM runtime adapter interface + reference adapter at
-  `kchat-skills/compiler/slm_adapter.py` (Protocol + `MockSLMAdapter`).
+- [x] Encoder classifier runtime adapter interface + reference adapter
+  at `kchat-skills/compiler/slm_adapter.py` (Protocol + `MockSLMAdapter`).
 - [x] Hard-coded threshold enforcement (`label_only=0.45`,
   `warn=0.62`, `strong_warn=0.78`, `critical_intervention=0.85`) at
   `kchat-skills/compiler/threshold_policy.py`, including child-safety
@@ -193,14 +193,39 @@ This file tracks delivery against the phased plan in
   report with summary tables, per-community, per-country, and
   mixed-language breakdowns, and performance metrics.
 
-### 2026-04-30 — Sample data layer + real SLM integration (Bonsai-1.7B)
+### 2026-05-01 — XLM-R MiniLM-L6 encoder classifier integration
 
-- `kchat-skills/compiler/llama_cpp_adapter.py` — `LlamaCppSLMAdapter`
-  implementing the `SLMAdapter` Protocol against a llama.cpp server
-  (kennguy3n/llama.cpp, branch prism). Connects via HTTP to the
-  OpenAI-compatible `/v1/chat/completions` endpoint with constrained
-  JSON output (`response_format: {"type": "json_object"}`,
-  `temperature: 0.0`). Uses Bonsai-1.7B-gguf from
+- `kchat-skills/compiler/xlmr_minilm_adapter.py` — `XLMRMiniLMAdapter`
+  implementing the `SLMAdapter` Protocol against the
+  `nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large` encoder
+  loaded through `transformers`. The adapter holds a single
+  `AutoModel` + `AutoTokenizer` pair, runs each classification as a
+  cosine-similarity argmax against a bank of 16 category prototype
+  embeddings, and blends the result with the deterministic local
+  signals (URL risk, PII patterns, scam patterns, lexicon hits, media
+  descriptors). Falls back to a SAFE output when the encoder weights
+  are missing, transformers/torch are unavailable, or inference
+  raises.
+
+  Replaces the previous Phase 6 `LlamaCppSLMAdapter` (Bonsai-1.7B over
+  llama.cpp's `/v1/chat/completions`) — the encoder approach is
+  faster on CPU, fully deterministic, ~12× smaller (~80 MB vs ~1 GB),
+  and avoids the unpredictability of generative output formatting.
+
+### 2026-04-30 — Sample data layer
+
+- Sample-message corpus (`kchat-skills/samples/sample_messages.yaml`)
+  and the `tools/run_guardrail_demo.py` driver were originally landed
+  alongside the deprecated llama.cpp adapter. The driver now
+  instantiates `XLMRMiniLMAdapter` instead. The remainder of this
+  entry retains its historical wording for traceability.
+
+  Earlier wording: "`kchat-skills/compiler/llama_cpp_adapter.py` —
+  `LlamaCppSLMAdapter` implementing the `SLMAdapter` Protocol against
+  a llama.cpp server (kennguy3n/llama.cpp, branch prism). Connects
+  via HTTP to the OpenAI-compatible `/v1/chat/completions` endpoint
+  with constrained JSON output (`response_format: {\"type\":
+  \"json_object\"}`, `temperature: 0.0`). Uses Bonsai-1.7B-gguf from
   https://huggingface.co/prism-ml/Bonsai-1.7B-gguf. Stdlib-only
   (`urllib.request` + `json`); falls back to a SAFE output when the
   server is unreachable, returns malformed JSON, or returns
@@ -215,22 +240,24 @@ This file tracks delivery against the phased plan in
   text.
 - `kchat-skills/samples/README.md` — sample-data format reference,
   privacy contract, and usage examples.
-- `tools/run_guardrail_demo.py` — end-to-end demo script: health-checks
-  llama-server, loads samples, compiles a prompt via `SkillPackCompiler`
-  (with optional `--jurisdiction` / `--community`), runs the pipeline
-  with either `LlamaCppSLMAdapter` or `MockSLMAdapter` (`--mock`),
-  prints a results table, optionally runs `PipelineBenchmark`
-  (`--benchmark`) and commits results (`--commit-results`).
+- `tools/run_guardrail_demo.py` — end-to-end demo script: checks for
+  XLM-R MiniLM-L6 weight availability, loads samples, compiles a
+  classifier-bundle prompt via `SkillPackCompiler` (with optional
+  `--jurisdiction` / `--community`), runs the pipeline with either
+  `XLMRMiniLMAdapter` or `MockSLMAdapter` (`--mock`), prints a
+  results table, optionally runs `PipelineBenchmark` (`--benchmark`)
+  and commits results (`--commit-results`).
 - `kchat-skills/benchmarks/` — committed benchmark results directory
-  with reproduction instructions; `bonsai_1.7b_results.json` is
+  with reproduction instructions; `xlmr_minilm_l6_results.json` is
   generated on demand by the demo script.
-- `kchat-skills/tests/global/test_llama_cpp_adapter.py` — adapter
-  Protocol conformance, fallback behaviour, JSON parsing, output
-  schema coercion, request-shape constraints (temperature 0.0,
+- `kchat-skills/tests/global/test_xlmr_minilm_adapter.py` — adapter
+  Protocol conformance, fallback behaviour, output
+  schema coercion, classification-head behaviour with stub embeddings,
+  signal-priority overrides (
   `response_format: json_object`).
 - `kchat-skills/tests/global/test_sample_messages.py` — sample data
   structural validation (required keys, taxonomy range,
-  case-id uniqueness, multi-language coverage) and MockSLMAdapter
+  case-id uniqueness, multi-language coverage) and `MockSLMAdapter`
   smoke tests.
 - `pyproject.toml` — adds optional `[project.optional-dependencies].demo`
   group (PyYAML only).
@@ -320,7 +347,8 @@ This file tracks delivery against the phased plan in
 - `kchat-skills/compiler/benchmark.py` — `PipelineBenchmark`,
   `BenchmarkCase`, `BenchmarkReport` + `default_benchmark_cases`.
   Measures p50 / p95 / p99 / mean / max / min per-message latency
-  against `MockSLMAdapter`; `passed` iff p95 ≤ 250 ms.
+  against `MockSLMAdapter` (or any other `SLMAdapter`, e.g. the
+  `XLMRMiniLMAdapter`); `passed` iff p95 ≤ 250 ms.
 - `kchat-skills/tests/global/test_benchmark.py` — constructor /
   invariant checks, per-taxonomy parametrisation (all 16 cats),
   baseline-only / jurisdiction-only / full-stack latency targets,
@@ -456,10 +484,10 @@ This file tracks delivery against the phased plan in
   / per-tag coverage floors, and a pin on the 0.07 target declared in
   the test-suite template.
 - `kchat-skills/compiler/pipeline.py` — 7-step hybrid local pipeline
-  (normalize → deterministic detectors → signal packaging → SLM adapter
-  → threshold policy → output → counter updates) with a `SkillBundle`
-  carrier and a fully offline-capable `GuardrailPipeline.classify`
-  entry point.
+  (normalize → deterministic detectors → signal packaging → encoder
+  classifier adapter → threshold policy → output → counter updates)
+  with a `SkillBundle` carrier and a fully offline-capable
+  `GuardrailPipeline.classify` entry point.
 - `kchat-skills/compiler/slm_adapter.py` — backend-agnostic
   `SLMAdapter` Protocol plus a deterministic `MockSLMAdapter` that
   maps detector signals to all 16 taxonomy categories for end-to-end
@@ -504,13 +532,13 @@ This file tracks delivery against the phased plan in
 
 ### 2026-04-29 — Phase 0 complete + Phase 1 partial
 
-- `local_signal_schema.json` — SLM input contract (Draft-07 JSON Schema).
+- `local_signal_schema.json` — encoder classifier input contract (Draft-07 JSON Schema).
 - `privacy_contract.yaml` — eight non-negotiable privacy rules as
   enforceable constraints.
 - Phase 0 complete: all foundation artifacts landed.
 - Complete (non-stub) `baseline.yaml` with full privacy rules, input
   contract references.
-- Runtime SLM instruction prompt (`runtime_instruction.txt`) — 10-rule
+- Runtime classifier-bundle instruction prompt (`runtime_instruction.txt`) — 10-rule
   instruction.
 - Compiled-prompt format reference and workplace example.
 - 8 community overlay skills: school, family, workplace, adult_only,
@@ -528,7 +556,7 @@ This file tracks delivery against the phased plan in
   and child-safety policy stub.
 - 16-category global taxonomy (`taxonomy.yaml`).
 - 0–5 severity rubric (`severity.yaml`) with child-safety floor of 5.
-- Constrained SLM JSON output schema (`output_schema.json`, Draft-07).
+- Constrained encoder classifier JSON output schema (`output_schema.json`, Draft-07).
 - Pytest validation suite covering taxonomy, severity, output schema,
   and baseline structure (40 tests).
 - `requirements.txt` and `pyproject.toml` for the test toolchain

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Orchestrate the full benchmark-record-commit workflow for the
-# slm-guardrail pipeline.
+# kchat guardrail pipeline (XLM-R MiniLM-L6 encoder classifier).
 #
 # Steps:
-#   1. Verify Python deps and (optionally) check llama-server health.
-#      If llama-server is not reachable, fall back to --mock.
+#   1. Verify Python deps and (optionally) check that the XLM-R MiniLM-L6
+#      encoder weights are resolvable locally. If they are not, fall
+#      back to --mock automatically.
 #   2. Run the pipeline benchmark via tools/run_guardrail_demo.py
 #      and (when applicable) the deterministic mock reference.
 #   3. Run the cross-community / cross-country demo via
@@ -18,7 +19,7 @@
 # P95_LATENCY_TARGET_MS).
 #
 # Usage:
-#   tools/run_benchmark.sh                # real Bonsai-1.7B + mock + commit
+#   tools/run_benchmark.sh                # real XLM-R MiniLM-L6 + mock + commit
 #   tools/run_benchmark.sh --mock         # mock only, commit
 #   tools/run_benchmark.sh --mock --no-commit
 #   tools/run_benchmark.sh --mock --push
@@ -32,14 +33,14 @@ NO_COMMIT=0
 PUSH=0
 ITERATIONS=100
 WARMUP=5
-SERVER_URL="${LLAMA_SERVER_URL:-http://localhost:8080}"
+MODEL_PATH="${KCHAT_MODEL_PATH:-nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large}"
 P95_TARGET_MS="250"
 
 usage() {
   cat <<EOF
 Usage: $(basename "$0") [--mock] [--no-commit] [--push]
                        [--iterations N] [--warmup N]
-                       [--server-url URL]
+                       [--model-path PATH]
 
 Runs the pipeline benchmark + cross-community/cross-country demo,
 writes results to kchat-skills/benchmarks/ and results/, and
@@ -47,13 +48,14 @@ writes results to kchat-skills/benchmarks/ and results/, and
 is breached on any committed run.
 
 Flags:
-  --mock          Skip the llama-server requirement and only run the
+  --mock          Skip the encoder-weight requirement and only run the
                   deterministic MockSLMAdapter benchmark.
   --no-commit     Run benchmarks but skip the git commit step.
   --push          After committing, also git push the new commit.
   --iterations N  Per-case benchmark iterations (default: ${ITERATIONS}).
   --warmup N      Per-case warm-up iterations (default: ${WARMUP}).
-  --server-url U  llama-server base URL (default: ${SERVER_URL}).
+  --model-path P  Path or HF model id for the XLM-R MiniLM-L6 encoder
+                  (default: ${MODEL_PATH}).
   -h, --help      Show this help.
 EOF
 }
@@ -69,9 +71,9 @@ while [[ $# -gt 0 ]]; do
     --warmup)
       [[ $# -ge 2 ]] || { echo "error: --warmup requires a value" >&2; exit 2; }
       WARMUP="$2"; shift ;;
-    --server-url)
-      [[ $# -ge 2 ]] || { echo "error: --server-url requires a value" >&2; exit 2; }
-      SERVER_URL="$2"; shift ;;
+    --model-path)
+      [[ $# -ge 2 ]] || { echo "error: --model-path requires a value" >&2; exit 2; }
+      MODEL_PATH="$2"; shift ;;
     -h|--help) usage; exit 0 ;;
     *)
       echo "error: unknown argument: $1" >&2
@@ -116,31 +118,28 @@ if ! "${PYTHON}" -c "import yaml, jsonschema, cryptography" >/dev/null 2>&1; the
   exit 2
 fi
 
-is_server_alive() {
-  local url="${1%/}/health"
-  if command -v curl >/dev/null 2>&1; then
-    curl -fsS --max-time 2 "${url}" >/dev/null 2>&1
-  else
-    "${PYTHON}" - "${url}" <<'PY' >/dev/null 2>&1
-import sys, urllib.request, urllib.error
-url = sys.argv[1]
-try:
-    with urllib.request.urlopen(url, timeout=2) as resp:
-        sys.exit(0 if 200 <= resp.status < 300 else 1)
-except Exception:
-    sys.exit(1)
+# Defer the encoder-weight availability check to
+# tools/run_guardrail_demo.py (it shares is_model_available with the
+# adapter) so the bash side does not duplicate model-loading logic.
+is_model_available() {
+  local mp="${1}"
+  "${PYTHON}" - "${mp}" <<'PY' >/dev/null 2>&1
+import sys
+sys.path.insert(0, "tools")
+from run_guardrail_demo import is_model_available
+
+sys.exit(0 if is_model_available(sys.argv[1]) else 1)
 PY
-  fi
 }
 
 if [[ "${MOCK_ONLY}" -eq 0 ]]; then
-  log "Checking llama-server at ${SERVER_URL} ..."
-  if ! is_server_alive "${SERVER_URL}"; then
-    warn "llama-server not reachable at ${SERVER_URL}; falling back to --mock."
-    warn "Real Bonsai-1.7B benchmark will be SKIPPED."
+  log "Checking XLM-R MiniLM-L6 weights at ${MODEL_PATH} ..."
+  if ! is_model_available "${MODEL_PATH}"; then
+    warn "XLM-R MiniLM-L6 weights not resolvable at ${MODEL_PATH}; falling back to --mock."
+    warn "Real XLM-R MiniLM-L6 benchmark will be SKIPPED."
     MOCK_ONLY=1
   else
-    log "llama-server is alive."
+    log "XLM-R MiniLM-L6 weights are available."
   fi
 fi
 
@@ -151,13 +150,13 @@ BENCH_FILES=()
 RAN_REAL=0
 
 if [[ "${MOCK_ONLY}" -eq 0 ]]; then
-  log "Running real Bonsai-1.7B benchmark (LlamaCppSLMAdapter)..."
+  log "Running real XLM-R MiniLM-L6 benchmark (XLMRMiniLMAdapter)..."
   "${PYTHON}" tools/run_guardrail_demo.py \
-    --server-url "${SERVER_URL}" \
+    --model-path "${MODEL_PATH}" \
     --benchmark --commit-results \
     --benchmark-iterations "${ITERATIONS}" \
     --benchmark-warmup "${WARMUP}"
-  BENCH_FILES+=("kchat-skills/benchmarks/bonsai_1.7b_results.json")
+  BENCH_FILES+=("kchat-skills/benchmarks/xlmr_minilm_l6_results.json")
   RAN_REAL=1
 fi
 
@@ -167,7 +166,7 @@ log "Running deterministic mock benchmark (MockSLMAdapter)..."
   --benchmark --commit-results \
   --benchmark-iterations "${ITERATIONS}" \
   --benchmark-warmup "${WARMUP}"
-BENCH_FILES+=("kchat-skills/benchmarks/bonsai_1.7b_mock_results.json")
+BENCH_FILES+=("kchat-skills/benchmarks/xlmr_minilm_l6_mock_results.json")
 
 # ---------------------------------------------------------------------------
 # Cross-community / cross-country demo.
@@ -294,7 +293,7 @@ fi
 # ---------------------------------------------------------------------------
 echo ""
 if [[ "${RAN_REAL}" -eq 0 ]]; then
-  log "Note: real Bonsai-1.7B run was skipped (mock-only mode)."
+  log "Note: real XLM-R MiniLM-L6 run was skipped (mock-only mode)."
 fi
 
 if [[ "${OVERALL_PASSED}" -eq 1 ]]; then

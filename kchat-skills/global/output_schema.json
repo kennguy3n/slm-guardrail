@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "kchat.guardrail.output.v1",
-  "title": "KChat Guardrail SLM Output",
-  "description": "Constrained JSON output schema emitted by the on-device SLM. The runtime rejects any output that does not validate against this schema. See ARCHITECTURE.md 'Output Schema'.",
+  "title": "KChat Guardrail Encoder Classifier Output",
+  "description": "Constrained JSON output schema emitted by the on-device encoder classifier. The runtime rejects any output that does not validate against this schema. See ARCHITECTURE.md 'Output Schema'.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -78,7 +78,7 @@
     },
     "resource_link_id": {
       "type": ["string", "null"],
-      "description": "Localized resource link id (e.g. crisis hotline, electoral authority). The runtime resolves the URL locally; the SLM never emits a resolved URL."
+      "description": "Localized resource link id (e.g. crisis hotline, electoral authority). The runtime resolves the URL locally; the classifier never emits a resolved URL."
     },
     "counter_updates": {
       "type": "array",

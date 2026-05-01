@@ -1,23 +1,26 @@
-"""SLM runtime adapter — the boundary between the hybrid local pipeline
-and any tiny-SLM backend (ONNX, TFLite, llama.cpp, Core ML, etc.).
+"""Encoder classifier runtime adapter — the boundary between the
+hybrid local pipeline and any encoder-classifier backend.
+
+Reference backend: **XLM-R MiniLM-L6** (see
+:mod:`xlmr_minilm_adapter`). The Protocol itself is deliberately
+backend-agnostic: any implementation that accepts a
+``kchat.guardrail.local_signal.v1`` instance and returns a
+``kchat.guardrail.output.v1`` instance is a valid adapter — the
+pipeline never imports a specific model runtime.
 
 Spec references:
 
-* PHASES.md Phase 3 — "Define the SLM runtime adapter interface — the
-  boundary between the pipeline and any tiny-SLM backend (so we can
-  swap backends without changing skill packs)."
-* ARCHITECTURE.md "Hybrid Local Pipeline" step 4 — "SLM contextual
-  classification (tiny SLM, temperature 0.0)".
-
-The adapter is deliberately backend-agnostic: any implementation that
-accepts a ``kchat.guardrail.local_signal.v1`` instance and returns a
-``kchat.guardrail.output.v1`` instance is a valid adapter. The
-pipeline never imports a specific model runtime.
+* PHASES.md Phase 3 — "Define the runtime adapter interface — the
+  boundary between the pipeline and any encoder-classifier backend
+  (so we can swap backends without changing skill packs)."
+* ARCHITECTURE.md "Hybrid Local Pipeline" step 4 —
+  "Encoder-based contextual classification (XLM-R MiniLM-L6)".
 
 This module ships:
 
 * :class:`SLMAdapter` — the :mod:`typing.Protocol` defining the
-  contract.
+  contract. The name is preserved for backwards compatibility; it
+  matches any encoder-classifier backend.
 * :class:`MockSLMAdapter` — a deterministic reference adapter. It
   returns fixed outputs keyed off the deterministic-local-detector
   signals so the full pipeline is testable end-to-end without a real
@@ -71,7 +74,7 @@ def _safe_output() -> dict[str, Any]:
 
 @runtime_checkable
 class SLMAdapter(Protocol):
-    """Adapter contract implemented by any tiny-SLM backend.
+    """Adapter contract implemented by any encoder-classifier backend.
 
     Implementations must:
 
@@ -80,8 +83,10 @@ class SLMAdapter(Protocol):
     * Return a dict matching ``kchat.guardrail.output.v1``. The
       pipeline validates the return shape; invalid outputs are
       rejected and re-coerced to SAFE.
-    * Be deterministic at temperature 0.0 — identical input must
-      produce identical output.
+    * Be deterministic — identical input must produce identical
+      output. For encoder backends this is satisfied by argmax over
+      fixed prototype embeddings; for any future generative backend
+      the adapter must pin temperature to 0.0.
     * Run with no network access. The pipeline enforces this at the
       step-3 packaging boundary; adapters are expected not to reach
       out.
@@ -95,7 +100,9 @@ class SLMAdapter(Protocol):
 class MockSLMAdapter:
     """Deterministic reference adapter for pipeline tests.
 
-    Maps deterministic-detector signals to category outputs:
+    Used in tests, demos, and any environment that does not have the
+    XLM-R MiniLM-L6 encoder weights loaded. Maps deterministic-detector
+    signals to category outputs:
 
     * ``url_risk > 0.8`` → SCAM_FRAUD (7).
     * any ``pii_patterns_hit`` → PRIVATE_DATA (9).

@@ -1,4 +1,4 @@
-# KChat SLM Guardrail Skills — Project Proposal
+# KChat Guardrail Skills — Project Proposal
 
 ## Problem Statement
 
@@ -31,9 +31,10 @@ back door.
 
 ## Proposed Solution
 
-Run **tiny Small Language Models (SLMs) on-device** as **local safety
-assistants**. The SLM never sees anything the user is not already entitled
-to see; it classifies content already decrypted on the user's device and
+Run an **encoder classifier on-device** — the **XLM-R MiniLM-L6**
+6-layer multilingual encoder — as a **local safety assistant**. The
+classifier never sees anything the user is not already entitled to
+see; it classifies content already decrypted on the user's device and
 produces local warnings, labels, and suggestions. **No plaintext, no
 embeddings, no hashes, no message identifiers, and no evidence are uploaded
 to a server by default.**
@@ -94,21 +95,27 @@ construction.
 
 ## Design Goals
 
-1. **Run on tiny SLMs.** Compiled prompt budget: **< 1800 instruction
-   tokens**, **< 600 output tokens**, **temperature 0.0**. Models are
-   expected to run on commodity phones with no remote inference.
+1. **Run on efficient encoder models.** Reference backend:
+   **XLM-R MiniLM-L6** (~80 MB, 6 layers, 384 hidden, multilingual).
+   The compiled skill bundle still respects the **< 1800 instruction
+   token** budget so it remains compatible with any future
+   classifier backend, but the encoder itself runs as a deterministic argmax over
+   a fixed bank of prototype embeddings — no temperature, no token
+   generation. Models are expected to run on commodity phones with no
+   remote inference.
 2. **Deterministic taxonomy.** **16 global categories**, **6 severity
    levels** (0–5). Overlays may narrow categories or raise severity but
    may never invent new ones.
 3. **Constrained JSON output.** A single JSON schema consumed directly by
    the UI — no free-form prose, no chain-of-thought leakage, no novel
    fields.
-4. **Hybrid local pipeline.** Cheap deterministic detectors first; SLM does
-   only the contextual reasoning that detectors cannot. End-to-end:
-   normalize → deterministic detectors → SLM contextual classification →
-   threshold policy → local JSON → local counters.
+4. **Hybrid local pipeline.** Cheap deterministic detectors first; the
+   encoder classifier does only the contextual reasoning that detectors
+   cannot. End-to-end: normalize → deterministic detectors → encoder-based
+   contextual classification → threshold policy → local JSON → local
+   counters.
 5. **Country / community adaptation via overlays, not global model
-   changes.** The same SLM weights serve every jurisdiction; only the
+   changes.** The same encoder weights serve every jurisdiction; only the
    skill pack changes.
 6. **Anti-misuse controls.** Transparency (active packs visible to user),
    narrowness (no vague categories), protected contexts (news / satire /
@@ -125,8 +132,8 @@ construction.
 - Skill definitions (YAML) for the global baseline, jurisdiction overlays,
   and community overlays.
 - The risk taxonomy and severity rubric.
-- SLM instruction templates and the compiled-prompt format.
-- Input / output contracts (JSON schemas) for the SLM.
+- Classifier-bundle instruction templates and the compiled-prompt format.
+- Input / output contracts (JSON schemas) for the encoder classifier.
 - Test suite templates and accuracy / latency metrics.
 - A skill-pack compiler pipeline specification (authoring → review →
   compile → sign → distribute).
@@ -139,7 +146,8 @@ construction.
   including MLS, lives in the [KChat](https://github.com/kennguy3n/slm-chat-demo)
   repository. This project produces inputs to that runtime.
 - **Not a model training project.** Skills are *prompts and configs* for
-  existing tiny SLMs. We do not fine-tune or pre-train models here.
+  existing encoder classifiers (and any other backend that satisfies the
+  ``SLMAdapter`` Protocol). We do not fine-tune or pre-train models here.
 - **Not server-side moderation.** No skill output is uploaded by default.
   No skill may demand that it be.
 - **Not legal advice.** Jurisdiction packs are **product policy guidance**
@@ -156,9 +164,10 @@ construction.
   before they ship.
 - **Community admins** — pick or compose a community overlay for their
   group; the choice is visible to all members.
-- **SLM runtime engineers** — implement the on-device pipeline that
-  consumes compiled skill packs, runs the SLM, and renders local
-  warnings.
+- **Encoder classifier runtime engineers** — implement the on-device
+  pipeline that consumes compiled skill packs, runs the classifier
+  (XLM-R MiniLM-L6 today, swappable via the ``SLMAdapter`` Protocol),
+  and renders local warnings.
 
 ## Success Metrics
 

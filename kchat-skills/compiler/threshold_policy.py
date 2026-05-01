@@ -6,9 +6,9 @@ confidence thresholds (`label_only=0.45`, `warn=0.62`,
 `strong_warn=0.78`, `critical_intervention=0.85`) and uncertainty
 handling."
 
-The thresholds are **immutable**. The SLM cannot override them — a tiny
-model that tries to emit an action inconsistent with its confidence is
-re-coerced by :meth:`ThresholdPolicy.apply` before the output leaves
+The thresholds are **immutable**. The encoder classifier cannot override
+them — any classifier output that asserts an action inconsistent with
+its confidence is re-coerced by :meth:`ThresholdPolicy.apply` before the output leaves
 the device.
 
 Child-safety floor: any positive CHILD_SAFETY signal at confidence
@@ -71,8 +71,8 @@ class ThresholdPolicy:
         2. Uncertainty handling: any non-zero category with confidence
            ``< LABEL_ONLY`` is coerced to SAFE (category 0, severity 0,
            all actions false).
-        3. Action flags are recomputed from confidence — the SLM
-           cannot assert ``warn`` at confidence 0.10.
+        3. Action flags are recomputed from confidence — the
+           classifier cannot assert ``warn`` at confidence 0.10.
         4. ``suggest_redact`` from the raw output is preserved (it is
            a content-type hint, not a confidence-driven flag).
         """

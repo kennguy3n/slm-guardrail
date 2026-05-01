@@ -1,4 +1,4 @@
-# Sample message corpus for the KChat SLM Guardrail demo + benchmark harness.
+# Sample message corpus for the KChat Guardrail demo + benchmark harness.
 #
 # Spec references:
 #
@@ -16,8 +16,9 @@
 #   - message              — fields of `kchat.guardrail.local_signal.v1.message`
 #   - context              — fields of `kchat.guardrail.local_signal.v1.context`
 #   - expected_category    — taxonomy id (0..15) the *deterministic* layer +
-#                             MockSLMAdapter is expected to land on. Real SLM
-#                             output may differ; the demo prints both.
+#                             MockSLMAdapter is expected to land on. The real
+#                             encoder classifier (XLM-R MiniLM-L6) output may
+#                             differ; the demo prints both.
 #   - expected_severity    — 0..5; expected severity from the deterministic
 #                             layer. CHILD_SAFETY (1) is pinned at 5.
 #   - description          — plain-English description (no operative payload)
@@ -25,7 +26,8 @@
 # The corpus is *additive*: extending it does not regress prior cases.
 # When adding a case, prefer descriptive text over literal harm strings —
 # the deterministic detectors react to detector-shaped patterns, and
-# the SLM reasons over the descriptors plus the surrounding context.
+# the encoder classifier reasons over the descriptors plus the surrounding
+# context.
 
 - case_id: safe-greeting-01
   message:
@@ -282,8 +284,8 @@
   expected_category: 0
   expected_severity: 0
   description: >-
-    Counterspeech against hate — must remain SAFE; the SLM is expected to
-    set the COUNTERSPEECH_CONTEXT reason code where applicable.
+    Counterspeech against hate — must remain SAFE; the classifier is
+    expected to set the COUNTERSPEECH_CONTEXT reason code where applicable.
 
 - case_id: harassment-context-01
   message:
@@ -328,7 +330,7 @@
   expected_severity: 0
   description: >-
     Quoted health claim with explicit refutation — protected by NEWS /
-    QUOTED_SPEECH context; SLM is expected to label only.
+    QUOTED_SPEECH context; classifier is expected to label only.
 
 - case_id: civic-misinfo-context-01
   message:
@@ -579,7 +581,7 @@
   expected_severity: 0
   description: >-
     Mental-health resource sharing — SAFE / supportive context.
-    The SLM is expected to surface a resource_link_id for the local
+    The classifier is expected to surface a resource_link_id for the local
     crisis hotline.
 
 - case_id: drugs-education-context-01

@@ -1,7 +1,8 @@
 # Severity Rubric — kchat.global.guardrail.baseline
 #
-# 0–5 severity rubric. Severity is computed by the SLM under a hard-coded
-# thresholds policy (see ARCHITECTURE.md "Decision Policy"). Overlays may
+# 0–5 severity rubric. Severity is produced by the on-device encoder
+# classifier under a hard-coded thresholds policy (see ARCHITECTURE.md
+# "Decision Policy"). Overlays may
 # RAISE the severity floor for a given category but may not lower it below
 # the global baseline.
 #

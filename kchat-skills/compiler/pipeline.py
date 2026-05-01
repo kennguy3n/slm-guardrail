@@ -7,15 +7,17 @@ and PHASES.md Phase 3:
        transliteration).
     2. Deterministic local detectors (URL risk, PII patterns, scam
        patterns, lexicon matching, media descriptor signal extraction).
-    3. Signal packaging into the SLM input contract.
-    4. SLM contextual classification (tiny SLM, temperature 0.0).
+    3. Signal packaging into the classifier input contract.
+    4. Encoder-based contextual classification
+       (XLM-R MiniLM-L6, deterministic argmax over fixed prototype
+       embeddings).
     5. Severity / threshold policy enforcement.
     6. Local JSON output generation.
     7. Local expiring counter updates (device-local only).
 
 The pipeline is fully offline-capable: no step requires network
-access. The SLM receives the *original* text; normalization is used
-only for detector matching.
+access. The encoder receives the *original* text; normalization is
+used only for detector matching.
 """
 from __future__ import annotations
 
@@ -255,9 +257,10 @@ def pack_signals(
 ) -> dict[str, Any]:
     """Pipeline step 3: pack the structured ``kchat.guardrail.local_signal.v1``.
 
-    The pipeline supplies the ``constraints`` block (temperature 0.0,
-    max_output_tokens 600, output_format json, schema_id pinned) so the
-    SLM adapter cannot drift them.
+    The pipeline supplies the ``constraints`` block (output_format
+    json, schema_id pinned). ``temperature`` and ``max_output_tokens``
+    are kept for backwards compatibility with older skill packs but
+    are ignored by encoder-classifier backends like XLM-R MiniLM-L6.
     """
     return {
         "message": message,
@@ -285,8 +288,11 @@ class GuardrailPipeline:
         Compiled active skill bundle (global baseline + optional
         jurisdiction overlay + optional community overlay).
     slm_adapter
-        Any :class:`SLMAdapter` implementation — the real model or
-        :class:`MockSLMAdapter` in tests.
+        Any :class:`SLMAdapter` implementation — the real encoder
+        classifier (e.g. ``XLMRMiniLMAdapter``) or
+        :class:`MockSLMAdapter` in tests. The attribute name is kept
+        for backwards compatibility with existing skill packs and
+        callers; any encoder-classifier backend is acceptable.
     threshold_policy
         Hard-coded threshold enforcer. Defaults to a fresh
         :class:`ThresholdPolicy`.
@@ -338,7 +344,7 @@ class GuardrailPipeline:
 
         # --- Step 3: Signal packaging.
         packed_message = {
-            "text": text,  # SLM receives *original* text, not normalized.
+            "text": text,  # encoder receives *original* text, not normalized.
             "lang_hint": message.get("lang_hint"),
             "has_attachment": bool(message.get("has_attachment", False)),
             "attachment_kinds": list(message.get("attachment_kinds") or []),
@@ -371,7 +377,8 @@ class GuardrailPipeline:
             local_signals=local_signals,
         )
 
-        # --- Step 4: SLM contextual classification.
+        # --- Step 4: Encoder-based contextual classification
+        # (XLM-R MiniLM-L6 reference backend; any SLMAdapter works).
         raw_output = self.slm_adapter.classify(packed)
 
         # --- Step 5: Severity / threshold policy enforcement.

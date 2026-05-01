@@ -11,7 +11,7 @@
 # archetypes are represented with placeholder tokens (e.g.
 # "<SLUR_TOKEN_A>"). ``expected_detection`` states whether the Phase 6
 # pipeline's *normalized* form should allow a downstream detector /
-# SLM to recognise the underlying category.
+# encoder classifier to recognise the underlying category.
 
 schema_version: 1
 

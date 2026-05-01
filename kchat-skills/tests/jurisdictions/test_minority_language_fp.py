@@ -7,11 +7,11 @@ and code-switching** to ensure the `minority_language_false_positive <=
 
 These cases are *structural / contract* tests following the same
 pattern as ``kchat-skills/tests/global/test_baseline_cases.py``: each
-case is a ``(local_signal input, expected SLM output)`` pair validated
+case is a ``(local_signal input, expected classifier output)`` pair validated
 against ``local_signal_schema.json`` and ``output_schema.json``.
 
 They define the false-positive corpus that the Phase 3 pipeline must
-clear for each archetype. A concrete SLM run against these inputs is
+clear for each archetype. A concrete encoder classifier run against these inputs is
 expected to produce the ``expected_output`` (SAFE, category 0, severity
 0) — a positive label on any of these cases is counted as a
 minority-language false positive against the

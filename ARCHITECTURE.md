@@ -1,16 +1,17 @@
-# KChat SLM Guardrail Skills — Architecture
+# KChat Guardrail Skills — Architecture
 
 ## System Overview
 
 KChat is an end-to-end encrypted messaging app. Plaintext exists only on the
 sender and recipient devices. We add a **local safety assistant** to each
-device — a tiny Small Language Model running a layered set of skill packs —
-that classifies content already visible to the user and produces local
-warnings, labels, and suggestions.
+device — the **XLM-R MiniLM-L6** encoder classifier driving a layered set of
+skill packs — that classifies content already visible to the user and
+produces local warnings, labels, and suggestions.
 
-The SLM is **not** a centralized moderator. It is a personal safety co-pilot
-governed by transparent, signed, versioned skill packs. The composition of
-those skill packs into a runtime bundle is the heart of this architecture.
+The encoder classifier is **not** a centralized moderator. It is a personal
+safety co-pilot governed by transparent, signed, versioned skill packs. The
+composition of those skill packs into a runtime bundle is the heart of this
+architecture.
 
 ```
                      ┌──────────────────────────┐
@@ -33,7 +34,7 @@ those skill packs into a runtime bundle is the heart of this architecture.
                   │  + runtime context       │
                   └─────────────┬────────────┘
                                 ▼
-                       compiled SLM prompt
+                  compiled classifier-bundle prompt
 ```
 
 The **active skill bundle** at runtime is:
@@ -123,10 +124,10 @@ The full privacy contract from the global baseline:
 ```yaml
 privacy_first:
   plaintext_handling:
-    - Plaintext message bytes never leave the on-device SLM context.
-    - The SLM input is constructed by the local guardrail runtime, not by
-      a server.
-    - The SLM has no network access during evaluation.
+    - Plaintext message bytes never leave the on-device classifier context.
+    - The classifier input is constructed by the local guardrail runtime,
+      not by a server.
+    - The classifier has no network access during evaluation.
   allowed_outputs:
     - severity (integer 0..5)
     - category id (integer 0..15)
@@ -150,7 +151,7 @@ privacy_first:
     - any output that depends on contacting a remote service
 ```
 
-The SLM is sandboxed: it has no network, no filesystem, no access to other
+The classifier is sandboxed: it has no network, no filesystem, no access to other
 conversations or other users' devices. It receives the structured input
 contract for a single message-in-context and emits a single JSON object
 matching the output schema.
@@ -194,9 +195,9 @@ categories; they may not remove or rename categories.
 Child-safety categories carry a **severity floor of 5** regardless of model
 confidence (see [Child Safety Policy](#child-safety-policy)).
 
-## SLM Execution Contract
+## Encoder Classifier Execution Contract
 
-Every SLM call receives a single structured input matching this schema:
+Every classifier call receives a single structured input matching this schema:
 
 ```yaml
 input_contract:
@@ -216,7 +217,7 @@ input_contract:
     locale: string                # IETF BCP 47
     jurisdiction_id: string?      # only if explicitly activated (see overlay rules)
     community_overlay_id: string? # if any
-    is_offline: bool              # SLM must produce identical output when true
+    is_offline: bool              # classifier must produce identical output when true
   local_signals:
     url_risk: float               # 0..1, from deterministic local detector
     pii_patterns_hit: [string]    # closed enum from PII detector
@@ -237,28 +238,32 @@ input_contract:
     schema_id: kchat.guardrail.output.v1
 ```
 
-The SLM **reasons over local descriptors** — `lexicon_hits`,
+The classifier **reasons over local descriptors** — `lexicon_hits`,
 `media_descriptors`, `pii_patterns_hit` — not over raw media bytes.
 Decoding, OCR, ASR, and image classification all happen in deterministic
-local detectors before the SLM is invoked.
+local detectors before the classifier is invoked.
 
 ## Hybrid Local Pipeline
 
 The pipeline is hybrid by design: deterministic detectors handle anything
-that does not need a model, and the SLM is reserved for *contextual*
-decisions (news vs. praise of violence; quoted speech vs. authored speech;
-educational vs. operational; counterspeech vs. hate).
+that does not need a model, and the encoder classifier is reserved for
+*contextual* decisions (news vs. praise of violence; quoted speech vs.
+authored speech; educational vs. operational; counterspeech vs. hate).
 
 1. **Normalize text** — Unicode NFKC, case folding, homoglyph map,
-   transliteration to the lexicon language for matching only (the SLM
-   receives the original text).
+   transliteration to the lexicon language for matching only (the
+   encoder receives the original text).
 2. **Run deterministic local detectors** — URL risk, private-data patterns
    (PII, credentials, financial), scam patterns, jurisdiction lexicons,
    group age mode, attachment / media descriptors.
-3. **Pass compact signals to SLM** — pack the structured input contract;
-   the SLM never sees the raw lexicon, only the *hits*.
-4. **SLM contextual classification** — distinguishes harm from news,
-   satire, education, counterspeech, quoted speech.
+3. **Pass compact signals to the classifier** — pack the structured input
+   contract; the encoder never sees the raw lexicon, only the *hits*.
+4. **Encoder-based contextual classification** — XLM-R MiniLM-L6 produces
+   a contextual embedding of the message; the classification head takes
+   the cosine-similarity argmax over a fixed bank of category prototype
+   embeddings, blended with the deterministic local signals from step 2.
+   This distinguishes harm from news, satire, education, counterspeech,
+   and quoted speech.
 5. **Apply severity and threshold policy** — hard-coded thresholds prevent
    prompt drift; child-safety floor enforced here.
 6. **Produce local JSON** — UI consumes `actions`; **no plaintext leaves
@@ -271,7 +276,7 @@ flowchart TD
     A[Decrypted message + media on device] --> B[Normalize text<br/>NFKC, case fold, homoglyph, transliteration]
     B --> C[Deterministic local detectors<br/>URL risk · PII · scam · lexicons · media descriptors]
     C --> D[Pack structured input contract<br/>compact signals + non-content context]
-    D --> E[SLM contextual classification<br/>tiny on-device model, temperature 0.0]
+    D --> E[Encoder-based contextual classification<br/>XLM-R MiniLM-L6 · deterministic argmax over fixed prototypes]
     E --> F[Threshold + severity policy<br/>hard-coded thresholds, child-safety floor 5]
     F --> G[Constrained JSON output<br/>severity · category · confidence · actions]
     G --> H[UI renders local warning / label / suggestion]
@@ -280,45 +285,54 @@ flowchart TD
 
 Steps (1)–(7) are entirely on-device; no step requires network access.
 
-### llama.cpp / Bonsai-1.7B integration
+### XLM-R MiniLM-L6 integration
 
-Step 4 (the SLM contextual classifier) is intentionally
-backend-agnostic. The pipeline talks to whatever object is passed in
-through
+Step 4 (the encoder classifier) is intentionally backend-agnostic.
+The pipeline talks to whatever object is passed in through
 [`SLMAdapter`](kchat-skills/compiler/slm_adapter.py) — the Protocol
 freezes a single `classify(input) -> dict` method so backends can be
 swapped without touching skill packs or the threshold policy.
 
-The reference real-SLM backend is
-[`LlamaCppSLMAdapter`](kchat-skills/compiler/llama_cpp_adapter.py)
+The reference encoder backend is
+[`XLMRMiniLMAdapter`](kchat-skills/compiler/xlmr_minilm_adapter.py)
 (Phase 6):
 
-- **Backend.** A running `llama-server` from
-  [`kennguy3n/llama.cpp`](https://github.com/kennguy3n/llama.cpp)
-  (branch `prism`) — *not* upstream `ggml-org/llama.cpp` — exposed
-  over the OpenAI-compatible `/v1/chat/completions` endpoint.
-- **Model.** [`Bonsai-1.7B`](https://huggingface.co/prism-ml/Bonsai-1.7B-gguf)
-  in GGUF format (a 1.7B-parameter SLM appropriate for on-device
-  inference).
-- **Determinism.** Every call sends `temperature: 0.0` so the pipeline
-  produces identical output for identical input (matches the
-  `is_offline` invariant: identical results online vs offline).
-- **Constrained output.** The request sets
-  `response_format: {"type": "json_object"}`, keeping the model on the
-  output-schema rail without relying on free-form post-parsing.
-- **Compiled-prompt boundary.** The compiled skill-pack prompt becomes
-  the **system** message; the JSON-serialised
-  `kchat.guardrail.local_signal.v1` instance becomes the **user**
-  message. This is what lets a single small adapter run any compiled
-  skill bundle.
-- **Privacy-safe fallback.** If the server is unreachable, returns
-  malformed JSON, or returns out-of-range fields, the adapter falls
-  back to a SAFE output (category 0, severity 0) rather than raising
-  or returning unsafe defaults — matching `threshold_policy`'s
-  existing degrade-to-SAFE behaviour.
-- **Stdlib only.** Implementation uses `urllib.request` + `json`, so the
-  adapter ships with the same zero-dependency footprint as the rest of
-  the compiler module.
+- **Backend.** A locally-loaded `transformers` encoder — no separate
+  server, no HTTP, no chat completions. The adapter holds a single
+  `AutoModel` + `AutoTokenizer` pair in process and runs each
+  classification in-line with the rest of the pipeline.
+- **Model.**
+  [`nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large`](https://huggingface.co/nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large)
+  — a ~80 MB, 6-layer, 384-dim multilingual encoder distilled from
+  XLM-R Large. Tokenisation is SentencePiece with the
+  XLM-R vocabulary, so the same checkpoint covers all 100+ XLM-R
+  languages without per-language assets.
+- **Determinism.** No sampling, no temperature, no token budget for
+  generation. Classification reduces to argmax over a fixed bank of
+  16 *category prototype* embeddings, so identical input always
+  produces identical output (matches the `is_offline` invariant:
+  identical results online vs offline).
+- **Constrained output.** The classification head emits a Python dict
+  that is then run through `_coerce_to_output_schema` — any field
+  outside the schema bounds (category, severity, confidence,
+  reason codes) collapses the call to a SAFE output, just like the
+  threshold policy's degrade-to-SAFE behaviour.
+- **Skill-bundle boundary.** The compiled skill-pack prompt no longer
+  becomes a generative-model system message. Instead it configures
+  the encoder pipeline at compile time: it pins the classification
+  head's allowed actions, reason codes, and counters. The
+  `kchat.guardrail.local_signal.v1` instance is consumed directly by
+  the adapter — message text goes through the encoder, deterministic
+  signals (URL risk, PII, scam, lexicon hits, media descriptors) act
+  as *high-priority overrides* of the embedding head.
+- **Privacy-safe fallback.** If the encoder weights are missing,
+  `transformers` / `torch` are not installed, or inference raises,
+  the adapter falls back to a SAFE output (category 0, severity 0)
+  rather than raising or returning unsafe defaults.
+- **Lean dependency footprint.** `transformers`, `torch`, and
+  `sentencepiece` are listed as runtime dependencies of the demo /
+  benchmark scripts (and the test suite for stub-encoder tests).
+  The skill-pack files themselves remain pure YAML / JSON.
 
 End-to-end demonstration and benchmarking happens through
 [`tools/run_guardrail_demo.py`](tools/run_guardrail_demo.py); see
@@ -398,8 +412,9 @@ Example output for a phishing-style message in a workplace community:
 
 ## Decision Policy
 
-Confidence thresholds are **hard-coded** in the runtime — the SLM cannot
-override them. They prevent prompt drift in tiny models.
+Confidence thresholds are **hard-coded** in the runtime — the encoder
+classifier cannot override them. They keep the runtime on-rail no matter
+which backend produces the output.
 
 | Threshold              | Confidence  | Effect                                                                |
 | ---------------------- | ----------- | --------------------------------------------------------------------- |
@@ -408,7 +423,7 @@ override them. They prevent prompt drift in tiny models.
 | `strong_warn`          | ≥ 0.78      | Hard modal; require explicit acknowledge to view.                     |
 | `critical_intervention`| ≥ 0.85      | Block preview; surface report / crisis flow.                          |
 
-**Uncertainty handling.** If the SLM's confidence falls below the lowest
+**Uncertainty handling.** If the classifier's confidence falls below the lowest
 threshold (0.45) for any non-zero category, the runtime treats the message
 as `SAFE` (category 0, severity 0) and emits no label. This avoids
 "helpful-looking but wrong" labels. Tied categories at the same severity
@@ -618,8 +633,8 @@ child_safety_policy:
     - jurisdiction overlay declares a minor-protection rule that matches
   detectors:
     - csam_indicators              # opaque local descriptor only
-    - grooming_patterns            # lexicon + SLM contextual
-    - sextortion_patterns          # lexicon + SLM contextual
+    - grooming_patterns            # lexicon + encoder contextual
+    - sextortion_patterns          # lexicon + encoder contextual
     - request_for_private_meeting_with_minor
   actions:
     - critical_intervention: true
@@ -638,11 +653,14 @@ child_safety_policy:
 The runtime's child-safety reporting flow is **user-initiated**: the device
 surfaces local resources and the option to report; it does not auto-upload.
 
-## Runtime SLM Instruction Prompt
+## Runtime Classifier-Bundle Instruction Prompt
 
-The compiled prompt always begins with this 10-rule instruction. It is
-deliberately short so it fits comfortably in a tiny SLM's instruction
-budget.
+The compiled prompt always begins with this 10-rule instruction. It
+remains in the skill bundle as a human- and reviewer-readable record
+of the classifier's allowed actions — the encoder backend itself does
+not consume the prompt at inference time, but the compiler still uses
+it to validate skill-pack merges and to keep the classification head's
+behaviour aligned with the skill bundle.
 
 ```
 You are KChat's on-device safety assistant. Follow these rules exactly.
@@ -717,7 +735,7 @@ flowchart LR
     C --> D[Test suite generation<br/>from skill rules]
     A --> D
     D --> E[Pack validator<br/>anti-misuse + privacy]
-    E --> F[SLM prompt compiler<br/>compiled prompt + schemas]
+    E --> F[Classifier-bundle compiler<br/>compiled prompt + schemas]
     F --> G[Test suite execution<br/>recall / precision / latency]
     G -->|pass| H[Skill passport sign<br/>ed25519]
     G -->|fail| A
@@ -738,7 +756,7 @@ skill_passport:
     cultural: [<reviewer handles>]   # required for jurisdiction packs
     trust_and_safety: [<reviewer handles>]
   model_compatibility:
-    - model_id: <slm model id>
+    - model_id: <encoder classifier model id>
       model_min_version: <semver>
       max_instruction_tokens: 1800
       max_output_tokens: 600
@@ -816,7 +834,7 @@ anti_misuse_controls:
 │   ├── taxonomy.yaml                # 16-category global taxonomy
 │   ├── severity.yaml                # 0–5 severity rubric
 │   ├── output_schema.json           # constrained JSON output
-│   ├── local_signal_schema.json     # SLM input contract
+│   ├── local_signal_schema.json     # encoder classifier input contract
 │   └── privacy_contract.yaml        # non-negotiable privacy rules
 │
 ├── jurisdictions/
@@ -875,7 +893,7 @@ anti_misuse_controls:
 │   └── emergency_response.yaml      # ↑ 30 Phase 6 expansion overlays
 │
 ├── prompts/
-│   ├── runtime_instruction.txt      # 10-rule SLM instruction
+│   ├── runtime_instruction.txt      # 10-rule classifier-bundle instruction
 │   ├── compiled_prompt_format.md    # compiled-prompt section reference
 │   └── compiled_examples/           # 73 reference compiled prompts (Phase 4-6):
 │       ├── baseline_only.txt
@@ -890,7 +908,7 @@ anti_misuse_controls:
 │
 ├── benchmarks/                      # committed benchmark results (Phase 6)
 │   ├── README.md
-│   └── bonsai_1.7b_results.json     # generated by tools/run_guardrail_demo.py
+│   └── xlmr_minilm_l6_results.json # generated by tools/run_guardrail_demo.py
 │
 ├── compiler/
 │   ├── pipeline.md
@@ -898,7 +916,7 @@ anti_misuse_controls:
 │   ├── counters.py                   # device-local expiring counter store
 │   ├── pipeline.py                   # 7-step hybrid local pipeline (Phase 3)
 │   ├── slm_adapter.py                # SLMAdapter Protocol + MockSLMAdapter (Phase 3)
-│   ├── llama_cpp_adapter.py          # LlamaCppSLMAdapter for llama.cpp backend (Phase 6)
+│   ├── xlmr_minilm_adapter.py        # XLMRMiniLMAdapter — XLM-R MiniLM-L6 encoder classifier (Phase 6)
 │   ├── threshold_policy.py           # hard-coded threshold enforcement (Phase 3)
 │   ├── metric_validator.py           # 7-metric validator (Phase 3)
 │   ├── compiler.py                   # skill-pack compiler pipeline (Phase 4)
@@ -932,7 +950,7 @@ anti_misuse_controls:
 
 /tools
 ├── regenerate_compiled_examples.py  # refresh prompts/compiled_examples
-├── run_guardrail_demo.py            # sample-data demo (mock or llama.cpp)
+├── run_guardrail_demo.py            # sample-data demo (mock or XLM-R MiniLM-L6)
 └── demo_guardrail.py                # cross-community / cross-country demo
 
 /results                             # demo run outputs (JSON + Markdown)
@@ -951,17 +969,17 @@ Concrete test files in this repository:
 - `kchat-skills/tests/global/test_taxonomy.py` — 16-category taxonomy.
 - `kchat-skills/tests/global/test_severity.py` — 0–5 severity rubric and
   child-safety floor of 5.
-- `kchat-skills/tests/global/test_output_schema.py` — Draft-07 SLM output
+- `kchat-skills/tests/global/test_output_schema.py` — Draft-07 classifier output
   schema (`kchat.guardrail.output.v1`).
 - `kchat-skills/tests/global/test_baseline.py` — global baseline skill
   (Phase 1 complete).
-- `kchat-skills/tests/global/test_local_signal_schema.py` — Draft-07 SLM
+- `kchat-skills/tests/global/test_local_signal_schema.py` — Draft-07 classifier
   input contract (`kchat.guardrail.local_signal.v1`).
 - `kchat-skills/tests/global/test_privacy_contract.py` — eight
   non-negotiable privacy rules and the plaintext-handling /
   allowed-outputs / forbidden-outputs blocks.
-- `kchat-skills/tests/global/test_prompts.py` — runtime SLM instruction
-  prompt and compiled-prompt example.
+- `kchat-skills/tests/global/test_prompts.py` — runtime classifier-bundle
+  instruction prompt and compiled-prompt example.
 - `kchat-skills/tests/global/test_counters.py` — device-local expiring
   counter store (`kchat-skills/compiler/counters.py`): increment /
   retrieval, per-window expiry, threshold-based label generation,
@@ -999,8 +1017,8 @@ Concrete test files in this repository:
 - `kchat-skills/tests/global/test_pipeline.py` — 7-step hybrid local
   pipeline (`kchat-skills/compiler/pipeline.py`): normalization,
   deterministic detectors, signal packaging, end-to-end classification
-  with a mock SLM adapter, threshold-policy coercion, counter-store
-  integration.
+  with the deterministic `MockSLMAdapter`, threshold-policy coercion,
+  counter-store integration.
 - `kchat-skills/tests/global/test_slm_adapter.py` — backend-agnostic
   `SLMAdapter` Protocol and the deterministic `MockSLMAdapter`
   reference implementation at `kchat-skills/compiler/slm_adapter.py`.
