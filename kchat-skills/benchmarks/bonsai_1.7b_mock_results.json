@@ -1,0 +1,468 @@
+{
+  "adapter": "MockSLMAdapter",
+  "community": null,
+  "jurisdiction": null,
+  "llama_cpp_commit": null,
+  "llama_cpp_repo": null,
+  "model_name": "MockSLMAdapter",
+  "model_url": null,
+  "per_case_results": [
+    {
+      "actions": [],
+      "adapter_latency_ms": 0.0,
+      "case_id": "safe-greeting-01",
+      "category": 0,
+      "confidence": 0.05,
+      "expected_category": 0,
+      "expected_severity": 0,
+      "passed": true,
+      "pipeline_latency_ms": 0.091,
+      "rationale_id": "safe_benign_v1",
+      "reason_codes": [],
+      "severity": 0
+    },
+    {
+      "actions": [],
+      "adapter_latency_ms": 0.0,
+      "case_id": "safe-question-01",
+      "category": 0,
+      "confidence": 0.05,
+      "expected_category": 0,
+      "expected_severity": 0,
+      "passed": true,
+      "pipeline_latency_ms": 0.05,
+      "rationale_id": "safe_benign_v1",
+      "reason_codes": [],
+      "severity": 0
+    },
+    {
+      "actions": [],
+      "adapter_latency_ms": 0.0,
+      "case_id": "safe-logistics-01",
+      "category": 0,
+      "confidence": 0.05,
+      "expected_category": 0,
+      "expected_severity": 0,
+      "passed": true,
+      "pipeline_latency_ms": 0.035,
+      "rationale_id": "safe_benign_v1",
+      "reason_codes": [],
+      "severity": 0
+    },
+    {
+      "actions": [
+        "critical_intervention"
+      ],
+      "adapter_latency_ms": 0.0,
+      "case_id": "scam-fake-giveaway-01",
+      "category": 7,
+      "confidence": 0.9,
+      "expected_category": 7,
+      "expected_severity": 3,
+      "passed": true,
+      "pipeline_latency_ms": 0.163,
+      "rationale_id": "scam_credential_phish_v1",
+      "reason_codes": [
+        "URL_RISK",
+        "SCAM_PATTERN"
+      ],
+      "severity": 3
+    },
+    {
+      "actions": [
+        "critical_intervention"
+      ],
+      "adapter_latency_ms": 0.0,
+      "case_id": "scam-credential-harvest-01",
+      "category": 7,
+      "confidence": 0.9,
+      "expected_category": 7,
+      "expected_severity": 3,
+      "passed": true,
+      "pipeline_latency_ms": 0.067,
+      "rationale_id": "scam_credential_phish_v1",
+      "reason_codes": [
+        "URL_RISK",
+        "SCAM_PATTERN"
+      ],
+      "severity": 3
+    },
+    {
+      "actions": [
+        "warn"
+      ],
+      "adapter_latency_ms": 0.0,
+      "case_id": "scam-advance-fee-01",
+      "category": 7,
+      "confidence": 0.65,
+      "expected_category": 7,
+      "expected_severity": 3,
+      "passed": true,
+      "pipeline_latency_ms": 0.049,
+      "rationale_id": "scam_credential_phish_v1",
+      "reason_codes": [
+        "SCAM_PATTERN"
+      ],
+      "severity": 3
+    },
+    {
+      "actions": [
+        "warn",
+        "suggest_redact"
+      ],
+      "adapter_latency_ms": 0.0,
+      "case_id": "pii-email-01",
+      "category": 9,
+      "confidence": 0.65,
+      "expected_category": 9,
+      "expected_severity": 3,
+      "passed": true,
+      "pipeline_latency_ms": 0.034,
+      "rationale_id": "private_data_pii_v1",
+      "reason_codes": [
+        "PRIVATE_DATA_PATTERN"
+      ],
+      "severity": 3
+    },
+    {
+      "actions": [
+        "warn",
+        "suggest_redact"
+      ],
+      "adapter_latency_ms": 0.0,
+      "case_id": "pii-phone-01",
+      "category": 9,
+      "confidence": 0.65,
+      "expected_category": 9,
+      "expected_severity": 3,
+      "passed": true,
+      "pipeline_latency_ms": 0.033,
+      "rationale_id": "private_data_pii_v1",
+      "reason_codes": [
+        "PRIVATE_DATA_PATTERN"
+      ],
+      "severity": 3
+    },
+    {
+      "actions": [
+        "warn",
+        "suggest_redact"
+      ],
+      "adapter_latency_ms": 0.0,
+      "case_id": "pii-credit-card-01",
+      "category": 9,
+      "confidence": 0.75,
+      "expected_category": 9,
+      "expected_severity": 3,
+      "passed": true,
+      "pipeline_latency_ms": 0.034,
+      "rationale_id": "private_data_pii_v1",
+      "reason_codes": [
+        "PRIVATE_DATA_PATTERN"
+      ],
+      "severity": 3
+    },
+    {
+      "actions": [],
+      "adapter_latency_ms": 0.0,
+      "case_id": "child-safety-context-01",
+      "category": 0,
+      "confidence": 0.05,
+      "expected_category": 0,
+      "expected_severity": 0,
+      "passed": true,
+      "pipeline_latency_ms": 0.039,
+      "rationale_id": "safe_benign_v1",
+      "reason_codes": [],
+      "severity": 0
+    },
+    {
+      "actions": [],
+      "adapter_latency_ms": 0.0,
+      "case_id": "news-violence-context-01",
+      "category": 0,
+      "confidence": 0.05,
+      "expected_category": 0,
+      "expected_severity": 0,
+      "passed": true,
+      "pipeline_latency_ms": 0.042,
+      "rationale_id": "safe_benign_v1",
+      "reason_codes": [],
+      "severity": 0
+    },
+    {
+      "actions": [],
+      "adapter_latency_ms": 0.0,
+      "case_id": "hate-counterspeech-01",
+      "category": 0,
+      "confidence": 0.05,
+      "expected_category": 0,
+      "expected_severity": 0,
+      "passed": true,
+      "pipeline_latency_ms": 0.04,
+      "rationale_id": "safe_benign_v1",
+      "reason_codes": [],
+      "severity": 0
+    },
+    {
+      "actions": [],
+      "adapter_latency_ms": 0.0,
+      "case_id": "harassment-context-01",
+      "category": 0,
+      "confidence": 0.05,
+      "expected_category": 0,
+      "expected_severity": 0,
+      "passed": true,
+      "pipeline_latency_ms": 0.038,
+      "rationale_id": "safe_benign_v1",
+      "reason_codes": [],
+      "severity": 0
+    },
+    {
+      "actions": [],
+      "adapter_latency_ms": 0.0,
+      "case_id": "health-misinfo-context-01",
+      "category": 0,
+      "confidence": 0.05,
+      "expected_category": 0,
+      "expected_severity": 0,
+      "passed": true,
+      "pipeline_latency_ms": 0.042,
+      "rationale_id": "safe_benign_v1",
+      "reason_codes": [],
+      "severity": 0
+    },
+    {
+      "actions": [],
+      "adapter_latency_ms": 0.0,
+      "case_id": "civic-misinfo-context-01",
+      "category": 0,
+      "confidence": 0.05,
+      "expected_category": 0,
+      "expected_severity": 0,
+      "passed": true,
+      "pipeline_latency_ms": 0.04,
+      "rationale_id": "safe_benign_v1",
+      "reason_codes": [],
+      "severity": 0
+    },
+    {
+      "actions": [],
+      "adapter_latency_ms": 0.0,
+      "case_id": "marketplace-restricted-context-01",
+      "category": 0,
+      "confidence": 0.05,
+      "expected_category": 0,
+      "expected_severity": 0,
+      "passed": true,
+      "pipeline_latency_ms": 0.04,
+      "rationale_id": "safe_benign_v1",
+      "reason_codes": [],
+      "severity": 0
+    },
+    {
+      "actions": [],
+      "adapter_latency_ms": 0.0,
+      "case_id": "safe-vi-greeting-01",
+      "category": 0,
+      "confidence": 0.05,
+      "expected_category": 0,
+      "expected_severity": 0,
+      "passed": true,
+      "pipeline_latency_ms": 0.081,
+      "rationale_id": "safe_benign_v1",
+      "reason_codes": [],
+      "severity": 0
+    },
+    {
+      "actions": [],
+      "adapter_latency_ms": 0.0,
+      "case_id": "safe-es-question-01",
+      "category": 0,
+      "confidence": 0.05,
+      "expected_category": 0,
+      "expected_severity": 0,
+      "passed": true,
+      "pipeline_latency_ms": 0.035,
+      "rationale_id": "safe_benign_v1",
+      "reason_codes": [],
+      "severity": 0
+    },
+    {
+      "actions": [],
+      "adapter_latency_ms": 0.0,
+      "case_id": "safe-de-question-01",
+      "category": 0,
+      "confidence": 0.05,
+      "expected_category": 0,
+      "expected_severity": 0,
+      "passed": true,
+      "pipeline_latency_ms": 0.03,
+      "rationale_id": "safe_benign_v1",
+      "reason_codes": [],
+      "severity": 0
+    },
+    {
+      "actions": [],
+      "adapter_latency_ms": 0.0,
+      "case_id": "code-switching-en-vi-01",
+      "category": 0,
+      "confidence": 0.05,
+      "expected_category": 0,
+      "expected_severity": 0,
+      "passed": true,
+      "pipeline_latency_ms": 0.043,
+      "rationale_id": "safe_benign_v1",
+      "reason_codes": [],
+      "severity": 0
+    },
+    {
+      "actions": [
+        "warn",
+        "suggest_redact"
+      ],
+      "adapter_latency_ms": 0.0,
+      "case_id": "outbound-warn-pii-email-01",
+      "category": 9,
+      "confidence": 0.65,
+      "expected_category": 9,
+      "expected_severity": 3,
+      "passed": true,
+      "pipeline_latency_ms": 0.043,
+      "rationale_id": "private_data_pii_v1",
+      "reason_codes": [
+        "PRIVATE_DATA_PATTERN"
+      ],
+      "severity": 3
+    },
+    {
+      "actions": [],
+      "adapter_latency_ms": 0.0,
+      "case_id": "media-image-benign-01",
+      "category": 0,
+      "confidence": 0.05,
+      "expected_category": 0,
+      "expected_severity": 0,
+      "passed": true,
+      "pipeline_latency_ms": 0.028,
+      "rationale_id": "safe_benign_v1",
+      "reason_codes": [],
+      "severity": 0
+    },
+    {
+      "actions": [
+        "critical_intervention"
+      ],
+      "adapter_latency_ms": 0.0,
+      "case_id": "media-nsfw-adult-only-01",
+      "category": 10,
+      "confidence": 0.85,
+      "expected_category": 10,
+      "expected_severity": 3,
+      "passed": true,
+      "pipeline_latency_ms": 0.041,
+      "rationale_id": "sexual_adult_media_v1",
+      "reason_codes": [],
+      "severity": 3
+    },
+    {
+      "actions": [],
+      "adapter_latency_ms": 0.0,
+      "case_id": "extremism-news-context-01",
+      "category": 0,
+      "confidence": 0.05,
+      "expected_category": 0,
+      "expected_severity": 0,
+      "passed": true,
+      "pipeline_latency_ms": 0.036,
+      "rationale_id": "safe_benign_v1",
+      "reason_codes": [],
+      "severity": 0
+    },
+    {
+      "actions": [],
+      "adapter_latency_ms": 0.0,
+      "case_id": "self-harm-support-context-01",
+      "category": 0,
+      "confidence": 0.05,
+      "expected_category": 0,
+      "expected_severity": 0,
+      "passed": true,
+      "pipeline_latency_ms": 0.041,
+      "rationale_id": "safe_benign_v1",
+      "reason_codes": [],
+      "severity": 0
+    },
+    {
+      "actions": [],
+      "adapter_latency_ms": 0.0,
+      "case_id": "drugs-education-context-01",
+      "category": 0,
+      "confidence": 0.05,
+      "expected_category": 0,
+      "expected_severity": 0,
+      "passed": true,
+      "pipeline_latency_ms": 0.042,
+      "rationale_id": "safe_benign_v1",
+      "reason_codes": [],
+      "severity": 0
+    },
+    {
+      "actions": [],
+      "adapter_latency_ms": 0.0,
+      "case_id": "community-rule-violation-01",
+      "category": 0,
+      "confidence": 0.05,
+      "expected_category": 0,
+      "expected_severity": 0,
+      "passed": true,
+      "pipeline_latency_ms": 0.039,
+      "rationale_id": "safe_benign_v1",
+      "reason_codes": [],
+      "severity": 0
+    }
+  ],
+  "report": {
+    "iterations": 100,
+    "max_ms": 0.105,
+    "mean_ms": 0.033,
+    "min_ms": 0.018,
+    "p50_ms": 0.034,
+    "p95_ms": 0.046,
+    "p99_ms": 0.064,
+    "passed": true,
+    "per_case_mean_ms": {
+      "child-safety-context-01": 0.036,
+      "civic-misinfo-context-01": 0.037,
+      "code-switching-en-vi-01": 0.037,
+      "community-rule-violation-01": 0.036,
+      "drugs-education-context-01": 0.038,
+      "extremism-news-context-01": 0.032,
+      "harassment-context-01": 0.036,
+      "hate-counterspeech-01": 0.037,
+      "health-misinfo-context-01": 0.039,
+      "marketplace-restricted-context-01": 0.038,
+      "media-image-benign-01": 0.019,
+      "media-nsfw-adult-only-01": 0.033,
+      "news-violence-context-01": 0.039,
+      "outbound-warn-pii-email-01": 0.034,
+      "pii-credit-card-01": 0.029,
+      "pii-email-01": 0.027,
+      "pii-phone-01": 0.026,
+      "safe-de-question-01": 0.026,
+      "safe-es-question-01": 0.029,
+      "safe-greeting-01": 0.029,
+      "safe-logistics-01": 0.027,
+      "safe-question-01": 0.026,
+      "safe-vi-greeting-01": 0.022,
+      "scam-advance-fee-01": 0.04,
+      "scam-credential-harvest-01": 0.047,
+      "scam-fake-giveaway-01": 0.044,
+      "self-harm-support-context-01": 0.035
+    },
+    "total_cases": 27
+  },
+  "samples_path": "kchat-skills/samples/sample_messages.yaml",
+  "server_url": null,
+  "timestamp_utc": "2026-05-01T14:28:54.958054+00:00"
+}
