@@ -72,6 +72,21 @@ def _safe_output() -> dict[str, Any]:
     }
 
 
+def _safe_output_with_context(context_hints: list[str]) -> dict[str, Any]:
+    """Like :func:`_safe_output`, but echoes the protected-speech
+    context hints back into ``reason_codes`` for reviewer traceability.
+
+    The output category is already SAFE so the threshold policy's
+    protected-speech demotion rule is a no-op; the hints are kept on
+    the record purely so reviewers can see *why* a borderline message
+    was treated as SAFE (e.g. it carried ``NEWS_CONTEXT``).
+    """
+    out = _safe_output()
+    if context_hints:
+        out["reason_codes"] = list(dict.fromkeys(context_hints))
+    return out
+
+
 @runtime_checkable
 class SLMAdapter(Protocol):
     """Adapter contract implemented by any encoder-classifier backend.
@@ -151,17 +166,25 @@ class MockSLMAdapter:
                 "resource_link_id": "child_safety_resources_v1",
             }
 
-        # Helper: append protected-speech context hints to a reason
-        # code list. The threshold policy uses these to demote the
-        # verdict back to SAFE — see ``threshold_policy.py``.
-        def _with_context(codes: list[str]) -> list[str]:
-            merged = list(codes)
-            for hint in context_hints:
-                if hint not in merged:
-                    merged.append(hint)
-            return merged
+        # NOTE: deterministic-signal branches below (PII / SCAM_FRAUD /
+        # LEXICON / NSFW) emit their reason codes *without* the
+        # protected-speech ``context_hints`` from the pipeline. This
+        # is intentional: the threshold policy demotes any non-SAFE /
+        # non-CHILD_SAFETY verdict carrying a protected-speech reason
+        # code to SAFE, and we do **not** want that demotion to
+        # silence a phishing URL detected in a school group chat or a
+        # PII leak in a journalism community. Protected-speech
+        # demotion only applies on the embedding-head path (mock has
+        # no embedding head; the trained adapter does — see
+        # ``xlmr_minilm_adapter.py``).
+        #
+        # The ``context_hints`` list is still consumed below: it is
+        # used by the ``_safe_output()`` fallback at the bottom of the
+        # method via the existing pipeline -> threshold-policy flow,
+        # and is also visible to the threshold policy via the pipeline
+        # ``local_signals`` view (it is *not* re-emitted here).
 
-        # PRIVATE_DATA — any PII pattern.
+        # PRIVATE_DATA — any PII pattern. Deterministic — never demoted.
         if pii_hits:
             confidence = min(0.95, 0.55 + 0.1 * len(pii_hits))
             return {
@@ -173,11 +196,11 @@ class MockSLMAdapter:
                     "warn": True,
                     "suggest_redact": True,
                 },
-                "reason_codes": _with_context(["PRIVATE_DATA_PATTERN"]),
+                "reason_codes": ["PRIVATE_DATA_PATTERN"],
                 "rationale_id": "private_data_pii_v1",
             }
 
-        # SCAM_FRAUD — high URL risk or scam patterns.
+        # SCAM_FRAUD — high URL risk or scam patterns. Deterministic.
         if url_risk > 0.8 or scam_hits:
             confidence = max(url_risk, 0.55 + 0.1 * len(scam_hits))
             confidence = min(0.95, confidence)
@@ -191,28 +214,28 @@ class MockSLMAdapter:
                 "category": CAT_SCAM_FRAUD,
                 "confidence": confidence,
                 "actions": {**_zero_actions(), "warn": True},
-                "reason_codes": _with_context(reason_codes),
+                "reason_codes": reason_codes,
                 "rationale_id": "scam_credential_phish_v1",
             }
 
-        # Lexicon-only hits — pick the highest-weight hit.
+        # Lexicon-only hits — pick the highest-weight hit. Deterministic.
         if lexicon_hits:
             top = max(lexicon_hits, key=lambda h: float(h.get("weight", 0.0)))
             category = int(top.get("category", CAT_SAFE))
             weight = float(top.get("weight", 0.5))
             if category == CAT_SAFE:
-                return _safe_output()
+                return _safe_output_with_context(context_hints)
             confidence = max(0.45, min(0.95, weight))
             return {
                 "severity": 3,
                 "category": category,
                 "confidence": confidence,
                 "actions": {**_zero_actions(), "warn": True},
-                "reason_codes": _with_context(["LEXICON_HIT"]),
+                "reason_codes": ["LEXICON_HIT"],
                 "rationale_id": f"lexicon_category_{category}_v1",
             }
 
-        # Media NSFW.
+        # Media NSFW. Deterministic — never demoted.
         for m in media:
             nsfw = m.get("nsfw_score")
             if nsfw is not None and float(nsfw) > 0.7:
@@ -222,11 +245,11 @@ class MockSLMAdapter:
                     "category": CAT_SEXUAL_ADULT,
                     "confidence": confidence,
                     "actions": {**_zero_actions(), "warn": True},
-                    "reason_codes": _with_context([]),
+                    "reason_codes": [],
                     "rationale_id": "sexual_adult_media_v1",
                 }
 
-        return _safe_output()
+        return _safe_output_with_context(context_hints)
 
 
 __all__ = ["SLMAdapter", "MockSLMAdapter"]

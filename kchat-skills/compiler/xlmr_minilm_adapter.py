@@ -404,8 +404,19 @@ class XLMRMiniLMAdapter:
 
         # Helper: append protected-speech context hints to a reason
         # code list. The threshold policy uses these to demote the
-        # verdict back to SAFE — see ``threshold_policy.py``. Only
-        # applied to non-CHILD_SAFETY branches.
+        # verdict back to SAFE — see ``threshold_policy.py``.
+        #
+        # IMPORTANT: ``_with_context()`` is **only** applied on the
+        # embedding-head branch below, where the encoder may have been
+        # confused by surface tokens that look harmful but are
+        # protected speech (e.g. a news quote about a violent attack).
+        # It is **not** applied on the deterministic-signal branches
+        # (PII / SCAM / LEXICON / NSFW) — those signals are concrete
+        # and must not be silenced just because the message lives in a
+        # journalism / education / counterspeech community. Letting
+        # protected-speech demotion silence a phishing URL in a school
+        # group is exactly the bug the regression tests in
+        # ``test_pipeline.py`` lock down.
         def _with_context(codes: list[str]) -> list[str]:
             merged = list(codes)
             for hint in context_hints:
@@ -435,7 +446,7 @@ class XLMRMiniLMAdapter:
                 "resource_link_id": "child_safety_resources_v1",
             }
 
-        # PRIVATE_DATA — any PII pattern.
+        # PRIVATE_DATA — any PII pattern. Deterministic, never demoted.
         if pii_hits:
             confidence = min(0.95, 0.55 + 0.1 * len(pii_hits))
             return {
@@ -447,11 +458,11 @@ class XLMRMiniLMAdapter:
                     "warn": True,
                     "suggest_redact": True,
                 },
-                "reason_codes": _with_context(["PRIVATE_DATA_PATTERN"]),
+                "reason_codes": ["PRIVATE_DATA_PATTERN"],
                 "rationale_id": "private_data_pii_v1",
             }
 
-        # SCAM_FRAUD — high URL risk or scam patterns.
+        # SCAM_FRAUD — high URL risk or scam patterns. Deterministic.
         if url_risk > 0.8 or scam_hits:
             confidence = max(url_risk, 0.55 + 0.1 * len(scam_hits))
             confidence = min(0.95, confidence)
@@ -465,11 +476,11 @@ class XLMRMiniLMAdapter:
                 "category": CAT_SCAM_FRAUD,
                 "confidence": confidence,
                 "actions": {**_zero_actions(), "warn": True},
-                "reason_codes": _with_context(reason_codes),
+                "reason_codes": reason_codes,
                 "rationale_id": "scam_credential_phish_v1",
             }
 
-        # Lexicon-only hits — pick the highest-weight hit.
+        # Lexicon-only hits — pick the highest-weight hit. Deterministic.
         if lexicon_hits:
             top = max(
                 lexicon_hits, key=lambda h: float(h.get("weight", 0.0))
@@ -483,11 +494,11 @@ class XLMRMiniLMAdapter:
                     "category": category,
                     "confidence": confidence,
                     "actions": {**_zero_actions(), "warn": True},
-                    "reason_codes": _with_context(["LEXICON_HIT"]),
+                    "reason_codes": ["LEXICON_HIT"],
                     "rationale_id": f"lexicon_category_{category}_v1",
                 }
 
-        # Media NSFW.
+        # Media NSFW. Deterministic, never demoted.
         for m in media:
             nsfw = m.get("nsfw_score") if isinstance(m, dict) else None
             if nsfw is not None and float(nsfw) > 0.7:
@@ -497,7 +508,7 @@ class XLMRMiniLMAdapter:
                     "category": CAT_SEXUAL_ADULT,
                     "confidence": confidence,
                     "actions": {**_zero_actions(), "warn": True},
-                    "reason_codes": _with_context([]),
+                    "reason_codes": [],
                     "rationale_id": "sexual_adult_media_v1",
                 }
 
