@@ -19,7 +19,7 @@ The guiding principle is the UN Convention on the Rights of the Child
 | UNICEF / ITU Recommendation | Artefact |
 | --- | --- |
 | Integrate child rights considerations into all appropriate corporate policies and management processes. | `kchat-skills/global/baseline.yaml` declares `child_safety_policy` with `severity_floor: 5` on category 1 (CHILD_SAFETY). The floor is non-negotiable — `kchat-skills/compiler/anti_misuse.py` `assert_no_relaxed_child_safety` rejects any overlay that lowers it. |
-| Develop standard processes to identify, prevent and mitigate the adverse impact of the ICT services on children. | `kchat-skills/tests/jurisdictions/_country_pack_assertions.py` runs `assert_no_relaxed_child_safety` against **every** jurisdiction overlay on every CI run (40 country packs × 3 archetypes = 43 coverage). |
+| Develop standard processes to identify, prevent and mitigate the adverse impact of the ICT services on children. | `kchat-skills/tests/jurisdictions/_country_pack_assertions.py` runs `assert_no_relaxed_child_safety` against **every** jurisdiction overlay on every CI run (59 country packs + 3 archetypes = 62 coverage). |
 | Establish appropriate remediation processes, including for cases where adverse effects have been caused or contributed to. | `kchat-skills/compiler/appeal_flow.py` routes appeals on-device while preserving the privacy contract (no content uploaded). Category-1 appeals trigger `AppealReport.recommendation = "urgent_review"` at lower thresholds than other categories. |
 
 ---
@@ -68,7 +68,7 @@ The guiding principle is the UN Convention on the Rights of the Child
 ## 6. Per-jurisdiction legal grounding for child-safety floors
 
 The following table records the statutory basis for category 1
-severity floor 5 in each of the 40 country packs. The citation is the
+severity floor 5 in each of the 59 country packs. The citation is the
 header docstring of each overlay (`kchat-skills/jurisdictions/<cc>/overlay.yaml`).
 
 | ISO-3166 | Statute (partial list — see overlay headers for full reference) |
@@ -146,4 +146,4 @@ check.
 - UN Convention on the Rights of the Child (1989).
 - `kchat-skills/global/baseline.yaml`
 - `kchat-skills/compiler/anti_misuse.py`
-- `kchat-skills/jurisdictions/` (40 country packs).
+- `kchat-skills/jurisdictions/` (59 country packs).

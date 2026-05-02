@@ -1,4 +1,4 @@
-"""XLM-R MiniLM-L6 ``SLMAdapter`` — runs the on-device guardrail
+"""XLM-R MiniLM-L6 ``EncoderAdapter`` — runs the on-device guardrail
 encoder classifier.
 
 Spec references:
@@ -10,7 +10,7 @@ Spec references:
   contextual classification (XLM-R MiniLM-L6)".
 
 This adapter is one concrete implementation of the
-:class:`slm_adapter.SLMAdapter` Protocol. It targets the
+:class:`encoder_adapter.EncoderAdapter` Protocol. It targets the
 **XLM-R MiniLM-L6** encoder model (``nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large``)
 loaded via :mod:`transformers`. The model is encoder-only — no chat
 completions, no temperature, no token budgets for generation. The
@@ -29,7 +29,7 @@ adapter:
 5. Coerces the final dict to the ``kchat.guardrail.output.v1`` schema
    and returns it. Out-of-range fields collapse to a SAFE fallback.
 
-Design constraints inherited from the SLMAdapter contract:
+Design constraints inherited from the EncoderAdapter contract:
 
 * **Deterministic.** No sampling — argmax over fixed prototype
   embeddings. Identical input → identical output.
@@ -41,9 +41,9 @@ Design constraints inherited from the SLMAdapter contract:
   expected shape, the adapter returns a SAFE output (category 0,
   severity 0) rather than raising.
 * **No generative state.** The adapter has no notion of compiled
-  prompts, response_format, max_tokens, or temperature — those are
-  remnants of the old chat-completions backend and are intentionally
-  ignored if present in ``input.constraints``.
+  prompts, response_format, max_tokens, or temperature — the
+  encoder-classifier backend has no generative side and intentionally
+  ignores any such fields in ``input.constraints``.
 """
 from __future__ import annotations
 
@@ -55,13 +55,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Optional
 
-from slm_adapter import (  # type: ignore[import-not-found]
+from encoder_adapter import (  # type: ignore[import-not-found]
     CAT_CHILD_SAFETY,
     CAT_PRIVATE_DATA,
     CAT_SAFE,
     CAT_SCAM_FRAUD,
     CAT_SEXUAL_ADULT,
-    SLMAdapter,
+    EncoderAdapter,
 )
 
 
@@ -77,7 +77,7 @@ XLMR_MINILM_MODEL_ID = (
 # ---------------------------------------------------------------------------
 # Category prototypes — short multilingual-friendly descriptions used
 # for zero-shot classification via cosine similarity. Index = taxonomy
-# category id (0..15). Order MUST match ``slm_adapter.CAT_*`` constants.
+# category id (0..15). Order MUST match ``encoder_adapter.CAT_*`` constants.
 # ---------------------------------------------------------------------------
 CATEGORY_PROTOTYPES: tuple[str, ...] = (
     "benign safe everyday conversation, friendly chat, neutral message",  # 0 SAFE
@@ -154,7 +154,7 @@ def safe_fallback_output() -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 @dataclass
 class XLMRMiniLMAdapter:
-    """SLMAdapter backed by the XLM-R MiniLM-L6 encoder.
+    """EncoderAdapter backed by the XLM-R MiniLM-L6 encoder.
 
     Parameters
     ----------
@@ -791,9 +791,9 @@ def _coerce_to_output_schema(parsed: dict[str, Any]) -> dict[str, Any]:
 _ = json
 
 
-# Make ``isinstance(adapter, SLMAdapter)`` cheap for tests that import
+# Make ``isinstance(adapter, EncoderAdapter)`` cheap for tests that import
 # the protocol.
-_PROTOCOL_REFERENCE: SLMAdapter = XLMRMiniLMAdapter()  # type: ignore[assignment]
+_PROTOCOL_REFERENCE: EncoderAdapter = XLMRMiniLMAdapter()  # type: ignore[assignment]
 del _PROTOCOL_REFERENCE
 
 

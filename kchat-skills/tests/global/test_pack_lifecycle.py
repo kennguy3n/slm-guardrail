@@ -61,7 +61,7 @@ def _passport(
         trust_and_safety_reviewers=("ts_reviewer_a",),
         model_compatibility=(
             ModelCompatibility(
-                model_id="kchat-slm-q4", model_min_version="1.0.0"
+                model_id="kchat-encoder-q4", model_min_version="1.0.0"
             ),
         ),
         expires_on=expires_on or (date.today() + timedelta(days=180)),
@@ -403,7 +403,7 @@ class TestIntegrationWithSkillPassport:
             trust_and_safety_reviewers=("ts_reviewer_jp",),
             model_compatibility=(
                 ModelCompatibility(
-                    model_id="kchat-slm-q4", model_min_version="1.0.0"
+                    model_id="kchat-encoder-q4", model_min_version="1.0.0"
                 ),
             ),
             expires_on=date.today() + timedelta(days=200),

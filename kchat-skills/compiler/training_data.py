@@ -39,7 +39,7 @@ from __future__ import annotations
 
 
 # ---------------------------------------------------------------------------
-# Taxonomy category ids (kept in sync with ``slm_adapter.CAT_*`` and
+# Taxonomy category ids (kept in sync with ``encoder_adapter.CAT_*`` and
 # ``xlmr_minilm_adapter.CATEGORY_PROTOTYPES``).
 # ---------------------------------------------------------------------------
 CAT_SAFE = 0

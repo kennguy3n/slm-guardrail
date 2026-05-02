@@ -213,7 +213,7 @@ def test_apply_produces_valid_output_schema(
 # ---------------------------------------------------------------------------
 # Input does not override thresholds
 # ---------------------------------------------------------------------------
-def test_slm_cannot_assert_warn_below_warn_threshold():
+def test_encoder_cannot_assert_warn_below_warn_threshold():
     """A classifier output that asserts warn=true at confidence 0.10 must be re-coerced."""
     p = ThresholdPolicy()
     out = p.apply(
@@ -235,7 +235,7 @@ def test_slm_cannot_assert_warn_below_warn_threshold():
     assert all(v is False for v in out["actions"].values())
 
 
-def test_slm_cannot_assert_critical_intervention_at_low_confidence():
+def test_encoder_cannot_assert_critical_intervention_at_low_confidence():
     p = ThresholdPolicy()
     out = p.apply(
         _raw(

@@ -13,7 +13,7 @@ import pytest
 import yaml
 
 from pipeline import GuardrailPipeline, SkillBundle  # type: ignore[import-not-found]
-from slm_adapter import MockSLMAdapter  # type: ignore[import-not-found]
+from encoder_adapter import MockEncoderAdapter  # type: ignore[import-not-found]
 from threshold_policy import ThresholdPolicy  # type: ignore[import-not-found]
 
 
@@ -158,7 +158,7 @@ def test_corpus_includes_multilanguage_samples(samples):
 def _pipeline() -> GuardrailPipeline:
     return GuardrailPipeline(
         skill_bundle=SkillBundle(),
-        slm_adapter=MockSLMAdapter(),
+        encoder_adapter=MockEncoderAdapter(),
         threshold_policy=ThresholdPolicy(),
     )
 

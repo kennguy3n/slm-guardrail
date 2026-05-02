@@ -2,7 +2,7 @@
 
 Covers the seven shipping metrics, boundary-value checks at the
 canonical thresholds, the child-safety-recall floor, and end-to-end
-validation against the :class:`GuardrailPipeline` + :class:`MockSLMAdapter`.
+validation against the :class:`GuardrailPipeline` + :class:`MockEncoderAdapter`.
 """
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ from pipeline import (  # type: ignore[import-not-found]
     LexiconEntry,
     SkillBundle,
 )
-from slm_adapter import MockSLMAdapter  # type: ignore[import-not-found]
+from encoder_adapter import MockEncoderAdapter  # type: ignore[import-not-found]
 
 
 # ---------------------------------------------------------------------------
@@ -423,7 +423,7 @@ class TestMetricReport:
 
 
 # ---------------------------------------------------------------------------
-# End-to-end validation against the GuardrailPipeline + MockSLMAdapter.
+# End-to-end validation against the GuardrailPipeline + MockEncoderAdapter.
 # ---------------------------------------------------------------------------
 def _safe_input(text: str = "hello", *, tags=()) -> dict[str, Any]:
     return {
@@ -455,7 +455,7 @@ class TestRunPipelineEndToEnd:
     def _baseline_pipeline(self) -> GuardrailPipeline:
         bundle = SkillBundle(
             lexicons=[
-                # Category-1 hit triggers child-safety floor in MockSLMAdapter.
+                # Category-1 hit triggers child-safety floor in MockEncoderAdapter.
                 LexiconEntry(
                     "child_safety_lex_v1",
                     1,
@@ -464,7 +464,7 @@ class TestRunPipelineEndToEnd:
                 ),
             ]
         )
-        return GuardrailPipeline(skill_bundle=bundle, slm_adapter=MockSLMAdapter())
+        return GuardrailPipeline(skill_bundle=bundle, encoder_adapter=MockEncoderAdapter())
 
     def test_pipeline_passes_all_metrics_on_baseline_cases(self):
         pipeline = self._baseline_pipeline()

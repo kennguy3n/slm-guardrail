@@ -23,7 +23,7 @@ least one named artefact.
 | **Accountable & Transparent** | Every pack carries `signers`, `expires_on`, and a `skill_passport` entry (`kchat-skills/compiler/skill_passport.py`). The compiled-prompt format (`kchat-skills/prompts/compiled_prompt_format.md`) exposes the exact rules to downstream reviewers. |
 | **Explainable & Interpretable** | The classifier output contract (`kchat-skills/global/output_schema.json`) carries a stable `rationale_id` pointing to a human-readable catalogue entry. Pack summaries are surfaced via `user_notice.visible_pack_summary`. |
 | **Privacy-Enhanced** | The baseline's 8 privacy rules (`kchat-skills/global/baseline.yaml` `privacy_rules`) are immutable — `anti_misuse.assert_privacy_rules_not_redefined` rejects any overlay that touches them. The appeal flow (`kchat-skills/compiler/appeal_flow.py`) records only metadata, never content. |
-| **Fair (Harmful bias managed)** | `kchat-skills/compiler/bias_audit.py` runs per-minority-language-target audits; `kchat-skills/tests/jurisdictions/test_minority_language_fp.py` exercises 43 archetypes × ≥4 minority-language / code-switching false-positive cases (≥140 from Phase 5 second wave alone). |
+| **Fair (Harmful bias managed)** | `kchat-skills/compiler/bias_audit.py` runs per-minority-language-target audits; `kchat-skills/tests/jurisdictions/test_minority_language_fp.py` exercises 62 archetypes × ≥4 minority-language / code-switching false-positive cases (≥140 from Phase 5 second wave alone). |
 
 ---
 
@@ -84,7 +84,7 @@ least one named artefact.
 
 **MEASURE 1 — Appropriate methods and metrics are identified and applied.**
 
-- `kchat-skills/compiler/metric_validator.py` declares and enforces the numeric targets. The suite template (`kchat-skills/tests/suite/test_suite_template.yaml`) pins every metric and threshold.
+- `kchat-skills/compiler/metric_validator.py` declares and enforces the numeric targets. The suite template (`kchat-skills/tests/test_suite_template.yaml`) pins every metric and threshold.
 
 **MEASURE 2 — Trustworthy characteristics evaluated.**
 

@@ -5,7 +5,7 @@ Spec references:
 
 * PHASES.md Phase 3 / Phase 6 — sample-data demonstration + perf benchmark.
 * ARCHITECTURE.md "Hybrid Local Pipeline" — drives the full pipeline
-  end-to-end against either ``MockSLMAdapter`` (no encoder weights
+  end-to-end against either ``MockEncoderAdapter`` (no encoder weights
   required) or ``XLMRMiniLMAdapter`` against a locally-cached
   XLM-R MiniLM-L6 checkpoint.
 
@@ -50,7 +50,7 @@ from pipeline import (  # type: ignore[import-not-found]  # noqa: E402
     GuardrailPipeline,
     SkillBundle,
 )
-from slm_adapter import MockSLMAdapter  # type: ignore[import-not-found]  # noqa: E402
+from encoder_adapter import MockEncoderAdapter  # type: ignore[import-not-found]  # noqa: E402
 from threshold_policy import ThresholdPolicy  # type: ignore[import-not-found]  # noqa: E402
 from xlmr_minilm_adapter import (  # type: ignore[import-not-found]  # noqa: E402
     XLMR_MINILM_MODEL_ID,
@@ -77,7 +77,7 @@ The encoder is ~80 MB. Two ways to make it available:
        python tools/run_guardrail_demo.py --model-path ./models/xlmr-minilm-l6
 
 Or rerun this script with --mock to use the deterministic
-MockSLMAdapter (no model weights required).
+MockEncoderAdapter (no model weights required).
 """
 
 
@@ -150,12 +150,12 @@ def build_pipeline(
         ),
     )
     if use_mock:
-        adapter: Any = MockSLMAdapter()
+        adapter: Any = MockEncoderAdapter()
     else:
         adapter = XLMRMiniLMAdapter(model_path=model_path)
     pipeline = GuardrailPipeline(
         skill_bundle=bundle,
-        slm_adapter=adapter,
+        encoder_adapter=adapter,
         threshold_policy=ThresholdPolicy(),
     )
     return pipeline, adapter
@@ -293,7 +293,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         "--mock",
         action="store_true",
         help=(
-            "Use the deterministic MockSLMAdapter instead of the encoder. "
+            "Use the deterministic MockEncoderAdapter instead of the encoder. "
             "No model weights required."
         ),
     )
@@ -412,7 +412,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     print(
         "Adapter: "
         + (
-            "MockSLMAdapter"
+            "MockEncoderAdapter"
             if args.mock
             else f"XLMRMiniLMAdapter -> {args.model_path}"
         )
@@ -461,7 +461,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         out_path = BENCH_DIR / f"{results_name}.json"
         record = {
             "model_name": (
-                XLMR_MINILM_MODEL_NAME if not args.mock else "MockSLMAdapter"
+                XLMR_MINILM_MODEL_NAME if not args.mock else "MockEncoderAdapter"
             ),
             "model_id": (
                 XLMR_MINILM_MODEL_ID if not args.mock else None
@@ -472,7 +472,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                 else None
             ),
             "adapter": (
-                "MockSLMAdapter" if args.mock else "XLMRMiniLMAdapter"
+                "MockEncoderAdapter" if args.mock else "XLMRMiniLMAdapter"
             ),
             "model_path": None if args.mock else args.model_path,
             "jurisdiction": args.jurisdiction,

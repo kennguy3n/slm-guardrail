@@ -24,9 +24,9 @@ from typing import Any
 import jsonschema
 import pytest
 
-from slm_adapter import (  # type: ignore[import-not-found]
+from encoder_adapter import (  # type: ignore[import-not-found]
     CAT_SAFE,
-    SLMAdapter,
+    EncoderAdapter,
 )
 from xlmr_minilm_adapter import (  # type: ignore[import-not-found]
     CATEGORY_PROTOTYPES,
@@ -134,7 +134,7 @@ def _stub_loaded_adapter(monkeypatch: pytest.MonkeyPatch, *, hidden: int = 8):
 # ---------------------------------------------------------------------------
 def test_xlmr_minilm_adapter_satisfies_protocol():
     adapter = XLMRMiniLMAdapter()
-    assert isinstance(adapter, SLMAdapter)
+    assert isinstance(adapter, EncoderAdapter)
 
 
 def test_xlmr_minilm_adapter_has_classify_method():

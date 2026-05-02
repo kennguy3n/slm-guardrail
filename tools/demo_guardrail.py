@@ -47,7 +47,7 @@ from pipeline import (  # type: ignore[import-not-found]  # noqa: E402
     GuardrailPipeline,
     SkillBundle,
 )
-from slm_adapter import MockSLMAdapter  # type: ignore[import-not-found]  # noqa: E402
+from encoder_adapter import MockEncoderAdapter  # type: ignore[import-not-found]  # noqa: E402
 from threshold_policy import ThresholdPolicy  # type: ignore[import-not-found]  # noqa: E402
 
 
@@ -697,7 +697,7 @@ def _build_pipeline(scenario: Scenario) -> GuardrailPipeline:
     )
     return GuardrailPipeline(
         skill_bundle=bundle,
-        slm_adapter=MockSLMAdapter(),
+        encoder_adapter=MockEncoderAdapter(),
         threshold_policy=ThresholdPolicy(),
     )
 
@@ -806,7 +806,7 @@ def run_group_benchmarks(
         )
         pipeline = GuardrailPipeline(
             skill_bundle=bundle,
-            slm_adapter=MockSLMAdapter(),
+            encoder_adapter=MockEncoderAdapter(),
             threshold_policy=ThresholdPolicy(),
         )
         bench = PipelineBenchmark(pipeline=pipeline)
@@ -840,7 +840,7 @@ def run_overall_benchmark(
     bundle = SkillBundle()
     pipeline = GuardrailPipeline(
         skill_bundle=bundle,
-        slm_adapter=MockSLMAdapter(),
+        encoder_adapter=MockEncoderAdapter(),
         threshold_policy=ThresholdPolicy(),
     )
     bench = PipelineBenchmark(pipeline=pipeline)

@@ -202,10 +202,12 @@ categories have a severity floor of 5 regardless of model confidence.
 │   └── communities/
 │
 └── docs/
-    ├── PROPOSAL.md
-    ├── ARCHITECTURE.md
-    └── PHASES.md
+    └── regulatory/        # EU DSA / NIST AI RMF / UNICEF · ITU COP alignment
 ```
+
+> Top-level project documents (`PROPOSAL.md`, `ARCHITECTURE.md`,
+> `PHASES.md`, `PROGRESS.md`) live at the repository root, not under
+> `kchat-skills/docs/`.
 
 ## Practical First Build
 
@@ -358,17 +360,17 @@ the full list of community kinds.
 
 ## Getting Started
 
-This project is in **early development**. There is no runtime yet; the
-deliverables are skill *definitions* (YAML), prompt templates, schemas, test
-suites, and a compiler specification.
+All six phases are **complete**: Phase 0 (foundation), Phase 1 (global
+baseline + community overlays), Phase 2 (jurisdiction archetype
+overlays), Phase 3 (hybrid local pipeline + encoder classifier
+integration), Phase 4 (skill-pack compiler + signing), Phase 5
+(country-specific jurisdiction overlays), and Phase 6 (skill expansion
+to 100 packs, bias auditing, pack lifecycle, adversarial / obfuscation
+corpus, regulatory alignment, performance benchmarking, community
+feedback / appeal flow). The deliverables are skill *definitions*
+(YAML), prompt templates, schemas, test suites, the encoder-classifier
+adapter, and the skill-pack compiler.
 
-Phase 0 (foundation), Phase 1 (global baseline + community overlays),
-Phase 2 (jurisdiction archetype overlays), Phase 3 (hybrid local
-pipeline + encoder classifier integration), Phase 4 (skill-pack compiler + signing),
-Phase 5 (40 country-specific jurisdiction overlays) and Phase 6
-(skill expansion to 100 packs, bias auditing, pack lifecycle,
-adversarial / obfuscation corpus, regulatory alignment, performance
-benchmarking, community feedback / appeal flow) are all complete.
 The repository currently ships **100 skills** — 59 country packs +
 38 community overlays + 3 jurisdiction archetypes:
 
@@ -390,7 +392,7 @@ The repository currently ships **100 skills** — 59 country packs +
 - the 7-step hybrid local pipeline at
   [`kchat-skills/compiler/pipeline.py`](kchat-skills/compiler/pipeline.py),
   the backend-agnostic encoder classifier runtime adapter at
-  [`kchat-skills/compiler/slm_adapter.py`](kchat-skills/compiler/slm_adapter.py),
+  [`kchat-skills/compiler/encoder_adapter.py`](kchat-skills/compiler/encoder_adapter.py),
   and the hard-coded threshold policy at
   [`kchat-skills/compiler/threshold_policy.py`](kchat-skills/compiler/threshold_policy.py),
 - the test-suite template at
@@ -478,8 +480,8 @@ pip install -e ".[test]"
 ### Running with XLM-R MiniLM-L6
 
 The skill packs ship with a backend-agnostic
-[`SLMAdapter`](kchat-skills/compiler/slm_adapter.py) protocol; the
-[`XLMRMiniLMAdapter`](kchat-skills/compiler/xlmr_minilm_adapter.py)
+[`EncoderAdapter`](kchat-skills/compiler/encoder_adapter.py) protocol;
+the [`XLMRMiniLMAdapter`](kchat-skills/compiler/xlmr_minilm_adapter.py)
 implementation loads the **XLM-R MiniLM-L6** encoder
 (`nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large`) via
 `transformers`. The encoder is ~80 MB, loads in well under a second on
@@ -539,7 +541,7 @@ The demo loads
 [`kchat-skills/samples/README.md`](kchat-skills/samples/README.md)),
 compiles the active skill bundle through `SkillPackCompiler`, runs the
 full hybrid pipeline against either `XLMRMiniLMAdapter` or
-`MockSLMAdapter`, and prints a per-case table plus an optional
+`MockEncoderAdapter`, and prints a per-case table plus an optional
 `PipelineBenchmark` report. See
 [`kchat-skills/benchmarks/README.md`](kchat-skills/benchmarks/README.md)
 for the benchmark methodology and committed results.
@@ -626,7 +628,7 @@ kchat-skills/
 ├── compiler/             # skill-pack compiler (Phase 3-4)
 │   ├── counters.py           # device-local expiring counter store (Phase 1)
 │   ├── pipeline.py           # 7-step hybrid local pipeline (Phase 3)
-│   ├── slm_adapter.py        # SLMAdapter Protocol + MockSLMAdapter (Phase 3)
+│   ├── encoder_adapter.py    # EncoderAdapter Protocol + MockEncoderAdapter (Phase 3)
 │   ├── xlmr_minilm_adapter.py # XLMRMiniLMAdapter — XLM-R MiniLM-L6 encoder classifier (Phase 6)
 │   ├── threshold_policy.py   # hard-coded threshold enforcement (Phase 3)
 │   ├── metric_validator.py   # 7-metric validator (Phase 3)
@@ -645,7 +647,7 @@ kchat-skills/
 │   │   ├── test_baseline_cases.py  # first round of baseline cases
 │   │   ├── test_counters.py
 │   │   ├── test_pipeline.py        # 7-step hybrid pipeline
-│   │   ├── test_slm_adapter.py     # SLMAdapter Protocol / MockSLMAdapter
+│   │   ├── test_encoder_adapter.py # EncoderAdapter Protocol / MockEncoderAdapter
 │   │   ├── test_xlmr_minilm_adapter.py # XLMRMiniLMAdapter — XLM-R MiniLM-L6
 │   │   ├── test_threshold_policy.py # hard-coded threshold policy
 │   │   ├── test_metric_validator.py # 7-metric validator (Phase 3)
@@ -663,7 +665,7 @@ kchat-skills/
 │   │   ├── test_archetype_strict_adult.py
 │   │   ├── test_archetype_strict_hate.py
 │   │   ├── test_archetype_strict_marketplace.py
-│   │   ├── test_country_<cc>.py     # 40 per-country test files (Phase 5)
+│   │   ├── test_country_<cc>.py     # 59 per-country test files (Phase 5+6)
 │   │   └── test_minority_language_fp.py
 │   ├── adversarial/                 # Phase 6 obfuscation corpus
 │   │   ├── corpus.yaml
@@ -780,8 +782,8 @@ versions. Each `PackVersion` records the `skill_id`,
 
 The Phase 6 benchmark harness at
 [`kchat-skills/compiler/benchmark.py`](kchat-skills/compiler/benchmark.py)
-wraps `GuardrailPipeline` plus an ``SLMAdapter`` (typically
-`MockSLMAdapter` for deterministic regression tests, or
+wraps `GuardrailPipeline` plus an ``EncoderAdapter`` (typically
+`MockEncoderAdapter` for deterministic regression tests, or
 `XLMRMiniLMAdapter` for real encoder timings) into a
 deterministic measurement loop. `PipelineBenchmark.run(cases,
 iterations=100)` records wall-clock latency per iteration using
@@ -792,7 +794,7 @@ the ARCHITECTURE.md “Performance envelope” target. The contract
 test at
 [`kchat-skills/tests/global/test_benchmark.py`](kchat-skills/tests/global/test_benchmark.py)
 parametrises across all 16 taxonomy categories and across the full
-40-country set to verify latency does not regress as packs grow.
+59-country set to verify latency does not regress as packs grow.
 
 ### Appeal Flow
 

@@ -20,7 +20,7 @@ All three alignment documents follow the same structure:
 | --- | --- | --- |
 | EU Digital Services Act (Regulation (EU) 2022/2065) | [`eu_dsa_alignment.md`](./eu_dsa_alignment.md) | Transparency, notice-and-action, risk assessment, protection of minors, transparency reporting. |
 | NIST AI Risk Management Framework 1.0 (NIST AI 100-1) | [`nist_ai_rmf_alignment.md`](./nist_ai_rmf_alignment.md) | Govern, Map, Measure, Manage — plus trustworthy-AI characteristics (validity, safety, privacy, fairness, etc.). |
-| UNICEF / ITU Child Online Protection Guidelines (2020) | [`unicef_itu_cop_alignment.md`](./unicef_itu_cop_alignment.md) | Child-rights due diligence, safer environments, privacy by design, crisis resources, per-jurisdiction statutory grounding for 40 packs. |
+| UNICEF / ITU Child Online Protection Guidelines (2020) | [`unicef_itu_cop_alignment.md`](./unicef_itu_cop_alignment.md) | Child-rights due diligence, safer environments, privacy by design, crisis resources, per-jurisdiction statutory grounding for 59 packs. |
 
 ## How to use these documents
 

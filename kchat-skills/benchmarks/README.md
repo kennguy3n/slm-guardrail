@@ -19,7 +19,7 @@ and capture *real-hardware* measurements on top of that contract.
 - `xlmr_minilm_l6_results.json` — committed run against
   `XLMRMiniLMAdapter` with locally-loaded XLM-R MiniLM-L6 weights.
 - `xlmr_minilm_l6_mock_results.json` *(optional)* — committed run against
-  `MockSLMAdapter`. Useful as a reference for the *deterministic*
+  `MockEncoderAdapter`. Useful as a reference for the *deterministic*
   fast path latency, independent of any model.
 
 ## What gets measured

@@ -55,7 +55,7 @@ def _passing_test_results() -> TestResults:
 
 def _model() -> ModelCompatibility:
     return ModelCompatibility(
-        model_id="kchat.slm.tiny",
+        model_id="kchat.encoder.tiny",
         model_min_version="1.0.0",
         max_instruction_tokens=1800,
         max_output_tokens=600,
@@ -217,7 +217,7 @@ class TestModelCompatibility:
         p = _build()
         p.sign(private_key=sk, key_id="k1")
         runtime = ModelCompatibility(
-            model_id="kchat.slm.tiny",
+            model_id="kchat.encoder.tiny",
             model_min_version="1.5.0",
         )
         # Pack requires >= 1.0.0; runtime is 1.5.0 ⇒ OK.
@@ -228,7 +228,7 @@ class TestModelCompatibility:
         p = _build()
         p.sign(private_key=sk, key_id="k1")
         runtime = ModelCompatibility(
-            model_id="kchat.slm.tiny",
+            model_id="kchat.encoder.tiny",
             model_min_version="0.9.0",
         )
         with pytest.raises(PassportValidationError, match="not compatible"):
@@ -239,7 +239,7 @@ class TestModelCompatibility:
         p = _build()
         p.sign(private_key=sk, key_id="k1")
         other = ModelCompatibility(
-            model_id="kchat.slm.large",
+            model_id="kchat.encoder.large",
             model_min_version="1.0.0",
         )
         with pytest.raises(PassportValidationError, match="not compatible"):
@@ -271,7 +271,7 @@ class TestModelCompatibility:
             trust_and_safety_reviewers=("trust@kchat.example",),
             model_compatibility=(
                 ModelCompatibility(
-                    model_id="kchat.slm.tiny",
+                    model_id="kchat.encoder.tiny",
                     model_min_version=want,
                 ),
             ),
@@ -288,7 +288,7 @@ class TestModelCompatibility:
         )
         p.sign(private_key=sk, key_id="k1")
         runtime = ModelCompatibility(
-            model_id="kchat.slm.tiny",
+            model_id="kchat.encoder.tiny",
             model_min_version=have,
         )
         # Must NOT raise.

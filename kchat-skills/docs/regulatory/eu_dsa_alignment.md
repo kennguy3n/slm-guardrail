@@ -76,11 +76,11 @@ overrides or relaxes any of those instruments; it is a
 
 | Obligation | Artefact |
 | --- | --- |
-| Providers shall publish at least once a year reports on any content moderation that they engaged in. | `kchat-skills/compiler/metric_validator.py` + `kchat-skills/tests/suite/test_suite_template.yaml` pin the target metrics (`minority_language_false_positive <= 0.07`, etc.) and the CI runs them on every change. Aggregated, device-local appeal data from `appeal_flow.py` produces the structured input for such a report without any message content leaving the device. |
+| Providers shall publish at least once a year reports on any content moderation that they engaged in. | `kchat-skills/compiler/metric_validator.py` + `kchat-skills/tests/test_suite_template.yaml` pin the target metrics (`minority_language_false_positive <= 0.07`, etc.) and the CI runs them on every change. Aggregated, device-local appeal data from `appeal_flow.py` produces the structured input for such a report without any message content leaving the device. |
 
 **Source artefacts:**
 - `kchat-skills/compiler/metric_validator.py`
-- `kchat-skills/tests/suite/test_suite_template.yaml`
+- `kchat-skills/tests/test_suite_template.yaml`
 
 ---
 

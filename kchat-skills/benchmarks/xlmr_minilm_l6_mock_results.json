@@ -1,9 +1,9 @@
 {
-  "adapter": "MockSLMAdapter",
+  "adapter": "MockEncoderAdapter",
   "community": null,
   "jurisdiction": null,
   "model_id": null,
-  "model_name": "MockSLMAdapter",
+  "model_name": "MockEncoderAdapter",
   "model_path": null,
   "model_version": null,
   "per_case_results": [
@@ -16,7 +16,7 @@
       "expected_category": 0,
       "expected_severity": 0,
       "passed": true,
-      "pipeline_latency_ms": 0.079,
+      "pipeline_latency_ms": 0.087,
       "rationale_id": "safe_benign_v1",
       "reason_codes": [],
       "severity": 0
@@ -30,7 +30,7 @@
       "expected_category": 0,
       "expected_severity": 0,
       "passed": true,
-      "pipeline_latency_ms": 0.074,
+      "pipeline_latency_ms": 0.086,
       "rationale_id": "safe_benign_v1",
       "reason_codes": [],
       "severity": 0
@@ -44,7 +44,7 @@
       "expected_category": 0,
       "expected_severity": 0,
       "passed": true,
-      "pipeline_latency_ms": 0.063,
+      "pipeline_latency_ms": 0.062,
       "rationale_id": "safe_benign_v1",
       "reason_codes": [],
       "severity": 0
@@ -60,7 +60,7 @@
       "expected_category": 7,
       "expected_severity": 3,
       "passed": true,
-      "pipeline_latency_ms": 0.09,
+      "pipeline_latency_ms": 0.077,
       "rationale_id": "scam_credential_phish_v1",
       "reason_codes": [
         "URL_RISK",
@@ -79,7 +79,7 @@
       "expected_category": 7,
       "expected_severity": 3,
       "passed": true,
-      "pipeline_latency_ms": 0.086,
+      "pipeline_latency_ms": 0.151,
       "rationale_id": "scam_credential_phish_v1",
       "reason_codes": [
         "URL_RISK",
@@ -98,7 +98,7 @@
       "expected_category": 7,
       "expected_severity": 3,
       "passed": true,
-      "pipeline_latency_ms": 0.067,
+      "pipeline_latency_ms": 0.058,
       "rationale_id": "scam_credential_phish_v1",
       "reason_codes": [
         "SCAM_PATTERN"
@@ -117,7 +117,7 @@
       "expected_category": 9,
       "expected_severity": 3,
       "passed": true,
-      "pipeline_latency_ms": 0.035,
+      "pipeline_latency_ms": 0.039,
       "rationale_id": "private_data_pii_v1",
       "reason_codes": [
         "PRIVATE_DATA_PATTERN"
@@ -136,7 +136,7 @@
       "expected_category": 9,
       "expected_severity": 3,
       "passed": true,
-      "pipeline_latency_ms": 0.033,
+      "pipeline_latency_ms": 0.036,
       "rationale_id": "private_data_pii_v1",
       "reason_codes": [
         "PRIVATE_DATA_PATTERN"
@@ -155,7 +155,7 @@
       "expected_category": 9,
       "expected_severity": 3,
       "passed": true,
-      "pipeline_latency_ms": 0.071,
+      "pipeline_latency_ms": 0.037,
       "rationale_id": "private_data_pii_v1",
       "reason_codes": [
         "PRIVATE_DATA_PATTERN"
@@ -171,9 +171,11 @@
       "expected_category": 0,
       "expected_severity": 0,
       "passed": true,
-      "pipeline_latency_ms": 0.041,
+      "pipeline_latency_ms": 0.05,
       "rationale_id": "safe_benign_v1",
-      "reason_codes": [],
+      "reason_codes": [
+        "EDUCATION_CONTEXT"
+      ],
       "severity": 0
     },
     {
@@ -185,85 +187,17 @@
       "expected_category": 0,
       "expected_severity": 0,
       "passed": true,
-      "pipeline_latency_ms": 0.043,
+      "pipeline_latency_ms": 0.05,
       "rationale_id": "safe_benign_v1",
-      "reason_codes": [],
+      "reason_codes": [
+        "QUOTED_SPEECH_CONTEXT"
+      ],
       "severity": 0
     },
     {
       "actions": [],
       "adapter_latency_ms": 0.0,
       "case_id": "hate-counterspeech-01",
-      "category": 0,
-      "confidence": 0.05,
-      "expected_category": 0,
-      "expected_severity": 0,
-      "passed": true,
-      "pipeline_latency_ms": 0.04,
-      "rationale_id": "safe_benign_v1",
-      "reason_codes": [],
-      "severity": 0
-    },
-    {
-      "actions": [],
-      "adapter_latency_ms": 0.0,
-      "case_id": "harassment-context-01",
-      "category": 0,
-      "confidence": 0.05,
-      "expected_category": 0,
-      "expected_severity": 0,
-      "passed": true,
-      "pipeline_latency_ms": 0.038,
-      "rationale_id": "safe_benign_v1",
-      "reason_codes": [],
-      "severity": 0
-    },
-    {
-      "actions": [],
-      "adapter_latency_ms": 0.0,
-      "case_id": "health-misinfo-context-01",
-      "category": 0,
-      "confidence": 0.05,
-      "expected_category": 0,
-      "expected_severity": 0,
-      "passed": true,
-      "pipeline_latency_ms": 0.042,
-      "rationale_id": "safe_benign_v1",
-      "reason_codes": [],
-      "severity": 0
-    },
-    {
-      "actions": [],
-      "adapter_latency_ms": 0.0,
-      "case_id": "civic-misinfo-context-01",
-      "category": 0,
-      "confidence": 0.05,
-      "expected_category": 0,
-      "expected_severity": 0,
-      "passed": true,
-      "pipeline_latency_ms": 0.04,
-      "rationale_id": "safe_benign_v1",
-      "reason_codes": [],
-      "severity": 0
-    },
-    {
-      "actions": [],
-      "adapter_latency_ms": 0.0,
-      "case_id": "marketplace-restricted-context-01",
-      "category": 0,
-      "confidence": 0.05,
-      "expected_category": 0,
-      "expected_severity": 0,
-      "passed": true,
-      "pipeline_latency_ms": 0.04,
-      "rationale_id": "safe_benign_v1",
-      "reason_codes": [],
-      "severity": 0
-    },
-    {
-      "actions": [],
-      "adapter_latency_ms": 0.0,
-      "case_id": "safe-vi-greeting-01",
       "category": 0,
       "confidence": 0.05,
       "expected_category": 0,
@@ -277,13 +211,85 @@
     {
       "actions": [],
       "adapter_latency_ms": 0.0,
+      "case_id": "harassment-context-01",
+      "category": 0,
+      "confidence": 0.05,
+      "expected_category": 0,
+      "expected_severity": 0,
+      "passed": true,
+      "pipeline_latency_ms": 0.041,
+      "rationale_id": "safe_benign_v1",
+      "reason_codes": [],
+      "severity": 0
+    },
+    {
+      "actions": [],
+      "adapter_latency_ms": 0.0,
+      "case_id": "health-misinfo-context-01",
+      "category": 0,
+      "confidence": 0.05,
+      "expected_category": 0,
+      "expected_severity": 0,
+      "passed": true,
+      "pipeline_latency_ms": 0.048,
+      "rationale_id": "safe_benign_v1",
+      "reason_codes": [
+        "QUOTED_SPEECH_CONTEXT"
+      ],
+      "severity": 0
+    },
+    {
+      "actions": [],
+      "adapter_latency_ms": 0.0,
+      "case_id": "civic-misinfo-context-01",
+      "category": 0,
+      "confidence": 0.05,
+      "expected_category": 0,
+      "expected_severity": 0,
+      "passed": true,
+      "pipeline_latency_ms": 0.045,
+      "rationale_id": "safe_benign_v1",
+      "reason_codes": [],
+      "severity": 0
+    },
+    {
+      "actions": [],
+      "adapter_latency_ms": 0.0,
+      "case_id": "marketplace-restricted-context-01",
+      "category": 0,
+      "confidence": 0.05,
+      "expected_category": 0,
+      "expected_severity": 0,
+      "passed": true,
+      "pipeline_latency_ms": 0.044,
+      "rationale_id": "safe_benign_v1",
+      "reason_codes": [],
+      "severity": 0
+    },
+    {
+      "actions": [],
+      "adapter_latency_ms": 0.0,
+      "case_id": "safe-vi-greeting-01",
+      "category": 0,
+      "confidence": 0.05,
+      "expected_category": 0,
+      "expected_severity": 0,
+      "passed": true,
+      "pipeline_latency_ms": 0.047,
+      "rationale_id": "safe_benign_v1",
+      "reason_codes": [],
+      "severity": 0
+    },
+    {
+      "actions": [],
+      "adapter_latency_ms": 0.0,
       "case_id": "safe-es-question-01",
       "category": 0,
       "confidence": 0.05,
       "expected_category": 0,
       "expected_severity": 0,
       "passed": true,
-      "pipeline_latency_ms": 0.031,
+      "pipeline_latency_ms": 0.034,
       "rationale_id": "safe_benign_v1",
       "reason_codes": [],
       "severity": 0
@@ -297,7 +303,7 @@
       "expected_category": 0,
       "expected_severity": 0,
       "passed": true,
-      "pipeline_latency_ms": 0.028,
+      "pipeline_latency_ms": 0.031,
       "rationale_id": "safe_benign_v1",
       "reason_codes": [],
       "severity": 0
@@ -311,7 +317,7 @@
       "expected_category": 0,
       "expected_severity": 0,
       "passed": true,
-      "pipeline_latency_ms": 0.041,
+      "pipeline_latency_ms": 0.045,
       "rationale_id": "safe_benign_v1",
       "reason_codes": [],
       "severity": 0
@@ -328,7 +334,7 @@
       "expected_category": 9,
       "expected_severity": 3,
       "passed": true,
-      "pipeline_latency_ms": 0.041,
+      "pipeline_latency_ms": 0.045,
       "rationale_id": "private_data_pii_v1",
       "reason_codes": [
         "PRIVATE_DATA_PATTERN"
@@ -344,7 +350,7 @@
       "expected_category": 0,
       "expected_severity": 0,
       "passed": true,
-      "pipeline_latency_ms": 0.028,
+      "pipeline_latency_ms": 0.031,
       "rationale_id": "safe_benign_v1",
       "reason_codes": [],
       "severity": 0
@@ -360,7 +366,7 @@
       "expected_category": 10,
       "expected_severity": 3,
       "passed": true,
-      "pipeline_latency_ms": 0.04,
+      "pipeline_latency_ms": 0.044,
       "rationale_id": "sexual_adult_media_v1",
       "reason_codes": [],
       "severity": 3
@@ -374,9 +380,12 @@
       "expected_category": 0,
       "expected_severity": 0,
       "passed": true,
-      "pipeline_latency_ms": 0.058,
+      "pipeline_latency_ms": 0.044,
       "rationale_id": "safe_benign_v1",
-      "reason_codes": [],
+      "reason_codes": [
+        "NEWS_CONTEXT",
+        "QUOTED_SPEECH_CONTEXT"
+      ],
       "severity": 0
     },
     {
@@ -388,7 +397,7 @@
       "expected_category": 0,
       "expected_severity": 0,
       "passed": true,
-      "pipeline_latency_ms": 0.043,
+      "pipeline_latency_ms": 0.067,
       "rationale_id": "safe_benign_v1",
       "reason_codes": [],
       "severity": 0
@@ -402,9 +411,11 @@
       "expected_category": 0,
       "expected_severity": 0,
       "passed": true,
-      "pipeline_latency_ms": 0.043,
+      "pipeline_latency_ms": 0.051,
       "rationale_id": "safe_benign_v1",
-      "reason_codes": [],
+      "reason_codes": [
+        "QUOTED_SPEECH_CONTEXT"
+      ],
       "severity": 0
     },
     {
@@ -416,7 +427,7 @@
       "expected_category": 0,
       "expected_severity": 0,
       "passed": true,
-      "pipeline_latency_ms": 0.039,
+      "pipeline_latency_ms": 0.044,
       "rationale_id": "safe_benign_v1",
       "reason_codes": [],
       "severity": 0
@@ -424,44 +435,44 @@
   ],
   "report": {
     "iterations": 100,
-    "max_ms": 3.092,
+    "max_ms": 0.12,
     "mean_ms": 0.036,
-    "min_ms": 0.018,
-    "p50_ms": 0.033,
-    "p95_ms": 0.057,
-    "p99_ms": 0.083,
+    "min_ms": 0.021,
+    "p50_ms": 0.037,
+    "p95_ms": 0.049,
+    "p99_ms": 0.066,
     "passed": true,
     "per_case_mean_ms": {
-      "child-safety-context-01": 0.034,
-      "civic-misinfo-context-01": 0.054,
-      "code-switching-en-vi-01": 0.037,
-      "community-rule-violation-01": 0.035,
-      "drugs-education-context-01": 0.037,
-      "extremism-news-context-01": 0.032,
-      "harassment-context-01": 0.054,
-      "hate-counterspeech-01": 0.04,
-      "health-misinfo-context-01": 0.082,
-      "marketplace-restricted-context-01": 0.037,
-      "media-image-benign-01": 0.019,
-      "media-nsfw-adult-only-01": 0.032,
-      "news-violence-context-01": 0.04,
-      "outbound-warn-pii-email-01": 0.034,
-      "pii-credit-card-01": 0.033,
-      "pii-email-01": 0.027,
-      "pii-phone-01": 0.026,
+      "child-safety-context-01": 0.039,
+      "civic-misinfo-context-01": 0.038,
+      "code-switching-en-vi-01": 0.04,
+      "community-rule-violation-01": 0.039,
+      "drugs-education-context-01": 0.041,
+      "extremism-news-context-01": 0.037,
+      "harassment-context-01": 0.036,
+      "hate-counterspeech-01": 0.037,
+      "health-misinfo-context-01": 0.04,
+      "marketplace-restricted-context-01": 0.041,
+      "media-image-benign-01": 0.022,
+      "media-nsfw-adult-only-01": 0.037,
+      "news-violence-context-01": 0.041,
+      "outbound-warn-pii-email-01": 0.038,
+      "pii-credit-card-01": 0.031,
+      "pii-email-01": 0.03,
+      "pii-phone-01": 0.028,
       "safe-de-question-01": 0.028,
-      "safe-es-question-01": 0.027,
-      "safe-greeting-01": 0.023,
-      "safe-logistics-01": 0.026,
-      "safe-question-01": 0.026,
-      "safe-vi-greeting-01": 0.022,
-      "scam-advance-fee-01": 0.04,
-      "scam-credential-harvest-01": 0.048,
-      "scam-fake-giveaway-01": 0.045,
-      "self-harm-support-context-01": 0.034
+      "safe-es-question-01": 0.029,
+      "safe-greeting-01": 0.026,
+      "safe-logistics-01": 0.028,
+      "safe-question-01": 0.028,
+      "safe-vi-greeting-01": 0.026,
+      "scam-advance-fee-01": 0.043,
+      "scam-credential-harvest-01": 0.051,
+      "scam-fake-giveaway-01": 0.048,
+      "self-harm-support-context-01": 0.039
     },
     "total_cases": 27
   },
   "samples_path": "kchat-skills/samples/sample_messages.yaml",
-  "timestamp_utc": "2026-05-01T15:43:55.282036+00:00"
+  "timestamp_utc": "2026-05-02T01:41:56.043312+00:00"
 }
