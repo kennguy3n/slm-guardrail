@@ -521,11 +521,21 @@ embedding-stage classifier.
 pip install -r requirements.txt
 
 # 2. One-time ONNX export from the HuggingFace checkpoint. This
-#    requires transformers + torch + onnx, but only at export time —
-#    they are NOT runtime dependencies.
-pip install transformers torch onnx onnxruntime sentencepiece
+#    requires transformers + torch + onnx + onnxscript, but only at
+#    export time — they are NOT runtime dependencies. We pin
+#    `transformers<5` because v5 changed the positional signature of
+#    `XLMRobertaModel.forward()` and breaks the legacy `torch.onnx`
+#    tracer; the export script in turn forces `dynamo=False`,
+#    because the dynamo-based exporter on torch >= 2.5 emits an
+#    INT8 graph that `onnxruntime` rejects (`tensor(float16)`
+#    `DequantizeLinear` scales) and an FP32 graph whose
+#    `scaled_dot_product_attention` fails on dynamic shapes.
+pip install -e ".[export]"
+# or, equivalently:
+# pip install "transformers<5" torch onnx onnxruntime sentencepiece onnxscript
 python tools/export_xlmr_onnx.py --output-dir models
-# -> writes models/xlmr.onnx (INT8-quantised) and models/xlmr.spm
+# -> writes models/xlmr.onnx (INT8-quantised, ~107 MB) and
+#    models/xlmr.spm (~5 MB SentencePiece tokenizer)
 
 # 3. Run the demo against the local ONNX checkpoint
 python tools/run_guardrail_demo.py \

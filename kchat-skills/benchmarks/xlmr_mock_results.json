@@ -16,7 +16,7 @@
       "expected_category": 0,
       "expected_severity": 0,
       "passed": true,
-      "pipeline_latency_ms": 0.087,
+      "pipeline_latency_ms": 0.055,
       "rationale_id": "safe_benign_v1",
       "reason_codes": [],
       "severity": 0
@@ -30,7 +30,7 @@
       "expected_category": 0,
       "expected_severity": 0,
       "passed": true,
-      "pipeline_latency_ms": 0.086,
+      "pipeline_latency_ms": 0.075,
       "rationale_id": "safe_benign_v1",
       "reason_codes": [],
       "severity": 0
@@ -44,7 +44,7 @@
       "expected_category": 0,
       "expected_severity": 0,
       "passed": true,
-      "pipeline_latency_ms": 0.062,
+      "pipeline_latency_ms": 0.04,
       "rationale_id": "safe_benign_v1",
       "reason_codes": [],
       "severity": 0
@@ -60,7 +60,7 @@
       "expected_category": 7,
       "expected_severity": 3,
       "passed": true,
-      "pipeline_latency_ms": 0.077,
+      "pipeline_latency_ms": 0.066,
       "rationale_id": "scam_credential_phish_v1",
       "reason_codes": [
         "URL_RISK",
@@ -79,7 +79,7 @@
       "expected_category": 7,
       "expected_severity": 3,
       "passed": true,
-      "pipeline_latency_ms": 0.151,
+      "pipeline_latency_ms": 0.063,
       "rationale_id": "scam_credential_phish_v1",
       "reason_codes": [
         "URL_RISK",
@@ -98,7 +98,7 @@
       "expected_category": 7,
       "expected_severity": 3,
       "passed": true,
-      "pipeline_latency_ms": 0.058,
+      "pipeline_latency_ms": 0.052,
       "rationale_id": "scam_credential_phish_v1",
       "reason_codes": [
         "SCAM_PATTERN"
@@ -117,7 +117,7 @@
       "expected_category": 9,
       "expected_severity": 3,
       "passed": true,
-      "pipeline_latency_ms": 0.039,
+      "pipeline_latency_ms": 0.037,
       "rationale_id": "private_data_pii_v1",
       "reason_codes": [
         "PRIVATE_DATA_PATTERN"
@@ -136,7 +136,7 @@
       "expected_category": 9,
       "expected_severity": 3,
       "passed": true,
-      "pipeline_latency_ms": 0.036,
+      "pipeline_latency_ms": 0.035,
       "rationale_id": "private_data_pii_v1",
       "reason_codes": [
         "PRIVATE_DATA_PATTERN"
@@ -187,7 +187,7 @@
       "expected_category": 0,
       "expected_severity": 0,
       "passed": true,
-      "pipeline_latency_ms": 0.05,
+      "pipeline_latency_ms": 0.052,
       "rationale_id": "safe_benign_v1",
       "reason_codes": [
         "QUOTED_SPEECH_CONTEXT"
@@ -203,7 +203,7 @@
       "expected_category": 0,
       "expected_severity": 0,
       "passed": true,
-      "pipeline_latency_ms": 0.045,
+      "pipeline_latency_ms": 0.044,
       "rationale_id": "safe_benign_v1",
       "reason_codes": [],
       "severity": 0
@@ -217,7 +217,7 @@
       "expected_category": 0,
       "expected_severity": 0,
       "passed": true,
-      "pipeline_latency_ms": 0.041,
+      "pipeline_latency_ms": 0.04,
       "rationale_id": "safe_benign_v1",
       "reason_codes": [],
       "severity": 0
@@ -231,7 +231,7 @@
       "expected_category": 0,
       "expected_severity": 0,
       "passed": true,
-      "pipeline_latency_ms": 0.048,
+      "pipeline_latency_ms": 0.046,
       "rationale_id": "safe_benign_v1",
       "reason_codes": [
         "QUOTED_SPEECH_CONTEXT"
@@ -247,7 +247,7 @@
       "expected_category": 0,
       "expected_severity": 0,
       "passed": true,
-      "pipeline_latency_ms": 0.045,
+      "pipeline_latency_ms": 0.042,
       "rationale_id": "safe_benign_v1",
       "reason_codes": [],
       "severity": 0
@@ -261,7 +261,7 @@
       "expected_category": 0,
       "expected_severity": 0,
       "passed": true,
-      "pipeline_latency_ms": 0.044,
+      "pipeline_latency_ms": 0.042,
       "rationale_id": "safe_benign_v1",
       "reason_codes": [],
       "severity": 0
@@ -275,7 +275,7 @@
       "expected_category": 0,
       "expected_severity": 0,
       "passed": true,
-      "pipeline_latency_ms": 0.047,
+      "pipeline_latency_ms": 0.049,
       "rationale_id": "safe_benign_v1",
       "reason_codes": [],
       "severity": 0
@@ -289,7 +289,7 @@
       "expected_category": 0,
       "expected_severity": 0,
       "passed": true,
-      "pipeline_latency_ms": 0.034,
+      "pipeline_latency_ms": 0.033,
       "rationale_id": "safe_benign_v1",
       "reason_codes": [],
       "severity": 0
@@ -303,7 +303,7 @@
       "expected_category": 0,
       "expected_severity": 0,
       "passed": true,
-      "pipeline_latency_ms": 0.031,
+      "pipeline_latency_ms": 0.03,
       "rationale_id": "safe_benign_v1",
       "reason_codes": [],
       "severity": 0
@@ -317,7 +317,7 @@
       "expected_category": 0,
       "expected_severity": 0,
       "passed": true,
-      "pipeline_latency_ms": 0.045,
+      "pipeline_latency_ms": 0.042,
       "rationale_id": "safe_benign_v1",
       "reason_codes": [],
       "severity": 0
@@ -334,7 +334,7 @@
       "expected_category": 9,
       "expected_severity": 3,
       "passed": true,
-      "pipeline_latency_ms": 0.045,
+      "pipeline_latency_ms": 0.043,
       "rationale_id": "private_data_pii_v1",
       "reason_codes": [
         "PRIVATE_DATA_PATTERN"
@@ -350,7 +350,7 @@
       "expected_category": 0,
       "expected_severity": 0,
       "passed": true,
-      "pipeline_latency_ms": 0.031,
+      "pipeline_latency_ms": 0.029,
       "rationale_id": "safe_benign_v1",
       "reason_codes": [],
       "severity": 0
@@ -366,7 +366,7 @@
       "expected_category": 10,
       "expected_severity": 3,
       "passed": true,
-      "pipeline_latency_ms": 0.044,
+      "pipeline_latency_ms": 0.067,
       "rationale_id": "sexual_adult_media_v1",
       "reason_codes": [],
       "severity": 3
@@ -380,7 +380,7 @@
       "expected_category": 0,
       "expected_severity": 0,
       "passed": true,
-      "pipeline_latency_ms": 0.044,
+      "pipeline_latency_ms": 0.046,
       "rationale_id": "safe_benign_v1",
       "reason_codes": [
         "NEWS_CONTEXT",
@@ -397,7 +397,7 @@
       "expected_category": 0,
       "expected_severity": 0,
       "passed": true,
-      "pipeline_latency_ms": 0.067,
+      "pipeline_latency_ms": 0.044,
       "rationale_id": "safe_benign_v1",
       "reason_codes": [],
       "severity": 0
@@ -411,7 +411,7 @@
       "expected_category": 0,
       "expected_severity": 0,
       "passed": true,
-      "pipeline_latency_ms": 0.051,
+      "pipeline_latency_ms": 0.047,
       "rationale_id": "safe_benign_v1",
       "reason_codes": [
         "QUOTED_SPEECH_CONTEXT"
@@ -427,7 +427,7 @@
       "expected_category": 0,
       "expected_severity": 0,
       "passed": true,
-      "pipeline_latency_ms": 0.044,
+      "pipeline_latency_ms": 0.041,
       "rationale_id": "safe_benign_v1",
       "reason_codes": [],
       "severity": 0
@@ -435,44 +435,44 @@
   ],
   "report": {
     "iterations": 100,
-    "max_ms": 0.12,
+    "max_ms": 0.083,
     "mean_ms": 0.036,
     "min_ms": 0.021,
     "p50_ms": 0.037,
-    "p95_ms": 0.049,
-    "p99_ms": 0.066,
+    "p95_ms": 0.05,
+    "p99_ms": 0.064,
     "passed": true,
     "per_case_mean_ms": {
-      "child-safety-context-01": 0.039,
-      "civic-misinfo-context-01": 0.038,
+      "child-safety-context-01": 0.037,
+      "civic-misinfo-context-01": 0.041,
       "code-switching-en-vi-01": 0.04,
       "community-rule-violation-01": 0.039,
-      "drugs-education-context-01": 0.041,
-      "extremism-news-context-01": 0.037,
-      "harassment-context-01": 0.036,
-      "hate-counterspeech-01": 0.037,
-      "health-misinfo-context-01": 0.04,
+      "drugs-education-context-01": 0.043,
+      "extremism-news-context-01": 0.038,
+      "harassment-context-01": 0.038,
+      "hate-counterspeech-01": 0.038,
+      "health-misinfo-context-01": 0.044,
       "marketplace-restricted-context-01": 0.041,
-      "media-image-benign-01": 0.022,
+      "media-image-benign-01": 0.023,
       "media-nsfw-adult-only-01": 0.037,
-      "news-violence-context-01": 0.041,
+      "news-violence-context-01": 0.042,
       "outbound-warn-pii-email-01": 0.038,
-      "pii-credit-card-01": 0.031,
+      "pii-credit-card-01": 0.029,
       "pii-email-01": 0.03,
-      "pii-phone-01": 0.028,
-      "safe-de-question-01": 0.028,
-      "safe-es-question-01": 0.029,
-      "safe-greeting-01": 0.026,
+      "pii-phone-01": 0.027,
+      "safe-de-question-01": 0.029,
+      "safe-es-question-01": 0.031,
+      "safe-greeting-01": 0.027,
       "safe-logistics-01": 0.028,
-      "safe-question-01": 0.028,
+      "safe-question-01": 0.03,
       "safe-vi-greeting-01": 0.026,
       "scam-advance-fee-01": 0.043,
-      "scam-credential-harvest-01": 0.051,
-      "scam-fake-giveaway-01": 0.048,
+      "scam-credential-harvest-01": 0.05,
+      "scam-fake-giveaway-01": 0.049,
       "self-harm-support-context-01": 0.039
     },
     "total_cases": 27
   },
   "samples_path": "kchat-skills/samples/sample_messages.yaml",
-  "timestamp_utc": "2026-05-02T01:41:56.043312+00:00"
+  "timestamp_utc": "2026-05-02T12:42:01.703494+00:00"
 }
