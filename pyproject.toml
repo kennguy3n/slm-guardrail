@@ -43,7 +43,12 @@ demo = [
 # script (see the export script's module docstring for details).
 export = [
     "transformers<5",
-    "torch>=2.0",
+    # torch.onnx.export(..., dynamo=False) requires torch>=2.5 (the
+    # ``dynamo`` kwarg was added then). We pass it explicitly in
+    # tools/export_xlmr_onnx.py because the dynamo path produces a
+    # graph that onnxruntime cannot load (see the export script's
+    # module docstring for details).
+    "torch>=2.5",
     "onnx>=1.15",
     "onnxscript>=0.1",
     "onnxruntime>=1.16.0",
