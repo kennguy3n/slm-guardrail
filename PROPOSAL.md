@@ -147,7 +147,7 @@ construction.
   repository. This project produces inputs to that runtime.
 - **Not a model training project.** Skills are *prompts and configs* for
   existing encoder classifiers (and any other backend that satisfies the
-  ``SLMAdapter`` Protocol). We do not fine-tune or pre-train models here.
+  ``EncoderAdapter`` Protocol). We do not fine-tune or pre-train models here.
 - **Not server-side moderation.** No skill output is uploaded by default.
   No skill may demand that it be.
 - **Not legal advice.** Jurisdiction packs are **product policy guidance**
@@ -166,7 +166,7 @@ construction.
   group; the choice is visible to all members.
 - **Encoder classifier runtime engineers** — implement the on-device
   pipeline that consumes compiled skill packs, runs the classifier
-  (XLM-R MiniLM-L6 today, swappable via the ``SLMAdapter`` Protocol),
+  (XLM-R MiniLM-L6 today, swappable via the ``EncoderAdapter`` Protocol),
   and renders local warnings.
 
 ## Success Metrics

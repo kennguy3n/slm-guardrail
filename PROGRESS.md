@@ -2,7 +2,7 @@
 
 **Status:** Complete | 100% + demo layer
 **Current phase:** Phase 6 complete — 100 jurisdiction/community skills + XLM-R MiniLM-L6 encoder classifier integration with trained linear head + protected-speech context demotion
-**Last updated:** 2026-05-01
+**Last updated:** 2026-05-02
 
 This file tracks delivery against the phased plan in
 [`PHASES.md`](PHASES.md). Each phase ends with a tagged release
@@ -78,7 +78,8 @@ This file tracks delivery against the phased plan in
   pack signals → encoder classifier → thresholds → JSON → counters) at
   `kchat-skills/compiler/pipeline.py`.
 - [x] Encoder classifier runtime adapter interface + reference adapter
-  at `kchat-skills/compiler/slm_adapter.py` (Protocol + `MockSLMAdapter`).
+  at `kchat-skills/compiler/encoder_adapter.py` (`EncoderAdapter`
+  Protocol + `MockEncoderAdapter`).
 - [x] Hard-coded threshold enforcement (`label_only=0.45`,
   `warn=0.62`, `strong_warn=0.78`, `critical_intervention=0.85`) at
   `kchat-skills/compiler/threshold_policy.py`, including child-safety
@@ -176,7 +177,7 @@ This file tracks delivery against the phased plan in
   (`vn/school`, `vn/workplace`, `vn/marketplace`,
   `vn/health_support`, `vn/none`).
 - 250 ms p95 target — still PASS at 51-case corpus
-  (overall p95 ≪ 1 ms with `MockSLMAdapter`).
+  (overall p95 ≪ 1 ms with `MockEncoderAdapter`).
 
 ### 2026-04-30 — Cross-community / cross-country demo + results
 
@@ -193,10 +194,25 @@ This file tracks delivery against the phased plan in
   report with summary tables, per-community, per-country, and
   mixed-language breakdowns, and performance metrics.
 
+### 2026-05-02 — EncoderAdapter rename + Bonsai/llama purge
+
+- Renamed `kchat-skills/compiler/slm_adapter.py` →
+  `kchat-skills/compiler/encoder_adapter.py`. The Protocol is now
+  `EncoderAdapter` and the deterministic reference is
+  `MockEncoderAdapter`. Pipeline parameter and attribute renamed
+  `slm_adapter` → `encoder_adapter`. Tests, demos, benchmark scripts,
+  and docs all updated.
+- All historical references to "SLM", "Bonsai-1.7B", and "llama.cpp"
+  across the documentation set (PROGRESS.md, README.md,
+  ARCHITECTURE.md, PROPOSAL.md, benchmarks/README.md, samples/README.md)
+  have been condensed to brief historical notes or removed; the
+  current architecture is encoder-only.
+- Benchmark suite re-run via `tools/run_benchmark.sh`.
+
 ### 2026-05-01 — XLM-R MiniLM-L6 encoder classifier integration
 
 - `kchat-skills/compiler/xlmr_minilm_adapter.py` — `XLMRMiniLMAdapter`
-  implementing the `SLMAdapter` Protocol against the
+  implementing the `EncoderAdapter` Protocol against the
   `nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large` encoder
   loaded through `transformers`. The adapter holds a single
   `AutoModel` + `AutoTokenizer` pair, runs each classification as a
@@ -207,12 +223,12 @@ This file tracks delivery against the phased plan in
   are missing, transformers/torch are unavailable, or inference
   raises.
 
-  Replaces the previous Phase 6 `LlamaCppSLMAdapter` (Bonsai-1.7B over
-  llama.cpp's `/v1/chat/completions`) — the encoder approach is
-  faster on CPU, fully deterministic, ~12× smaller (~80 MB vs ~1 GB),
-  and avoids the unpredictability of generative output formatting.
+  Historical note: this replaced an earlier prototype generative
+  backend; the encoder-only approach is faster on CPU, fully
+  deterministic, ~12× smaller (~80 MB), and avoids the
+  unpredictability of generative output formatting.
 
-### 2026-05-01 — Protected-speech context demotion + trained linear head
+### 2026-05-02 — Protected-speech context demotion + trained linear head
 
 - **Pipeline-level context inference.**
   `kchat-skills/compiler/pipeline.derive_context_hints()` infers four
@@ -257,21 +273,12 @@ This file tracks delivery against the phased plan in
 ### 2026-04-30 — Sample data layer
 
 - Sample-message corpus (`kchat-skills/samples/sample_messages.yaml`)
-  and the `tools/run_guardrail_demo.py` driver were originally landed
-  alongside the deprecated llama.cpp adapter. The driver now
-  instantiates `XLMRMiniLMAdapter` instead. The remainder of this
-  entry retains its historical wording for traceability.
-
-  Earlier wording: "`kchat-skills/compiler/llama_cpp_adapter.py` —
-  `LlamaCppSLMAdapter` implementing the `SLMAdapter` Protocol against
-  a llama.cpp server (kennguy3n/llama.cpp, branch prism). Connects
-  via HTTP to the OpenAI-compatible `/v1/chat/completions` endpoint
-  with constrained JSON output (`response_format: {\"type\":
-  \"json_object\"}`, `temperature: 0.0`). Uses Bonsai-1.7B-gguf from
-  https://huggingface.co/prism-ml/Bonsai-1.7B-gguf. Stdlib-only
-  (`urllib.request` + `json`); falls back to a SAFE output when the
-  server is unreachable, returns malformed JSON, or returns
-  out-of-range fields.
+  and the `tools/run_guardrail_demo.py` driver — the driver
+  instantiates `XLMRMiniLMAdapter` (or `MockEncoderAdapter` with
+  `--mock`) and runs the pipeline end-to-end against the curated
+  sample corpus. (Historical note: an earlier prototype driver shipped
+  in this slot used a generative backend; that path was removed when
+  the encoder-only `XLMRMiniLMAdapter` landed.)
 - `kchat-skills/samples/sample_messages.yaml` — curated sample data
   layer with 27 messages covering safe / scam / PII / child-safety /
   hate / harassment / health-misinfo / civic-misinfo / marketplace /
@@ -286,20 +293,19 @@ This file tracks delivery against the phased plan in
   XLM-R MiniLM-L6 weight availability, loads samples, compiles a
   classifier-bundle prompt via `SkillPackCompiler` (with optional
   `--jurisdiction` / `--community`), runs the pipeline with either
-  `XLMRMiniLMAdapter` or `MockSLMAdapter` (`--mock`), prints a
+  `XLMRMiniLMAdapter` or `MockEncoderAdapter` (`--mock`), prints a
   results table, optionally runs `PipelineBenchmark` (`--benchmark`)
   and commits results (`--commit-results`).
 - `kchat-skills/benchmarks/` — committed benchmark results directory
   with reproduction instructions; `xlmr_minilm_l6_results.json` is
   generated on demand by the demo script.
 - `kchat-skills/tests/global/test_xlmr_minilm_adapter.py` — adapter
-  Protocol conformance, fallback behaviour, output
-  schema coercion, classification-head behaviour with stub embeddings,
-  signal-priority overrides (
-  `response_format: json_object`).
+  Protocol conformance, fallback behaviour, output schema coercion,
+  classification-head behaviour with stub embeddings, and
+  signal-priority overrides.
 - `kchat-skills/tests/global/test_sample_messages.py` — sample data
   structural validation (required keys, taxonomy range,
-  case-id uniqueness, multi-language coverage) and `MockSLMAdapter`
+  case-id uniqueness, multi-language coverage) and `MockEncoderAdapter`
   smoke tests.
 - `pyproject.toml` — adds optional `[project.optional-dependencies].demo`
   group (PyYAML only).
@@ -389,8 +395,8 @@ This file tracks delivery against the phased plan in
 - `kchat-skills/compiler/benchmark.py` — `PipelineBenchmark`,
   `BenchmarkCase`, `BenchmarkReport` + `default_benchmark_cases`.
   Measures p50 / p95 / p99 / mean / max / min per-message latency
-  against `MockSLMAdapter` (or any other `SLMAdapter`, e.g. the
-  `XLMRMiniLMAdapter`); `passed` iff p95 ≤ 250 ms.
+  against `MockEncoderAdapter` (or any other `EncoderAdapter`, e.g.
+  the `XLMRMiniLMAdapter`); `passed` iff p95 ≤ 250 ms.
 - `kchat-skills/tests/global/test_benchmark.py` — constructor /
   invariant checks, per-taxonomy parametrisation (all 16 cats),
   baseline-only / jurisdiction-only / full-stack latency targets,
@@ -530,17 +536,17 @@ This file tracks delivery against the phased plan in
   classifier adapter → threshold policy → output → counter updates)
   with a `SkillBundle` carrier and a fully offline-capable
   `GuardrailPipeline.classify` entry point.
-- `kchat-skills/compiler/slm_adapter.py` — backend-agnostic
-  `SLMAdapter` Protocol plus a deterministic `MockSLMAdapter` that
-  maps detector signals to all 16 taxonomy categories for end-to-end
-  pipeline tests without a real model.
+- `kchat-skills/compiler/encoder_adapter.py` — backend-agnostic
+  `EncoderAdapter` Protocol plus a deterministic `MockEncoderAdapter`
+  that maps detector signals to all 16 taxonomy categories for
+  end-to-end pipeline tests without a real model.
 - `kchat-skills/compiler/threshold_policy.py` — immutable
   `ThresholdPolicy` with hard-coded confidence thresholds, uncertainty
   handling (< 0.45 → SAFE), lower-numbered-category tie-break, and the
   CHILD_SAFETY severity-5 floor.
 - `kchat-skills/tests/global/test_pipeline.py`,
-  `test_slm_adapter.py`, `test_threshold_policy.py` — unit and end-
-  to-end tests for the new compiler modules.
+  `test_encoder_adapter.py`, `test_threshold_policy.py` — unit and
+  end-to-end tests for the new compiler modules.
 
 ### 2026-04-29 — Phase 1 close + Phase 2 partial
 

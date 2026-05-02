@@ -7,7 +7,7 @@ taxonomy category and every protected-speech context.
 
 ## What's in here
 
-- [`sample_messages.yaml`](sample_messages.yaml) — ~28 cases. Each case
+- [`sample_messages.yaml`](sample_messages.yaml) — 27 cases. Each case
   is a fixture that maps directly onto
   [`kchat.guardrail.local_signal.v1`](../global/local_signal_schema.json)
   fields plus an `expected_category` / `expected_severity` /
@@ -74,7 +74,7 @@ The corpus covers:
 ```
 
 `expected_category` / `expected_severity` describe the *deterministic*
-verdict the demo expects from `MockSLMAdapter`. A real encoder
+verdict the demo expects from `MockEncoderAdapter`. A real encoder
 classifier (XLM-R MiniLM-L6 via `XLMRMiniLMAdapter`) may produce a
 different but still schema-conformant output; the demo prints both so
 divergence is visible.

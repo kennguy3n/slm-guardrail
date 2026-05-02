@@ -28,7 +28,7 @@ from pipeline import (  # type: ignore[import-not-found]
     pack_signals,
     score_url_risk,
 )
-from slm_adapter import MockSLMAdapter  # type: ignore[import-not-found]
+from encoder_adapter import MockEncoderAdapter  # type: ignore[import-not-found]
 from threshold_policy import ThresholdPolicy  # type: ignore[import-not-found]
 
 
@@ -204,7 +204,7 @@ def _url_risk_message() -> dict[str, Any]:
 def pipeline() -> GuardrailPipeline:
     return GuardrailPipeline(
         skill_bundle=SkillBundle(),
-        slm_adapter=MockSLMAdapter(),
+        encoder_adapter=MockEncoderAdapter(),
         threshold_policy=ThresholdPolicy(),
     )
 
@@ -239,7 +239,7 @@ class TestPipelineEndToEnd:
             ]
         )
         p = GuardrailPipeline(
-            skill_bundle=bundle, slm_adapter=MockSLMAdapter()
+            skill_bundle=bundle, encoder_adapter=MockEncoderAdapter()
         )
         out = p.classify({"text": "this has badtoken inside"}, _context())
         jsonschema.validate(instance=out, schema=output_schema)
@@ -272,7 +272,7 @@ class _AlwaysLowConfidenceAdapter:
 def test_pipeline_coerces_low_confidence_to_safe():
     p = GuardrailPipeline(
         skill_bundle=SkillBundle(),
-        slm_adapter=_AlwaysLowConfidenceAdapter(),
+        encoder_adapter=_AlwaysLowConfidenceAdapter(),
     )
     out = p.classify({"text": "hi"}, _context())
     assert out["category"] == 0
@@ -307,7 +307,7 @@ def test_pipeline_applies_counter_updates_to_store():
     store = CounterStore(keystore=InMemoryKeystore(b"\x00" * 32))
     p = GuardrailPipeline(
         skill_bundle=SkillBundle(),
-        slm_adapter=_CounterEmittingAdapter(),
+        encoder_adapter=_CounterEmittingAdapter(),
         counter_store=store,
     )
     out = p.classify({"text": "hi"}, _context(), group_id="group-1")
@@ -319,7 +319,7 @@ def test_pipeline_skips_counter_updates_without_group_id():
     store = CounterStore(keystore=InMemoryKeystore(b"\x00" * 32))
     p = GuardrailPipeline(
         skill_bundle=SkillBundle(),
-        slm_adapter=_CounterEmittingAdapter(),
+        encoder_adapter=_CounterEmittingAdapter(),
         counter_store=store,
     )
     p.classify({"text": "hi"}, _context())  # no group_id
@@ -351,10 +351,10 @@ class _RecordingAdapter:
         }
 
 
-def test_slm_receives_original_text_not_normalized():
+def test_encoder_receives_original_text_not_normalized():
     adapter = _RecordingAdapter()
     p = GuardrailPipeline(
-        skill_bundle=SkillBundle(), slm_adapter=adapter
+        skill_bundle=SkillBundle(), encoder_adapter=adapter
     )
     raw = "HELLO\uff11\uff12\uff13"
     p.classify({"text": raw}, _context())
@@ -371,7 +371,7 @@ def test_bundle_jurisdiction_id_flows_into_packed_context():
         jurisdiction_id="kchat.jurisdiction.archetype-strict-marketplace.guardrail.v1",
         community_overlay_id="kchat.community.workplace.guardrail.v1",
     )
-    p = GuardrailPipeline(skill_bundle=bundle, slm_adapter=adapter)
+    p = GuardrailPipeline(skill_bundle=bundle, encoder_adapter=adapter)
     p.classify({"text": "hi"}, _context())
     assert adapter.last_input is not None
     ctx = adapter.last_input["context"]
@@ -495,7 +495,7 @@ def test_pipeline_news_quote_demotes_violence_to_safe():
         skill_bundle=SkillBundle(
             community_overlay_id="kchat.community.journalism.guardrail.v1"
         ),
-        slm_adapter=_AlwaysViolenceAdapter(),
+        encoder_adapter=_AlwaysViolenceAdapter(),
     )
     msg = {"text": "Reuters reports an attack.", "quoted_from_user": True}
     out = p.classify(msg, _context())
@@ -511,7 +511,7 @@ def test_pipeline_no_overlay_keeps_violence_label():
     survives the threshold policy at label_only."""
     p = GuardrailPipeline(
         skill_bundle=SkillBundle(),
-        slm_adapter=_AlwaysViolenceAdapter(),
+        encoder_adapter=_AlwaysViolenceAdapter(),
     )
     out = p.classify({"text": "i will hurt them"}, _context())
     assert out["category"] == 3  # VIOLENCE_THREAT
@@ -525,7 +525,7 @@ def test_pipeline_packs_context_hints_into_local_signals():
     bundle = SkillBundle(
         community_overlay_id="kchat.community.journalism.guardrail.v1"
     )
-    p = GuardrailPipeline(skill_bundle=bundle, slm_adapter=adapter)
+    p = GuardrailPipeline(skill_bundle=bundle, encoder_adapter=adapter)
     p.classify(
         {"text": "headline", "quoted_from_user": True}, _context()
     )
@@ -554,7 +554,7 @@ def test_phishing_url_in_school_context_stays_scam_fraud():
         skill_bundle=SkillBundle(
             community_overlay_id="kchat.community.school.guardrail.v1"
         ),
-        slm_adapter=MockSLMAdapter(),
+        encoder_adapter=MockEncoderAdapter(),
     )
     msg = {
         "text": "Kids click here: https://free-iphone.xyz/claim",
@@ -579,7 +579,7 @@ def test_pii_in_journalism_context_stays_private_data():
         skill_bundle=SkillBundle(
             community_overlay_id="kchat.community.journalism.guardrail.v1"
         ),
-        slm_adapter=MockSLMAdapter(),
+        encoder_adapter=MockEncoderAdapter(),
     )
     msg = {
         "text": "leaked: john.doe@example.com / 415-555-0199",
@@ -599,7 +599,7 @@ def test_scam_pattern_in_education_context_stays_scam_fraud():
         skill_bundle=SkillBundle(
             community_overlay_id="kchat.community.education.guardrail.v1"
         ),
-        slm_adapter=MockSLMAdapter(),
+        encoder_adapter=MockEncoderAdapter(),
     )
     msg = {
         "text": (
@@ -620,7 +620,7 @@ def test_quoted_phishing_url_still_flagged_as_scam_fraud():
     does not make it safe."""
     p = GuardrailPipeline(
         skill_bundle=SkillBundle(),
-        slm_adapter=MockSLMAdapter(),
+        encoder_adapter=MockEncoderAdapter(),
     )
     msg = {
         "text": "Friend forwarded this: https://win-now.click/claim",
@@ -641,7 +641,7 @@ def test_news_quote_about_violence_still_demotes_to_safe():
         skill_bundle=SkillBundle(
             community_overlay_id="kchat.community.journalism.guardrail.v1"
         ),
-        slm_adapter=_AlwaysViolenceAdapter(),
+        encoder_adapter=_AlwaysViolenceAdapter(),
     )
     msg = {
         "text": (

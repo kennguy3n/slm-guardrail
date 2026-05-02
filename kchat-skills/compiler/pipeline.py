@@ -32,7 +32,7 @@ from metric_validator import (  # type: ignore[import-not-found]
     MetricThresholds,
     MetricValidator,
 )
-from slm_adapter import SLMAdapter  # type: ignore[import-not-found]
+from encoder_adapter import EncoderAdapter  # type: ignore[import-not-found]
 from threshold_policy import ThresholdPolicy  # type: ignore[import-not-found]
 
 
@@ -352,12 +352,10 @@ class GuardrailPipeline:
     skill_bundle
         Compiled active skill bundle (global baseline + optional
         jurisdiction overlay + optional community overlay).
-    slm_adapter
-        Any :class:`SLMAdapter` implementation — the real encoder
+    encoder_adapter
+        Any :class:`EncoderAdapter` implementation — the real encoder
         classifier (e.g. ``XLMRMiniLMAdapter``) or
-        :class:`MockSLMAdapter` in tests. The attribute name is kept
-        for backwards compatibility with existing skill packs and
-        callers; any encoder-classifier backend is acceptable.
+        :class:`MockEncoderAdapter` in tests.
     threshold_policy
         Hard-coded threshold enforcer. Defaults to a fresh
         :class:`ThresholdPolicy`.
@@ -367,7 +365,7 @@ class GuardrailPipeline:
     """
 
     skill_bundle: SkillBundle
-    slm_adapter: SLMAdapter
+    encoder_adapter: EncoderAdapter
     threshold_policy: ThresholdPolicy = field(default_factory=ThresholdPolicy)
     counter_store: Optional[CounterStore] = None
 
@@ -449,8 +447,8 @@ class GuardrailPipeline:
         )
 
         # --- Step 4: Encoder-based contextual classification
-        # (XLM-R MiniLM-L6 reference backend; any SLMAdapter works).
-        raw_output = self.slm_adapter.classify(packed)
+        # (XLM-R MiniLM-L6 reference backend; any EncoderAdapter works).
+        raw_output = self.encoder_adapter.classify(packed)
 
         # --- Step 5: Severity / threshold policy enforcement.
         policy_output = self.threshold_policy.apply(raw_output)

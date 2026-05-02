@@ -49,7 +49,7 @@ is breached on any committed run.
 
 Flags:
   --mock          Skip the encoder-weight requirement and only run the
-                  deterministic MockSLMAdapter benchmark.
+                  deterministic MockEncoderAdapter benchmark.
   --no-commit     Run benchmarks but skip the git commit step.
   --push          After committing, also git push the new commit.
   --iterations N  Per-case benchmark iterations (default: ${ITERATIONS}).
@@ -160,7 +160,7 @@ if [[ "${MOCK_ONLY}" -eq 0 ]]; then
   RAN_REAL=1
 fi
 
-log "Running deterministic mock benchmark (MockSLMAdapter)..."
+log "Running deterministic mock benchmark (MockEncoderAdapter)..."
 "${PYTHON}" tools/run_guardrail_demo.py \
   --mock \
   --benchmark --commit-results \

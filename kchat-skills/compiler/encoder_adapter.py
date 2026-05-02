@@ -18,10 +18,10 @@ Spec references:
 
 This module ships:
 
-* :class:`SLMAdapter` — the :mod:`typing.Protocol` defining the
-  contract. The name is preserved for backwards compatibility; it
-  matches any encoder-classifier backend.
-* :class:`MockSLMAdapter` — a deterministic reference adapter. It
+* :class:`EncoderAdapter` — the :mod:`typing.Protocol` defining the
+  contract. Any encoder-classifier backend whose ``classify`` method
+  matches the shape is a valid implementation.
+* :class:`MockEncoderAdapter` — a deterministic reference adapter. It
   returns fixed outputs keyed off the deterministic-local-detector
   signals so the full pipeline is testable end-to-end without a real
   model.
@@ -88,7 +88,7 @@ def _safe_output_with_context(context_hints: list[str]) -> dict[str, Any]:
 
 
 @runtime_checkable
-class SLMAdapter(Protocol):
+class EncoderAdapter(Protocol):
     """Adapter contract implemented by any encoder-classifier backend.
 
     Implementations must:
@@ -100,8 +100,7 @@ class SLMAdapter(Protocol):
       rejected and re-coerced to SAFE.
     * Be deterministic — identical input must produce identical
       output. For encoder backends this is satisfied by argmax over
-      fixed prototype embeddings; for any future generative backend
-      the adapter must pin temperature to 0.0.
+      fixed prototype embeddings.
     * Run with no network access. The pipeline enforces this at the
       step-3 packaging boundary; adapters are expected not to reach
       out.
@@ -112,7 +111,7 @@ class SLMAdapter(Protocol):
         ...
 
 
-class MockSLMAdapter:
+class MockEncoderAdapter:
     """Deterministic reference adapter for pipeline tests.
 
     Used in tests, demos, and any environment that does not have the
@@ -252,4 +251,4 @@ class MockSLMAdapter:
         return _safe_output_with_context(context_hints)
 
 
-__all__ = ["SLMAdapter", "MockSLMAdapter"]
+__all__ = ["EncoderAdapter", "MockEncoderAdapter"]

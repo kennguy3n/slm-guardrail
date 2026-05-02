@@ -1,11 +1,10 @@
 """Tests for the encoder classifier runtime adapter protocol +
-MockSLMAdapter.
+MockEncoderAdapter.
 
-Module under test: ``kchat-skills/compiler/slm_adapter.py``. See
+Module under test: ``kchat-skills/compiler/encoder_adapter.py``. See
 ARCHITECTURE.md "Hybrid Local Pipeline" step 4 and PHASES.md Phase 3.
-The protocol class name (``SLMAdapter``) is preserved for backwards
-compatibility — it now matches any encoder-classifier backend, not
-just generative SLMs.
+The protocol class name (``EncoderAdapter``) describes any
+encoder-classifier backend.
 """
 from __future__ import annotations
 
@@ -14,9 +13,9 @@ from typing import Any
 import jsonschema
 import pytest
 
-from slm_adapter import (  # type: ignore[import-not-found]
-    MockSLMAdapter,
-    SLMAdapter,
+from encoder_adapter import (  # type: ignore[import-not-found]
+    EncoderAdapter,
+    MockEncoderAdapter,
 )
 
 
@@ -66,12 +65,12 @@ def _input(**signals: Any) -> dict[str, Any]:
 # Protocol compliance
 # ---------------------------------------------------------------------------
 def test_mock_adapter_satisfies_protocol():
-    adapter = MockSLMAdapter()
-    assert isinstance(adapter, SLMAdapter)
+    adapter = MockEncoderAdapter()
+    assert isinstance(adapter, EncoderAdapter)
 
 
 def test_mock_adapter_has_classify_method():
-    adapter = MockSLMAdapter()
+    adapter = MockEncoderAdapter()
     assert callable(getattr(adapter, "classify", None))
 
 
@@ -79,11 +78,11 @@ def test_mock_adapter_has_classify_method():
 # Deterministic output
 # ---------------------------------------------------------------------------
 def test_mock_adapter_is_deterministic():
-    adapter = MockSLMAdapter()
+    adapter = MockEncoderAdapter()
     inp = _input(pii_patterns_hit=["EMAIL"])
     a = adapter.classify(inp)
     b = adapter.classify(inp)
-    assert a == b, "MockSLMAdapter must be deterministic"
+    assert a == b, "MockEncoderAdapter must be deterministic"
 
 
 # ---------------------------------------------------------------------------
@@ -102,7 +101,7 @@ def test_mock_adapter_is_deterministic():
     ],
 )
 def test_mock_adapter_output_matches_output_schema(signals, output_schema):
-    adapter = MockSLMAdapter()
+    adapter = MockEncoderAdapter()
     out = adapter.classify(_input(**signals))
     jsonschema.validate(instance=out, schema=output_schema)
 
@@ -111,28 +110,28 @@ def test_mock_adapter_output_matches_output_schema(signals, output_schema):
 # Category-specific behaviour
 # ---------------------------------------------------------------------------
 def test_mock_adapter_returns_safe_for_empty_signals():
-    adapter = MockSLMAdapter()
+    adapter = MockEncoderAdapter()
     out = adapter.classify(_input())
     assert out["category"] == 0
     assert out["severity"] == 0
 
 
 def test_mock_adapter_flags_url_risk_as_scam():
-    adapter = MockSLMAdapter()
+    adapter = MockEncoderAdapter()
     out = adapter.classify(_input(url_risk=0.9))
     assert out["category"] == 7  # SCAM_FRAUD
     assert "URL_RISK" in out["reason_codes"]
 
 
 def test_mock_adapter_flags_pii_as_private_data():
-    adapter = MockSLMAdapter()
+    adapter = MockEncoderAdapter()
     out = adapter.classify(_input(pii_patterns_hit=["EMAIL"]))
     assert out["category"] == 9  # PRIVATE_DATA
     assert out["actions"]["suggest_redact"] is True
 
 
 def test_mock_adapter_flags_child_safety_lexicon():
-    adapter = MockSLMAdapter()
+    adapter = MockEncoderAdapter()
     out = adapter.classify(
         _input(
             lexicon_hits=[
@@ -147,7 +146,7 @@ def test_mock_adapter_flags_child_safety_lexicon():
 
 
 def test_mock_adapter_flags_media_nsfw():
-    adapter = MockSLMAdapter()
+    adapter = MockEncoderAdapter()
     out = adapter.classify(
         _input(
             media_descriptors=[
@@ -160,7 +159,7 @@ def test_mock_adapter_flags_media_nsfw():
 
 def test_mock_adapter_covers_all_16_categories_via_lexicon():
     """Feed one lexicon hit per category and verify the adapter returns a valid output for each."""
-    adapter = MockSLMAdapter()
+    adapter = MockEncoderAdapter()
     for category in range(16):
         out = adapter.classify(
             _input(
@@ -181,7 +180,7 @@ def test_mock_adapter_covers_all_16_categories_via_lexicon():
 # Priority ordering — CHILD_SAFETY wins over everything else.
 # ---------------------------------------------------------------------------
 def test_mock_adapter_child_safety_wins_over_pii():
-    adapter = MockSLMAdapter()
+    adapter = MockEncoderAdapter()
     out = adapter.classify(
         _input(
             pii_patterns_hit=["EMAIL"],
@@ -194,7 +193,7 @@ def test_mock_adapter_child_safety_wins_over_pii():
 
 
 def test_mock_adapter_pii_wins_over_scam():
-    adapter = MockSLMAdapter()
+    adapter = MockEncoderAdapter()
     out = adapter.classify(
         _input(
             url_risk=0.9,

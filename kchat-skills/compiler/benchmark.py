@@ -3,9 +3,9 @@
 Spec reference: PHASES.md Phase 6 — "Performance optimization
 benchmarking". The benchmark provides a structured, deterministic
 measurement harness over :class:`~pipeline.GuardrailPipeline` and its
-:class:`~slm_adapter.MockSLMAdapter` reference. The harness is
+:class:`~encoder_adapter.MockEncoderAdapter` reference. The harness is
 adapter-agnostic — swap in the XLM-R MiniLM-L6 encoder classifier
-(or any other ``SLMAdapter``) and re-run to measure that backend's
+(or any other ``EncoderAdapter``) and re-run to measure that backend's
 latency. It is intended for regression testing — the p95 latency
 target is pinned at 250ms (ARCHITECTURE.md "Performance envelope")
 and the benchmark test refuses to pass if the target is breached.
@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional
 
 from pipeline import GuardrailPipeline  # type: ignore[import-not-found]
-from slm_adapter import MockSLMAdapter  # type: ignore[import-not-found]
+from encoder_adapter import MockEncoderAdapter  # type: ignore[import-not-found]
 
 
 # ---------------------------------------------------------------------------
@@ -102,7 +102,7 @@ class PipelineBenchmark:
     """Measure per-message latency for a :class:`GuardrailPipeline`.
 
     The benchmark is deterministic when run against
-    :class:`MockSLMAdapter`. Each case is executed ``iterations`` times
+    :class:`MockEncoderAdapter`. Each case is executed ``iterations`` times
     and each execution's wall-clock latency is recorded. Percentiles
     are computed over the *flattened* list of all observations so the
     report is stable regardless of inter-case ordering.
@@ -119,11 +119,11 @@ class PipelineBenchmark:
         """Convenience constructor wiring the mock adapter.
 
         Callers pass a pre-built :class:`SkillBundle`; the benchmark
-        supplies its own :class:`MockSLMAdapter`.
+        supplies its own :class:`MockEncoderAdapter`.
         """
         kwargs: dict[str, Any] = {
             "skill_bundle": skill_bundle,
-            "slm_adapter": MockSLMAdapter(),
+            "encoder_adapter": MockEncoderAdapter(),
         }
         if threshold_policy is not None:
             kwargs["threshold_policy"] = threshold_policy

@@ -289,9 +289,9 @@ Steps (1)–(7) are entirely on-device; no step requires network access.
 
 Step 4 (the encoder classifier) is intentionally backend-agnostic.
 The pipeline talks to whatever object is passed in through
-[`SLMAdapter`](kchat-skills/compiler/slm_adapter.py) — the Protocol
-freezes a single `classify(input) -> dict` method so backends can be
-swapped without touching skill packs or the threshold policy.
+[`EncoderAdapter`](kchat-skills/compiler/encoder_adapter.py) — the
+Protocol freezes a single `classify(input) -> dict` method so backends
+can be swapped without touching skill packs or the threshold policy.
 
 The reference encoder backend is
 [`XLMRMiniLMAdapter`](kchat-skills/compiler/xlmr_minilm_adapter.py)
@@ -934,7 +934,7 @@ anti_misuse_controls:
 │   ├── skill_passport.schema.json    # Draft-07 passport schema (Phase 4)
 │   ├── counters.py                   # device-local expiring counter store
 │   ├── pipeline.py                   # 7-step hybrid local pipeline (Phase 3)
-│   ├── slm_adapter.py                # SLMAdapter Protocol + MockSLMAdapter (Phase 3)
+│   ├── encoder_adapter.py            # EncoderAdapter Protocol + MockEncoderAdapter (Phase 3)
 │   ├── xlmr_minilm_adapter.py        # XLMRMiniLMAdapter — XLM-R MiniLM-L6 encoder classifier (Phase 6)
 │   ├── threshold_policy.py           # hard-coded threshold enforcement (Phase 3)
 │   ├── metric_validator.py           # 7-metric validator (Phase 3)
@@ -1036,11 +1036,12 @@ Concrete test files in this repository:
 - `kchat-skills/tests/global/test_pipeline.py` — 7-step hybrid local
   pipeline (`kchat-skills/compiler/pipeline.py`): normalization,
   deterministic detectors, signal packaging, end-to-end classification
-  with the deterministic `MockSLMAdapter`, threshold-policy coercion,
-  counter-store integration.
-- `kchat-skills/tests/global/test_slm_adapter.py` — backend-agnostic
-  `SLMAdapter` Protocol and the deterministic `MockSLMAdapter`
-  reference implementation at `kchat-skills/compiler/slm_adapter.py`.
+  with the deterministic `MockEncoderAdapter`, threshold-policy
+  coercion, counter-store integration.
+- `kchat-skills/tests/global/test_encoder_adapter.py` — backend-
+  agnostic `EncoderAdapter` Protocol and the deterministic
+  `MockEncoderAdapter` reference implementation at
+  `kchat-skills/compiler/encoder_adapter.py`.
 - `kchat-skills/tests/global/test_threshold_policy.py` — hard-coded
   threshold enforcement at `kchat-skills/compiler/threshold_policy.py`:
   four confidence thresholds, uncertainty handling, lower-numbered-
@@ -1099,12 +1100,12 @@ Concrete test files in this repository:
   contract test pinning that every alignment doc under
   `kchat-skills/docs/regulatory/` exists, is non-empty, references
   the core source artefacts it maps, and — for the UNICEF / ITU
-  doc — contains a statutory-grounding row for every one of the 40
+  doc — contains a statutory-grounding row for every one of the 59
   country packs.
 - `kchat-skills/tests/global/test_benchmark.py` — Phase 6 latency
   benchmark (`kchat-skills/compiler/benchmark.py`). `BenchmarkReport`
   fails fast if p95 > 250 ms. Parametrised across all 16 taxonomy
-  categories and the full 40-country set.
+  categories and the full 59-country set.
 - `kchat-skills/tests/global/test_appeal_flow.py` — Phase 6
   community-feedback / appeal-flow spec
   (`kchat-skills/compiler/appeal_flow.py`). Pins the privacy
@@ -1213,7 +1214,7 @@ is the structured measurement harness that pins the
   `kchat.guardrail.local_signal.v1`.
 - `PipelineBenchmark` — wraps a `GuardrailPipeline`. The
   `with_mock_adapter(skill_bundle, threshold_policy=None)`
-  convenience constructor wires `MockSLMAdapter` for regression
+  convenience constructor wires `MockEncoderAdapter` for regression
   tests. `run(cases, iterations=100, warmup=3)` records
   `time.perf_counter` latency per iteration and returns:
 - `BenchmarkReport(total_cases, iterations, p50_ms, p95_ms, p99_ms,
@@ -1228,7 +1229,7 @@ The contract test
 [`kchat-skills/tests/global/test_benchmark.py`](kchat-skills/tests/global/test_benchmark.py)
 parametrises across every taxonomy category (0..15), across the
 baseline-only / jurisdiction-only / full-stack bundle configurations,
-and across the full 40-country set — any regression that breaches
+and across the full 59-country set — any regression that breaches
 the 250 ms p95 target fails CI immediately.
 
 ## Appeal Flow
