@@ -488,9 +488,11 @@ exported once to ONNX INT8 — see
 exact source artifact and conversion pipeline) via
 [`onnxruntime`](https://onnxruntime.ai). On-device
 the runtime depends on `onnxruntime` + `sentencepiece` + `numpy` only
-(no PyTorch / `transformers`). The exported model is ~25 MB, loads in
-well under a second on CPU, and runs inference in tens of milliseconds
-per message — well inside the 250 ms p95 envelope.
+(no PyTorch / `transformers`). The exported model is ~107 MB INT8,
+loads in well under a second on CPU, and runs inference in single-digit
+milliseconds per message — well inside the 250 ms p95 envelope (latest
+benchmark on this VM measured p95 ≈ 3.3 ms across 100 iterations × 27
+cases; see `kchat-skills/benchmarks/xlmr_results.json`).
 
 Two interchangeable embedding-stage classifiers are supported:
 
