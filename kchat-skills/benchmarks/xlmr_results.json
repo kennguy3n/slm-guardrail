@@ -1,10 +1,10 @@
 {
-  "adapter": "XLMRMiniLMAdapter",
+  "adapter": "XLMRAdapter",
   "community": null,
   "jurisdiction": null,
-  "model_id": "nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large",
-  "model_name": "XLM-R-MiniLM-L6",
-  "model_path": "nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large",
+  "model_id": "models/xlmr.onnx",
+  "model_name": "XLM-R",
+  "model_path": "models/xlmr.onnx",
   "model_version": null,
   "per_case_results": [
     {
@@ -17,7 +17,7 @@
       "expected_severity": 0,
       "passed": true,
       "pipeline_latency_ms": 5376.652,
-      "rationale_id": "xlmr_minilm_safe_trained_v1",
+      "rationale_id": "xlmr_safe_trained_v1",
       "reason_codes": [],
       "severity": 0
     },
@@ -31,7 +31,7 @@
       "expected_severity": 0,
       "passed": true,
       "pipeline_latency_ms": 26.899,
-      "rationale_id": "xlmr_minilm_safe_trained_v1",
+      "rationale_id": "xlmr_safe_trained_v1",
       "reason_codes": [],
       "severity": 0
     },
@@ -45,7 +45,7 @@
       "expected_severity": 0,
       "passed": true,
       "pipeline_latency_ms": 12.62,
-      "rationale_id": "xlmr_minilm_safe_trained_v1",
+      "rationale_id": "xlmr_safe_trained_v1",
       "reason_codes": [],
       "severity": 0
     },
@@ -172,7 +172,7 @@
       "expected_severity": 0,
       "passed": true,
       "pipeline_latency_ms": 12.46,
-      "rationale_id": "xlmr_minilm_safe_trained_v1",
+      "rationale_id": "xlmr_safe_trained_v1",
       "reason_codes": [
         "EDUCATION_CONTEXT"
       ],
@@ -188,7 +188,7 @@
       "expected_severity": 0,
       "passed": true,
       "pipeline_latency_ms": 15.108,
-      "rationale_id": "xlmr_minilm_safe_trained_v1",
+      "rationale_id": "xlmr_safe_trained_v1",
       "reason_codes": [
         "QUOTED_SPEECH_CONTEXT"
       ],
@@ -204,7 +204,7 @@
       "expected_severity": 0,
       "passed": true,
       "pipeline_latency_ms": 14.573,
-      "rationale_id": "xlmr_minilm_safe_trained_v1",
+      "rationale_id": "xlmr_safe_trained_v1",
       "reason_codes": [],
       "severity": 0
     },
@@ -218,7 +218,7 @@
       "expected_severity": 0,
       "passed": true,
       "pipeline_latency_ms": 14.89,
-      "rationale_id": "xlmr_minilm_safe_trained_v1",
+      "rationale_id": "xlmr_safe_trained_v1",
       "reason_codes": [],
       "severity": 0
     },
@@ -248,7 +248,7 @@
       "expected_severity": 0,
       "passed": true,
       "pipeline_latency_ms": 14.05,
-      "rationale_id": "xlmr_minilm_safe_trained_v1",
+      "rationale_id": "xlmr_safe_trained_v1",
       "reason_codes": [],
       "severity": 0
     },
@@ -262,7 +262,7 @@
       "expected_severity": 0,
       "passed": true,
       "pipeline_latency_ms": 15.605,
-      "rationale_id": "xlmr_minilm_safe_trained_v1",
+      "rationale_id": "xlmr_safe_trained_v1",
       "reason_codes": [],
       "severity": 0
     },
@@ -276,7 +276,7 @@
       "expected_severity": 0,
       "passed": true,
       "pipeline_latency_ms": 10.284,
-      "rationale_id": "xlmr_minilm_safe_trained_v1",
+      "rationale_id": "xlmr_safe_trained_v1",
       "reason_codes": [],
       "severity": 0
     },
@@ -290,7 +290,7 @@
       "expected_severity": 0,
       "passed": true,
       "pipeline_latency_ms": 11.672,
-      "rationale_id": "xlmr_minilm_safe_trained_v1",
+      "rationale_id": "xlmr_safe_trained_v1",
       "reason_codes": [],
       "severity": 0
     },
@@ -304,7 +304,7 @@
       "expected_severity": 0,
       "passed": true,
       "pipeline_latency_ms": 10.826,
-      "rationale_id": "xlmr_minilm_safe_trained_v1",
+      "rationale_id": "xlmr_safe_trained_v1",
       "reason_codes": [],
       "severity": 0
     },
@@ -318,7 +318,7 @@
       "expected_severity": 0,
       "passed": true,
       "pipeline_latency_ms": 15.102,
-      "rationale_id": "xlmr_minilm_category_7_trained_v1",
+      "rationale_id": "xlmr_category_7_trained_v1",
       "reason_codes": [],
       "severity": 0
     },
@@ -351,7 +351,7 @@
       "expected_severity": 0,
       "passed": true,
       "pipeline_latency_ms": 9.321,
-      "rationale_id": "xlmr_minilm_safe_trained_v1",
+      "rationale_id": "xlmr_safe_trained_v1",
       "reason_codes": [],
       "severity": 0
     },
@@ -381,7 +381,7 @@
       "expected_severity": 0,
       "passed": true,
       "pipeline_latency_ms": 10.764,
-      "rationale_id": "xlmr_minilm_safe_trained_v1",
+      "rationale_id": "xlmr_safe_trained_v1",
       "reason_codes": [
         "NEWS_CONTEXT",
         "QUOTED_SPEECH_CONTEXT"
@@ -398,7 +398,7 @@
       "expected_severity": 0,
       "passed": true,
       "pipeline_latency_ms": 13.632,
-      "rationale_id": "xlmr_minilm_safe_trained_v1",
+      "rationale_id": "xlmr_safe_trained_v1",
       "reason_codes": [],
       "severity": 0
     },
@@ -412,7 +412,7 @@
       "expected_severity": 0,
       "passed": true,
       "pipeline_latency_ms": 17.831,
-      "rationale_id": "xlmr_minilm_safe_trained_v1",
+      "rationale_id": "xlmr_safe_trained_v1",
       "reason_codes": [
         "QUOTED_SPEECH_CONTEXT"
       ],
@@ -428,7 +428,7 @@
       "expected_severity": 0,
       "passed": true,
       "pipeline_latency_ms": 13.907,
-      "rationale_id": "xlmr_minilm_safe_trained_v1",
+      "rationale_id": "xlmr_safe_trained_v1",
       "reason_codes": [],
       "severity": 0
     }

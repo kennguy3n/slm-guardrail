@@ -31,8 +31,8 @@ back door.
 
 ## Proposed Solution
 
-Run an **encoder classifier on-device** — the **XLM-R MiniLM-L6**
-6-layer multilingual encoder — as a **local safety assistant**. The
+Run an **encoder classifier on-device** — the **XLM-R**
+multilingual encoder — as a **local safety assistant**. The
 classifier never sees anything the user is not already entitled to
 see; it classifies content already decrypted on the user's device and
 produces local warnings, labels, and suggestions. **No plaintext, no
@@ -96,7 +96,9 @@ construction.
 ## Design Goals
 
 1. **Run on efficient encoder models.** Reference backend:
-   **XLM-R MiniLM-L6** (~80 MB, 6 layers, 384 hidden, multilingual).
+   **XLM-R** (multilingual, 384 hidden, exported once to a ~25 MB
+   INT8-quantised ONNX checkpoint and loaded on-device through
+   ONNX Runtime — no PyTorch / `transformers` runtime dependency).
    The compiled skill bundle still respects the **< 1800 instruction
    token** budget so it remains compatible with any future
    classifier backend, but the encoder itself runs as a deterministic argmax over
@@ -166,7 +168,8 @@ construction.
   group; the choice is visible to all members.
 - **Encoder classifier runtime engineers** — implement the on-device
   pipeline that consumes compiled skill packs, runs the classifier
-  (XLM-R MiniLM-L6 today, swappable via the ``EncoderAdapter`` Protocol),
+  (XLM-R via ONNX Runtime today, swappable via the
+  ``EncoderAdapter`` Protocol),
   and renders local warnings.
 
 ## Success Metrics

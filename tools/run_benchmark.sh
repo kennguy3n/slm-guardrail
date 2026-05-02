@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Orchestrate the full benchmark-record-commit workflow for the
-# kchat guardrail pipeline (XLM-R MiniLM-L6 encoder classifier).
+# kchat guardrail pipeline (XLM-R encoder classifier, ONNX Runtime).
 #
 # Steps:
-#   1. Verify Python deps and (optionally) check that the XLM-R MiniLM-L6
-#      encoder weights are resolvable locally. If they are not, fall
-#      back to --mock automatically.
+#   1. Verify Python deps and (optionally) check that the XLM-R
+#      ONNX model is resolvable locally. If it is not, fall back
+#      to --mock automatically.
 #   2. Run the pipeline benchmark via tools/run_guardrail_demo.py
 #      and (when applicable) the deterministic mock reference.
 #   3. Run the cross-community / cross-country demo via
@@ -19,7 +19,7 @@
 # P95_LATENCY_TARGET_MS).
 #
 # Usage:
-#   tools/run_benchmark.sh                # real XLM-R MiniLM-L6 + mock + commit
+#   tools/run_benchmark.sh                # real XLM-R + mock + commit
 #   tools/run_benchmark.sh --mock         # mock only, commit
 #   tools/run_benchmark.sh --mock --no-commit
 #   tools/run_benchmark.sh --mock --push
@@ -33,7 +33,8 @@ NO_COMMIT=0
 PUSH=0
 ITERATIONS=100
 WARMUP=5
-MODEL_PATH="${KCHAT_MODEL_PATH:-nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large}"
+MODEL_PATH="${KCHAT_MODEL_PATH:-models/xlmr.onnx}"
+TOKENIZER_PATH="${KCHAT_TOKENIZER_PATH:-models/xlmr.spm}"
 P95_TARGET_MS="250"
 
 usage() {
@@ -54,8 +55,10 @@ Flags:
   --push          After committing, also git push the new commit.
   --iterations N  Per-case benchmark iterations (default: ${ITERATIONS}).
   --warmup N      Per-case warm-up iterations (default: ${WARMUP}).
-  --model-path P  Path or HF model id for the XLM-R MiniLM-L6 encoder
+  --model-path P  Path to the ONNX-exported XLM-R encoder
                   (default: ${MODEL_PATH}).
+  --tokenizer-path P  Path to the SentencePiece tokenizer model
+                  (default: ${TOKENIZER_PATH}).
   -h, --help      Show this help.
 EOF
 }
@@ -74,6 +77,9 @@ while [[ $# -gt 0 ]]; do
     --model-path)
       [[ $# -ge 2 ]] || { echo "error: --model-path requires a value" >&2; exit 2; }
       MODEL_PATH="$2"; shift ;;
+    --tokenizer-path)
+      [[ $# -ge 2 ]] || { echo "error: --tokenizer-path requires a value" >&2; exit 2; }
+      TOKENIZER_PATH="$2"; shift ;;
     -h|--help) usage; exit 0 ;;
     *)
       echo "error: unknown argument: $1" >&2
@@ -123,23 +129,24 @@ fi
 # adapter) so the bash side does not duplicate model-loading logic.
 is_model_available() {
   local mp="${1}"
-  "${PYTHON}" - "${mp}" <<'PY' >/dev/null 2>&1
+  local tp="${2}"
+  "${PYTHON}" - "${mp}" "${tp}" <<'PY' >/dev/null 2>&1
 import sys
 sys.path.insert(0, "tools")
 from run_guardrail_demo import is_model_available
 
-sys.exit(0 if is_model_available(sys.argv[1]) else 1)
+sys.exit(0 if is_model_available(sys.argv[1], sys.argv[2]) else 1)
 PY
 }
 
 if [[ "${MOCK_ONLY}" -eq 0 ]]; then
-  log "Checking XLM-R MiniLM-L6 weights at ${MODEL_PATH} ..."
-  if ! is_model_available "${MODEL_PATH}"; then
-    warn "XLM-R MiniLM-L6 weights not resolvable at ${MODEL_PATH}; falling back to --mock."
-    warn "Real XLM-R MiniLM-L6 benchmark will be SKIPPED."
+  log "Checking XLM-R ONNX model at ${MODEL_PATH} (tokenizer ${TOKENIZER_PATH}) ..."
+  if ! is_model_available "${MODEL_PATH}" "${TOKENIZER_PATH}"; then
+    warn "XLM-R ONNX model/tokenizer not resolvable at ${MODEL_PATH} / ${TOKENIZER_PATH}; falling back to --mock."
+    warn "Real XLM-R benchmark will be SKIPPED."
     MOCK_ONLY=1
   else
-    log "XLM-R MiniLM-L6 weights are available."
+    log "XLM-R ONNX model is available."
   fi
 fi
 
@@ -150,13 +157,14 @@ BENCH_FILES=()
 RAN_REAL=0
 
 if [[ "${MOCK_ONLY}" -eq 0 ]]; then
-  log "Running real XLM-R MiniLM-L6 benchmark (XLMRMiniLMAdapter)..."
+  log "Running real XLM-R benchmark (XLMRAdapter, ONNX Runtime)..."
   "${PYTHON}" tools/run_guardrail_demo.py \
     --model-path "${MODEL_PATH}" \
+    --tokenizer-path "${TOKENIZER_PATH}" \
     --benchmark --commit-results \
     --benchmark-iterations "${ITERATIONS}" \
     --benchmark-warmup "${WARMUP}"
-  BENCH_FILES+=("kchat-skills/benchmarks/xlmr_minilm_l6_results.json")
+  BENCH_FILES+=("kchat-skills/benchmarks/xlmr_results.json")
   RAN_REAL=1
 fi
 
@@ -166,7 +174,7 @@ log "Running deterministic mock benchmark (MockEncoderAdapter)..."
   --benchmark --commit-results \
   --benchmark-iterations "${ITERATIONS}" \
   --benchmark-warmup "${WARMUP}"
-BENCH_FILES+=("kchat-skills/benchmarks/xlmr_minilm_l6_mock_results.json")
+BENCH_FILES+=("kchat-skills/benchmarks/xlmr_mock_results.json")
 
 # ---------------------------------------------------------------------------
 # Cross-community / cross-country demo.
@@ -293,7 +301,7 @@ fi
 # ---------------------------------------------------------------------------
 echo ""
 if [[ "${RAN_REAL}" -eq 0 ]]; then
-  log "Note: real XLM-R MiniLM-L6 run was skipped (mock-only mode)."
+  log "Note: real XLM-R run was skipped (mock-only mode)."
 fi
 
 if [[ "${OVERALL_PASSED}" -eq 1 ]]; then

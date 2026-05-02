@@ -75,7 +75,7 @@ The corpus covers:
 
 `expected_category` / `expected_severity` describe the *deterministic*
 verdict the demo expects from `MockEncoderAdapter`. A real encoder
-classifier (XLM-R MiniLM-L6 via `XLMRMiniLMAdapter`) may produce a
+classifier (XLM-R via `XLMRAdapter`, ONNX Runtime) may produce a
 different but still schema-conformant output; the demo prints both so
 divergence is visible.
 
@@ -95,11 +95,11 @@ All fixtures comply with
 
 ## How to use
 
-### Run the demo against a local XLM-R MiniLM-L6
+### Run the demo against a local XLM-R
 
 ```bash
-# 1. Make the XLM-R MiniLM-L6 weights available locally (see
-#    "Running with XLM-R MiniLM-L6" in the top-level README). Then:
+# 1. Make the XLM-R ONNX model + tokenizer available locally (see
+#    "Running with XLM-R" in the top-level README). Then:
 python tools/run_guardrail_demo.py
 ```
 
@@ -122,7 +122,7 @@ python tools/run_guardrail_demo.py \
 
 ```bash
 # Runs PipelineBenchmark over the corpus and writes
-# kchat-skills/benchmarks/xlmr_minilm_l6_results.json (or _mock_*.json
+# kchat-skills/benchmarks/xlmr_results.json (or _mock_*.json
 # when --mock is set).
 python tools/run_guardrail_demo.py --benchmark --commit-results
 ```

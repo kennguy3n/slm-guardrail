@@ -9,7 +9,7 @@ and PHASES.md Phase 3:
        patterns, lexicon matching, media descriptor signal extraction).
     3. Signal packaging into the classifier input contract.
     4. Encoder-based contextual classification
-       (XLM-R MiniLM-L6, deterministic argmax over fixed prototype
+       (XLM-R, deterministic argmax over fixed prototype
        embeddings).
     5. Severity / threshold policy enforcement.
     6. Local JSON output generation.
@@ -325,7 +325,7 @@ def pack_signals(
     The pipeline supplies the ``constraints`` block (output_format
     json, schema_id pinned). ``temperature`` and ``max_output_tokens``
     are kept for backwards compatibility with older skill packs but
-    are ignored by encoder-classifier backends like XLM-R MiniLM-L6.
+    are ignored by encoder-classifier backends like XLM-R.
     """
     return {
         "message": message,
@@ -354,7 +354,7 @@ class GuardrailPipeline:
         jurisdiction overlay + optional community overlay).
     encoder_adapter
         Any :class:`EncoderAdapter` implementation — the real encoder
-        classifier (e.g. ``XLMRMiniLMAdapter``) or
+        classifier (e.g. ``XLMRAdapter``) or
         :class:`MockEncoderAdapter` in tests.
     threshold_policy
         Hard-coded threshold enforcer. Defaults to a fresh
@@ -447,7 +447,7 @@ class GuardrailPipeline:
         )
 
         # --- Step 4: Encoder-based contextual classification
-        # (XLM-R MiniLM-L6 reference backend; any EncoderAdapter works).
+        # (XLM-R reference backend; any EncoderAdapter works).
         raw_output = self.encoder_adapter.classify(packed)
 
         # --- Step 5: Severity / threshold policy enforcement.

@@ -1,9 +1,15 @@
-"""Train the linear classification head for ``XLMRMiniLMAdapter``.
+"""Train the linear classification head for ``XLMRAdapter``.
 
 The trained head is a ``Linear(384, 16)`` layer fitted on top of the
-**frozen** XLM-R MiniLM-L6 encoder. The encoder weights are not
-modified; we only learn the projection from the mean-pooled token
-embedding to the 16-category taxonomy.
+**frozen** XLM-R encoder. The encoder weights are not modified; we
+only learn the projection from the mean-pooled token embedding to
+the 16-category taxonomy.
+
+This script runs **offline** (it requires ``transformers`` + ``torch``
+for encoding the training corpus) and is **not** part of the on-device
+runtime, which loads the encoder via :mod:`onnxruntime` instead. After
+training, use :mod:`tools.export_xlmr_onnx` to convert the head .pt
+to the .npz archive consumed by :class:`XLMRAdapter`.
 
 Run from the repo root:
 
@@ -13,9 +19,12 @@ Run from the repo root:
 
 The script:
 
-1. Loads the same encoder that ``XLMRMiniLMAdapter`` uses at runtime
-   (``nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large``), with
-   ``local_files_only=True`` so it works fully offline once cached.
+1. Loads the same XLM-R encoder that :class:`XLMRAdapter` uses at
+   runtime (``nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large``),
+   with ``local_files_only=True`` so it works fully offline once
+   cached. The on-device adapter loads the ONNX export of the same
+   weights via :mod:`onnxruntime`; this trainer uses the PyTorch
+   weights directly to fit the linear head.
 2. Encodes every example in :data:`training_data.TRAINING_EXAMPLES`
    into a 384-dim L2-normalised mean-pooled vector.
 3. Fits a ``Linear(384, 16)`` head with AdamW + class-weighted
@@ -23,9 +32,10 @@ The script:
    downweight it to keep harm classes well-calibrated.
 4. Validates training-set accuracy and per-class accuracy.
 5. Saves the head state_dict to
-   ``kchat-skills/compiler/data/xlmr_minilm_head.pt`` along with a
-   small JSON sidecar describing the encoder revision and training
-   metadata. Reviewers can audit both files.
+   ``kchat-skills/compiler/data/xlmr_head.pt`` along with a small JSON
+   sidecar describing the encoder revision and training metadata.
+   Reviewers can audit both files. ``tools/export_xlmr_onnx.py``
+   converts the .pt to the .npz archive consumed at runtime.
 
 Determinism: torch + python random seeds are pinned. Re-running the
 script on the same encoder + same corpus produces an identical
@@ -54,13 +64,13 @@ from training_data import TRAINING_EXAMPLES, category_counts  # noqa: E402
 
 LOGGER = logging.getLogger("kchat.guardrail.train_xlmr_head")
 
-XLMR_MINILM_MODEL_ID = "nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large"
+XLMR_MODEL_ID = "nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large"
 TAXONOMY_SIZE = 16
 EMBED_DIM = 384
 
 DATA_DIR = _THIS_DIR / "data"
-HEAD_WEIGHTS_PATH = DATA_DIR / "xlmr_minilm_head.pt"
-HEAD_METADATA_PATH = DATA_DIR / "xlmr_minilm_head.json"
+HEAD_WEIGHTS_PATH = DATA_DIR / "xlmr_head.pt"
+HEAD_METADATA_PATH = DATA_DIR / "xlmr_head.json"
 
 
 # ---------------------------------------------------------------------------
@@ -87,7 +97,7 @@ def _set_seeds(seed: int = 7) -> None:
 
 def _encode_corpus(
     *,
-    model_id: str = XLMR_MINILM_MODEL_ID,
+    model_id: str = XLMR_MODEL_ID,
     local_files_only: bool = False,
     max_seq_length: int = 128,
 ) -> tuple[Any, Any, str]:
@@ -214,7 +224,7 @@ def _per_class_report(head: Any, X: Any, y: Any) -> dict[int, float]:
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Train the XLM-R MiniLM-L6 classification head and save "
+            "Train the XLM-R classification head and save "
             "state_dict + metadata to kchat-skills/compiler/data/."
         )
     )
@@ -278,7 +288,7 @@ def main() -> int:
 
     torch.save(head.state_dict(), HEAD_WEIGHTS_PATH)
     metadata = {
-        "encoder_model_id": XLMR_MINILM_MODEL_ID,
+        "encoder_model_id": XLMR_MODEL_ID,
         "encoder_revision": encoder_revision,
         "embed_dim": EMBED_DIM,
         "taxonomy_size": TAXONOMY_SIZE,

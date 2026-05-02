@@ -1,6 +1,6 @@
 {
   "embed_dim": 384,
-  "encoder_model_id": "nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large",
+  "encoder_model_id": "XLM-R (nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large)",
   "encoder_revision": "160deb78aca30f63754e512a93337ce8013a32ca",
   "taxonomy_size": 16,
   "training_corpus_per_class": {

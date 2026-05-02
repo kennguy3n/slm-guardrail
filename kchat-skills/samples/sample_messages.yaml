@@ -17,7 +17,7 @@
 #   - context              — fields of `kchat.guardrail.local_signal.v1.context`
 #   - expected_category    — taxonomy id (0..15) the *deterministic* layer +
 #                             MockSLMAdapter is expected to land on. The real
-#                             encoder classifier (XLM-R MiniLM-L6) output may
+#                             encoder classifier (XLM-R) output may
 #                             differ; the demo prints both.
 #   - expected_severity    — 0..5; expected severity from the deterministic
 #                             layer. CHILD_SAFETY (1) is pinned at 5.

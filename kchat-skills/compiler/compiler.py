@@ -71,8 +71,8 @@ def estimate_tokens(text: str) -> int:
     thumb that one English token is ~4 characters. This deliberately
     over-counts compared with a real tokenizer so packs that pass our
     budget cleanly stay safely below the 1800-token cap on every
-    target classifier backend (XLM-R MiniLM-L6, plus any future
-    encoder or generative-classifier adapter) without re-running the
+    target classifier backend (XLM-R, plus any future encoder or
+    generative-classifier adapter) without re-running the
     tokenizer.
     """
     if not text:

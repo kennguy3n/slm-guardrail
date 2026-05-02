@@ -1,10 +1,11 @@
 # Guardrail Benchmark Results
 
 This directory pins the **committed benchmark measurements** for the
-hybrid local guardrail pipeline against
-[`nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large`](https://huggingface.co/nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large)
-— the **XLM-R MiniLM-L6** multilingual encoder classifier — loaded
-through `transformers`.
+hybrid local guardrail pipeline against the **XLM-R** multilingual
+encoder classifier — the same model used by
+[`XLMRAdapter`](../compiler/xlmr_adapter.py), exported once to ONNX
+INT8 by [`tools/export_xlmr_onnx.py`](../../tools/export_xlmr_onnx.py)
+and loaded on-device through `onnxruntime`.
 
 The 250 ms p95 latency target from
 [`ARCHITECTURE.md` "Performance envelope"](../../ARCHITECTURE.md#performance-envelope)
@@ -16,9 +17,9 @@ and capture *real-hardware* measurements on top of that contract.
 
 ## Files
 
-- `xlmr_minilm_l6_results.json` — committed run against
-  `XLMRMiniLMAdapter` with locally-loaded XLM-R MiniLM-L6 weights.
-- `xlmr_minilm_l6_mock_results.json` *(optional)* — committed run against
+- `xlmr_results.json` — committed run against
+  `XLMRAdapter` with the locally-exported XLM-R ONNX model.
+- `xlmr_mock_results.json` *(optional)* — committed run against
   `MockEncoderAdapter`. Useful as a reference for the *deterministic*
   fast path latency, independent of any model.
 
@@ -55,7 +56,7 @@ The end-to-end benchmark + record + commit workflow is wrapped by
 # Mock adapter (no encoder weights needed) — record + commit
 ./tools/run_benchmark.sh --mock
 
-# Real XLM-R MiniLM-L6 — record + commit
+# Real XLM-R — record + commit
 ./tools/run_benchmark.sh
 
 # Record only, no git commit
@@ -67,18 +68,17 @@ The end-to-end benchmark + record + commit workflow is wrapped by
 
 The script:
 
-- Verifies Python deps are importable (`transformers`, `torch`,
-  `sentencepiece`, plus the test-time deps already in
-  `requirements.txt`) and checks that the XLM-R MiniLM-L6 weights are
-  resolvable locally (Hugging Face cache or an explicit
-  `--model-path`).
-- Falls back to `--mock` automatically if the encoder weights are
-  not available (and the real XLM-R MiniLM-L6 run is skipped with a
-  warning).
+- Verifies Python deps are importable (`onnxruntime`,
+  `sentencepiece`, `numpy`, plus the test-time deps already in
+  `requirements.txt`) and checks that the XLM-R ONNX model and
+  SentencePiece tokenizer are resolvable locally (`models/xlmr.onnx`
+  + `models/xlmr.spm` by default, or an explicit `--model-path` /
+  `--tokenizer-path`).
+- Falls back to `--mock` automatically if the ONNX model is not
+  available (and the real XLM-R run is skipped with a warning).
 - Runs `tools/run_guardrail_demo.py` with `--benchmark
   --commit-results --benchmark-iterations 100 --benchmark-warmup 5`,
-  writing `xlmr_minilm_l6_results.json` and/or
-  `xlmr_minilm_l6_mock_results.json` here.
+  writing `xlmr_results.json` and/or `xlmr_mock_results.json` here.
 - Runs `tools/demo_guardrail.py` to write timestamped JSON +
   Markdown to `results/`.
 - Prints a summary of every recorded run with its `p95_ms` against
@@ -92,30 +92,30 @@ The script:
 ## How to reproduce manually
 
 ```bash
-# 1. Install runtime deps (transformers + torch are required for the
-#    real-model run; pure-mock runs do not need them).
+# 1. Install runtime deps. The on-device runtime only needs
+#    onnxruntime + sentencepiece + numpy (already in
+#    requirements.txt). Pure-mock runs do not need any of them.
 pip install -r requirements.txt
-pip install transformers torch sentencepiece
 
-# 2. Cache the XLM-R MiniLM-L6 weights (~80 MB) into the local
-#    Hugging Face cache. The adapter loads them offline after this.
-python -c "from transformers import AutoTokenizer, AutoModel; \
-    AutoTokenizer.from_pretrained('nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large'); \
-    AutoModel.from_pretrained('nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large')"
+# 2. One-time export of the XLM-R encoder + tokenizer + head .npz
+#    (requires transformers + torch + onnx, but only at export time).
+pip install transformers torch onnx
+python tools/export_xlmr_onnx.py --output-dir models
+# -> writes models/xlmr.onnx (~25 MB INT8) and models/xlmr.spm
 
 # 3. Re-run the demo with --benchmark --commit-results
 cd /path/to/slm-guardrail
 python tools/run_guardrail_demo.py --benchmark --commit-results
 ```
 
-The script writes `xlmr_minilm_l6_results.json` here. Commit the file
+The script writes `xlmr_results.json` here. Commit the file
 to pin the measurement to the current encoder weights.
 
 ### Mock-adapter reference
 
 ```bash
 python tools/run_guardrail_demo.py --mock --benchmark --commit-results
-# writes xlmr_minilm_l6_mock_results.json
+# writes xlmr_mock_results.json
 ```
 
 ## How to read the results

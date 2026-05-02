@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "kchat-guardrail"
 version = "0.0.0"
-description = "KChat Guardrail Skills — on-device safety skill packs for E2EE messaging, backed by the XLM-R MiniLM-L6 encoder classifier."
+description = "KChat Guardrail Skills — on-device safety skill packs for E2EE messaging, backed by the XLM-R encoder classifier (ONNX Runtime)."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "TBD" }
@@ -17,23 +17,23 @@ test = [
     "PyYAML>=6.0",
     "jsonschema>=4.0",
     "cryptography>=42.0",
-    # The XLM-R MiniLM-L6 adapter degrades to a SAFE fallback when
-    # transformers/torch/sentencepiece are missing, so unit tests do
-    # not strictly require them — but the encoder-head tests use
-    # ``torch`` for stub embeddings, hence the soft dep here.
-    "transformers>=4.36.0",
-    "torch>=2.1.0",
+    # The XLM-R adapter degrades to a SAFE fallback when
+    # onnxruntime / sentencepiece / numpy are missing, so unit tests
+    # do not strictly require them — but the encoder-head tests use
+    # ``numpy`` for stub embeddings, hence the soft dep here.
+    "onnxruntime>=1.16.0",
     "sentencepiece>=0.1.99",
+    "numpy>=1.24.0",
 ]
 # Demo / sample-data dependencies for `tools/run_guardrail_demo.py` and
-# `tools/demo_guardrail.py`. The XLM-R MiniLM-L6 adapter requires
-# transformers + torch (+ sentencepiece for the multilingual tokenizer);
-# the demo additionally loads the sample-message YAML.
+# `tools/demo_guardrail.py`. The XLM-R adapter requires onnxruntime +
+# sentencepiece + numpy; the demo additionally loads the sample-message
+# YAML.
 demo = [
     "PyYAML>=6.0",
-    "transformers>=4.36.0",
-    "torch>=2.1.0",
+    "onnxruntime>=1.16.0",
     "sentencepiece>=0.1.99",
+    "numpy>=1.24.0",
 ]
 
 [tool.pytest.ini_options]

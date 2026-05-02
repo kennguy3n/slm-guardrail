@@ -6,15 +6,15 @@ Spec references:
 * PHASES.md Phase 3 / Phase 6 — sample-data demonstration + perf benchmark.
 * ARCHITECTURE.md "Hybrid Local Pipeline" — drives the full pipeline
   end-to-end against either ``MockEncoderAdapter`` (no encoder weights
-  required) or ``XLMRMiniLMAdapter`` against a locally-cached
-  XLM-R MiniLM-L6 checkpoint.
+  required) or ``XLMRAdapter`` against a locally-exported XLM-R
+  ONNX checkpoint.
 
 Usage::
 
     # 1. Mock adapter — works without any model weights.
     python tools/run_guardrail_demo.py --mock
 
-    # 2. Real XLM-R MiniLM-L6 encoder.
+    # 2. Real XLM-R encoder (ONNX Runtime).
     python tools/run_guardrail_demo.py
     python tools/run_guardrail_demo.py --jurisdiction us --community workplace
 
@@ -52,68 +52,55 @@ from pipeline import (  # type: ignore[import-not-found]  # noqa: E402
 )
 from encoder_adapter import MockEncoderAdapter  # type: ignore[import-not-found]  # noqa: E402
 from threshold_policy import ThresholdPolicy  # type: ignore[import-not-found]  # noqa: E402
-from xlmr_minilm_adapter import (  # type: ignore[import-not-found]  # noqa: E402
-    XLMR_MINILM_MODEL_ID,
-    XLMR_MINILM_MODEL_NAME,
-    XLMRMiniLMAdapter,
+from xlmr_adapter import (  # type: ignore[import-not-found]  # noqa: E402
+    DEFAULT_ONNX_MODEL_PATH,
+    DEFAULT_TOKENIZER_PATH,
+    XLMR_MODEL_NAME,
+    XLMRAdapter,
 )
 
 
 MODEL_INSTRUCTIONS = """\
-XLM-R MiniLM-L6 weights are not available at: {model_path}
+XLM-R ONNX model not available at: {model_path}
+(tokenizer expected at: {tokenizer_path})
 
-The encoder is ~80 MB. Two ways to make it available:
+The ONNX-quantised encoder is ~25 MB. Two ways to make it available:
 
-1) Hugging Face cache (recommended for one-off local runs):
-       pip install transformers torch sentencepiece
-       python -c "from transformers import AutoTokenizer, AutoModel; \\
-           AutoTokenizer.from_pretrained('{model_id}'); \\
-           AutoModel.from_pretrained('{model_id}')"
-   The weights land in ~/.cache/huggingface and the next run picks
-   them up automatically.
+1) Run the one-time export (recommended for offline / mobile bundling):
+       pip install transformers torch onnx onnxruntime sentencepiece
+       python tools/export_xlmr_onnx.py --output-dir models
+   This writes models/xlmr.onnx + models/xlmr.spm. The on-device
+   adapter loads them through onnxruntime + sentencepiece (no torch /
+   transformers required at runtime).
 
-2) Local checkout (recommended for offline / CI / mobile bundling):
-       huggingface-cli download {model_id} --local-dir ./models/xlmr-minilm-l6
-       python tools/run_guardrail_demo.py --model-path ./models/xlmr-minilm-l6
+2) Use a pre-built ONNX checkpoint:
+       python tools/run_guardrail_demo.py \\
+           --model-path /path/to/xlmr.onnx \\
+           --tokenizer-path /path/to/xlmr.spm
 
 Or rerun this script with --mock to use the deterministic
 MockEncoderAdapter (no model weights required).
 """
 
 
-def is_model_available(model_path: str) -> bool:
-    """Return ``True`` iff ``model_path`` resolves to usable encoder weights.
+def is_model_available(
+    model_path: str, tokenizer_path: Optional[str] = None
+) -> bool:
+    """Return ``True`` iff the ONNX model + SentencePiece tokenizer exist.
 
-    Accepts either a local directory containing the standard
-    ``config.json`` + tokenizer / weight files, or a Hugging Face
-    model id whose tokenizer + model can be instantiated through the
-    transformers cache. The check is local-only — it never attempts a
+    The on-device runtime now loads an ONNX-exported encoder via
+    :mod:`onnxruntime` and a SentencePiece tokenizer via
+    :mod:`sentencepiece`. The check is local-only — we never attempt a
     network fetch.
     """
     if not model_path:
         return False
-    candidate = Path(model_path)
-    if candidate.is_dir():
-        return (candidate / "config.json").exists()
-
-    # HF model id — only treat as available if the transformers cache
-    # already has it so we never trigger a download from this script.
-    try:
-        from transformers.utils import (  # type: ignore[import-not-found]
-            cached_file,
-        )
-    except Exception:  # noqa: BLE001 — transformers not installed
+    if not Path(model_path).is_file():
         return False
-    try:
-        result = cached_file(
-            model_path,
-            "config.json",
-            _raise_exceptions_for_missing_entries=False,
-            local_files_only=True,
-        )
-    except Exception:  # noqa: BLE001 — anything fishy → not available
+    spm_path = tokenizer_path or DEFAULT_TOKENIZER_PATH
+    if not Path(spm_path).is_file():
         return False
-    return result is not None
+    return True
 
 
 def load_samples(path: Path) -> list[dict[str, Any]]:
@@ -136,6 +123,7 @@ def build_pipeline(
     *,
     use_mock: bool,
     model_path: str,
+    tokenizer_path: Optional[str],
     jurisdiction: Optional[str],
     community: Optional[str],
 ) -> tuple[GuardrailPipeline, Any]:
@@ -152,7 +140,10 @@ def build_pipeline(
     if use_mock:
         adapter: Any = MockEncoderAdapter()
     else:
-        adapter = XLMRMiniLMAdapter(model_path=model_path)
+        adapter = XLMRAdapter(
+            model_path=model_path,
+            tokenizer_path=tokenizer_path or DEFAULT_TOKENIZER_PATH,
+        )
     pipeline = GuardrailPipeline(
         skill_bundle=bundle,
         encoder_adapter=adapter,
@@ -250,26 +241,27 @@ def to_benchmark_cases(
 
 
 def detect_model_version(model_path: str) -> Optional[str]:
-    """Return a short version string for the loaded encoder, or None.
+    """Return a short version string for the loaded ONNX encoder, or ``None``.
 
-    Reads ``config.json`` from a local checkpoint and surfaces the
-    ``transformers_version`` / ``model_type`` fields if present.
+    Reads the ONNX file's ``producer_name`` / ``producer_version`` /
+    ``opset_import`` metadata when :mod:`onnx` is available; otherwise
+    returns ``None``.
     """
     candidate = Path(model_path)
-    config_paths: list[Path] = []
-    if candidate.is_dir():
-        config_paths.append(candidate / "config.json")
-    for p in config_paths:
-        if not p.is_file():
-            continue
-        try:
-            with p.open("r", encoding="utf-8") as f:
-                cfg = json.load(f)
-        except (OSError, json.JSONDecodeError):
-            continue
-        version = cfg.get("transformers_version") or cfg.get("model_type")
-        if isinstance(version, str) and version:
-            return version
+    if not candidate.is_file():
+        return None
+    try:
+        import onnx  # type: ignore[import-not-found]
+    except Exception:  # noqa: BLE001 — onnx not installed
+        return None
+    try:
+        model = onnx.load(str(candidate), load_external_data=False)
+    except Exception:  # noqa: BLE001 — unreadable file
+        return None
+    producer = getattr(model, "producer_name", "") or ""
+    version = getattr(model, "producer_version", "") or ""
+    if producer or version:
+        return f"{producer} {version}".strip() or None
     return None
 
 
@@ -283,10 +275,18 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--model-path",
-        default=XLMR_MINILM_MODEL_ID,
+        default=DEFAULT_ONNX_MODEL_PATH,
         help=(
-            "Path or HF model id for the XLM-R MiniLM-L6 encoder "
-            f"(default: {XLMR_MINILM_MODEL_ID})."
+            "Path to the ONNX-exported XLM-R encoder "
+            f"(default: {DEFAULT_ONNX_MODEL_PATH})."
+        ),
+    )
+    parser.add_argument(
+        "--tokenizer-path",
+        default=DEFAULT_TOKENIZER_PATH,
+        help=(
+            "Path to the SentencePiece tokenizer model "
+            f"(default: {DEFAULT_TOKENIZER_PATH})."
         ),
     )
     parser.add_argument(
@@ -343,8 +343,7 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         default=None,
         help=(
             "Override the results filename (without extension). "
-            "Default: 'xlmr_minilm_l6_results' (or "
-            "'xlmr_minilm_l6_mock_results' with --mock)."
+            "Default: 'xlmr_results' (or 'xlmr_mock_results' with --mock)."
         ),
     )
     parser.add_argument(
@@ -368,11 +367,13 @@ def main(argv: Optional[list[str]] = None) -> int:
         print(f"error: samples file not found: {samples_path}", file=sys.stderr)
         return 2
 
-    if not args.mock and not is_model_available(args.model_path):
+    if not args.mock and not is_model_available(
+        args.model_path, args.tokenizer_path
+    ):
         print(
             MODEL_INSTRUCTIONS.format(
                 model_path=args.model_path,
-                model_id=XLMR_MINILM_MODEL_ID,
+                tokenizer_path=args.tokenizer_path,
             ),
             file=sys.stderr,
         )
@@ -405,6 +406,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     pipeline, adapter = build_pipeline(
         use_mock=args.mock,
         model_path=args.model_path,
+        tokenizer_path=args.tokenizer_path,
         jurisdiction=args.jurisdiction,
         community=args.community,
     )
@@ -414,7 +416,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         + (
             "MockEncoderAdapter"
             if args.mock
-            else f"XLMRMiniLMAdapter -> {args.model_path}"
+            else f"XLMRAdapter -> {args.model_path}"
         )
     )
     print()
@@ -455,16 +457,16 @@ def main(argv: Optional[list[str]] = None) -> int:
         if args.results_name:
             results_name = args.results_name
         elif args.mock:
-            results_name = "xlmr_minilm_l6_mock_results"
+            results_name = "xlmr_mock_results"
         else:
-            results_name = "xlmr_minilm_l6_results"
+            results_name = "xlmr_results"
         out_path = BENCH_DIR / f"{results_name}.json"
         record = {
             "model_name": (
-                XLMR_MINILM_MODEL_NAME if not args.mock else "MockEncoderAdapter"
+                XLMR_MODEL_NAME if not args.mock else "MockEncoderAdapter"
             ),
             "model_id": (
-                XLMR_MINILM_MODEL_ID if not args.mock else None
+                args.model_path if not args.mock else None
             ),
             "model_version": (
                 detect_model_version(args.model_path)
@@ -472,7 +474,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                 else None
             ),
             "adapter": (
-                "MockEncoderAdapter" if args.mock else "XLMRMiniLMAdapter"
+                "MockEncoderAdapter" if args.mock else "XLMRAdapter"
             ),
             "model_path": None if args.mock else args.model_path,
             "jurisdiction": args.jurisdiction,

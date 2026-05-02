@@ -115,8 +115,8 @@ Goal: turn skill packs into actual on-device behaviour.
   2. Deterministic local detectors (URL risk, PII patterns, scam
      patterns, lexicon matching, media descriptor signals).
   3. Signal packaging into the encoder classifier input contract.
-  4. Encoder-based contextual classification (XLM-R MiniLM-L6 —
-     deterministic argmax over fixed prototype embeddings).
+  4. Encoder-based contextual classification (XLM-R via ONNX
+     Runtime — deterministic argmax over fixed prototype embeddings).
   5. Severity / threshold policy enforcement.
   6. Local JSON output generation.
   7. Local expiring counter updates (device-local only).

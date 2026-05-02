@@ -1,8 +1,9 @@
 """Encoder classifier runtime adapter — the boundary between the
 hybrid local pipeline and any encoder-classifier backend.
 
-Reference backend: **XLM-R MiniLM-L6** (see
-:mod:`xlmr_minilm_adapter`). The Protocol itself is deliberately
+Reference backend: **XLM-R** (see :mod:`xlmr_adapter`), an ONNX
+INT8 export of the multilingual XLM-R encoder loaded through
+:mod:`onnxruntime`. The Protocol itself is deliberately
 backend-agnostic: any implementation that accepts a
 ``kchat.guardrail.local_signal.v1`` instance and returns a
 ``kchat.guardrail.output.v1`` instance is a valid adapter — the
@@ -14,7 +15,7 @@ Spec references:
   boundary between the pipeline and any encoder-classifier backend
   (so we can swap backends without changing skill packs)."
 * ARCHITECTURE.md "Hybrid Local Pipeline" step 4 —
-  "Encoder-based contextual classification (XLM-R MiniLM-L6)".
+  "Encoder-based contextual classification (XLM-R)".
 
 This module ships:
 
@@ -115,7 +116,7 @@ class MockEncoderAdapter:
     """Deterministic reference adapter for pipeline tests.
 
     Used in tests, demos, and any environment that does not have the
-    XLM-R MiniLM-L6 encoder weights loaded. Maps deterministic-detector
+    XLM-R encoder weights loaded. Maps deterministic-detector
     signals to category outputs:
 
     * ``url_risk > 0.8`` → SCAM_FRAUD (7).
@@ -175,7 +176,7 @@ class MockEncoderAdapter:
         # PII leak in a journalism community. Protected-speech
         # demotion only applies on the embedding-head path (mock has
         # no embedding head; the trained adapter does — see
-        # ``xlmr_minilm_adapter.py``).
+        # ``xlmr_adapter.py``).
         #
         # The ``context_hints`` list is still consumed below: it is
         # used by the ``_safe_output()`` fallback at the bottom of the

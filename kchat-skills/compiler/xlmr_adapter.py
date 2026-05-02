@@ -1,5 +1,5 @@
-"""XLM-R MiniLM-L6 ``EncoderAdapter`` — runs the on-device guardrail
-encoder classifier.
+"""XLM-R ``EncoderAdapter`` — runs the on-device guardrail encoder
+classifier through ONNX Runtime.
 
 Spec references:
 
@@ -7,21 +7,24 @@ Spec references:
   boundary between the pipeline and any encoder-classifier backend (so
   we can swap backends without changing skill packs)."
 * ARCHITECTURE.md "Hybrid Local Pipeline" step 4 — "Encoder-based
-  contextual classification (XLM-R MiniLM-L6)".
+  contextual classification (XLM-R)".
 
 This adapter is one concrete implementation of the
 :class:`encoder_adapter.EncoderAdapter` Protocol. It targets the
-**XLM-R MiniLM-L6** encoder model (``nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large``)
-loaded via :mod:`transformers`. The model is encoder-only — no chat
-completions, no temperature, no token budgets for generation. The
-adapter:
+**XLM-R** multilingual encoder model exported to **ONNX INT8** and
+loaded through :mod:`onnxruntime`. The model is encoder-only — no
+chat completions, no temperature, no token budgets for generation.
+The adapter:
 
-1. Tokenises the message text.
-2. Runs the encoder once to get a contextual embedding (the [CLS]
-   token, mean-pooled across the sequence and L2-normalised).
+1. Tokenises the message text with the SentencePiece tokenizer
+   shipped alongside the ONNX model.
+2. Runs the encoder once via :class:`onnxruntime.InferenceSession` to
+   get a contextual embedding (mean-pooled across the sequence and
+   L2-normalised).
 3. Compares the embedding to a fixed bank of *category prototype*
    embeddings (one per taxonomy category) and selects the
-   highest-similarity category.
+   highest-similarity category, OR uses a trained ``Linear(384, 16)``
+   head loaded from ``xlmr_head.npz`` when available.
 4. Blends the embedding-derived category with deterministic
    ``local_signals`` (URL risk, PII patterns, scam patterns, lexicon
    hits, media descriptors) — signals take precedence when they are
@@ -32,14 +35,21 @@ adapter:
 Design constraints inherited from the EncoderAdapter contract:
 
 * **Deterministic.** No sampling — argmax over fixed prototype
-  embeddings. Identical input → identical output.
-* **Offline.** Model weights are loaded from a local path (``model_path``).
-  No network calls during inference. If weights are missing, the
-  adapter falls back to a SAFE output.
-* **Privacy-safe fallback.** If the encoder fails to load, raises an
-  exception during inference, or produces an embedding outside the
-  expected shape, the adapter returns a SAFE output (category 0,
-  severity 0) rather than raising.
+  embeddings (or the trained linear head). Identical input →
+  identical output.
+* **Offline.** Model weights are loaded from a local path
+  (``model_path``). No network calls during inference. If weights
+  are missing, the adapter falls back to a SAFE output.
+* **Privacy-safe fallback.** If the ONNX session fails to load,
+  raises an exception during inference, or produces an embedding
+  outside the expected shape, the adapter returns a SAFE output
+  (category 0, severity 0) rather than raising.
+* **No PyTorch / transformers runtime dependency.** The adapter only
+  needs :mod:`onnxruntime` + :mod:`sentencepiece` + :mod:`numpy` at
+  runtime — small, ship-friendly dependencies suitable for iOS,
+  Android, macOS, and Windows bundling. The one-time export script
+  (``tools/export_xlmr_onnx.py``) uses transformers + torch but those
+  do not ship on-device.
 * **No generative state.** The adapter has no notion of compiled
   prompts, response_format, max_tokens, or temperature — the
   encoder-classifier backend has no generative side and intentionally
@@ -47,7 +57,6 @@ Design constraints inherited from the EncoderAdapter contract:
 """
 from __future__ import annotations
 
-import json
 import logging
 import math
 import time
@@ -68,10 +77,26 @@ from encoder_adapter import (  # type: ignore[import-not-found]
 # ---------------------------------------------------------------------------
 # Model identity.
 # ---------------------------------------------------------------------------
-XLMR_MINILM_MODEL_NAME = "XLM-R-MiniLM-L6"
-XLMR_MINILM_MODEL_ID = (
-    "nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large"
-)
+XLMR_MODEL_NAME = "XLM-R"
+
+# Default location of the ONNX-exported encoder relative to the repo
+# root. ``tools/export_xlmr_onnx.py`` produces this artefact.
+DEFAULT_ONNX_MODEL_PATH = "models/xlmr.onnx"
+# Default location of the SentencePiece tokenizer model. XLM-R uses
+# SentencePiece BPE; the export script copies the tokenizer alongside
+# the ONNX model.
+DEFAULT_TOKENIZER_PATH = "models/xlmr.spm"
+
+# XLM-R / fairseq tokenizer offset. SentencePiece piece ids are
+# shifted by ``+1`` and the four special tokens occupy ids 0..3:
+# ``<s>=0, <pad>=1, </s>=2, <unk>=3``. Pieces whose ``piece_to_id``
+# returns 0 (i.e. SentencePiece's own ``<unk>``) map to 3 (the
+# fairseq ``<unk>`` slot).
+_FAIRSEQ_OFFSET = 1
+_BOS_ID = 0  # <s>
+_PAD_ID = 1  # <pad>
+_EOS_ID = 2  # </s>
+_UNK_ID = 3  # <unk>
 
 
 # ---------------------------------------------------------------------------
@@ -134,10 +159,10 @@ def _zero_actions() -> dict[str, bool]:
 def safe_fallback_output() -> dict[str, Any]:
     """Return a SAFE ``kchat.guardrail.output.v1``-shaped dict.
 
-    Used whenever the encoder cannot run (model weights missing,
-    transformers import error, runtime exception during inference).
-    Matches the privacy-first invariant: when in doubt, the runtime
-    degrades to SAFE rather than to a permissive label.
+    Used whenever the encoder cannot run (ONNX model missing,
+    onnxruntime / sentencepiece import error, runtime exception during
+    inference). Matches the privacy-first invariant: when in doubt,
+    the runtime degrades to SAFE rather than to a permissive label.
     """
     return {
         "severity": 0,
@@ -145,7 +170,7 @@ def safe_fallback_output() -> dict[str, Any]:
         "confidence": 0.05,
         "actions": _zero_actions(),
         "reason_codes": [],
-        "rationale_id": "xlmr_minilm_safe_fallback_v1",
+        "rationale_id": "xlmr_safe_fallback_v1",
     }
 
 
@@ -153,20 +178,24 @@ def safe_fallback_output() -> dict[str, Any]:
 # Adapter.
 # ---------------------------------------------------------------------------
 @dataclass
-class XLMRMiniLMAdapter:
-    """EncoderAdapter backed by the XLM-R MiniLM-L6 encoder.
+class XLMRAdapter:
+    """EncoderAdapter backed by the XLM-R encoder, loaded as ONNX.
 
     Parameters
     ----------
     model_path
-        Local filesystem path *or* Hugging Face model id from which to
-        load the encoder. Defaults to :data:`XLMR_MINILM_MODEL_ID`. The
-        adapter only loads the model on first :meth:`classify` call so
-        constructing one is cheap.
+        Local filesystem path to the ONNX-exported XLM-R encoder.
+        Defaults to :data:`DEFAULT_ONNX_MODEL_PATH`. The adapter only
+        loads the model on first :meth:`classify` call so constructing
+        one is cheap.
+    tokenizer_path
+        Local filesystem path to the SentencePiece tokenizer model
+        (``.spm`` / ``.model`` file). Defaults to
+        :data:`DEFAULT_TOKENIZER_PATH`.
     max_seq_length
-        Sequence length used by the tokenizer. The XLM-R MiniLM-L6
-        encoder supports up to 512 tokens; 128 is plenty for short
-        chat messages and ~3-4× faster per call.
+        Sequence length used by the tokenizer. The XLM-R encoder
+        supports up to 512 tokens; 128 is plenty for short chat
+        messages and ~3-4× faster per call.
     similarity_threshold
         Reserved for backwards compatibility — the embedding head now
         uses margin-based confidence (see ``softmax_temperature`` /
@@ -186,6 +215,11 @@ class XLMRMiniLMAdapter:
         margin is below this value the adapter returns SAFE — the
         encoder is "uncertain", and the deterministic detectors +
         threshold policy take over.
+    head_weights_path
+        Optional path to the trained ``Linear(384, 16)`` head stored
+        as a numpy ``.npz`` archive (keys: ``weight``, ``bias``).
+        Defaults to the conventional location next to this module:
+        ``compiler/data/xlmr_head.npz``.
     logger
         Optional :class:`logging.Logger` used for structured per-call
         latency / error logging. Defaults to the module logger.
@@ -198,7 +232,8 @@ class XLMRMiniLMAdapter:
     pipeline.
     """
 
-    model_path: str = XLMR_MINILM_MODEL_ID
+    model_path: str = DEFAULT_ONNX_MODEL_PATH
+    tokenizer_path: str = DEFAULT_TOKENIZER_PATH
     max_seq_length: int = 128
     similarity_threshold: float = 0.30
     softmax_temperature: float = 0.01
@@ -207,9 +242,16 @@ class XLMRMiniLMAdapter:
     logger: Optional[logging.Logger] = None
     last_latency_ms: float = field(default=0.0, init=False)
     _tokenizer: Any = field(default=None, init=False, repr=False)
-    _model: Any = field(default=None, init=False, repr=False)
-    _prototype_embeddings: Any = field(default=None, init=False, repr=False)
-    _trained_head: Any = field(default=None, init=False, repr=False)
+    _session: Any = field(default=None, init=False, repr=False)
+    _input_names: tuple[str, ...] = field(
+        default=(), init=False, repr=False
+    )
+    _prototype_embeddings: Any = field(
+        default=None, init=False, repr=False
+    )
+    _trained_head: Optional[tuple[Any, Any]] = field(
+        default=None, init=False, repr=False
+    )
     _load_failed: bool = field(default=False, init=False, repr=False)
 
     # ------------------------------------------------------------------
@@ -230,12 +272,12 @@ class XLMRMiniLMAdapter:
         except Exception as exc:  # noqa: BLE001 — defensive boundary
             self.last_latency_ms = (time.perf_counter() - start) * 1000.0
             log.warning(
-                "XLM-R MiniLM-L6 model load failed (%s); falling back to SAFE",
+                "XLM-R model load failed (%s); falling back to SAFE",
                 exc,
             )
             return safe_fallback_output()
 
-        if self._load_failed or self._model is None:
+        if self._load_failed or self._session is None:
             self.last_latency_ms = (time.perf_counter() - start) * 1000.0
             return safe_fallback_output()
 
@@ -252,7 +294,7 @@ class XLMRMiniLMAdapter:
         except Exception as exc:  # noqa: BLE001 — defensive boundary
             self.last_latency_ms = (time.perf_counter() - start) * 1000.0
             log.warning(
-                "XLM-R MiniLM-L6 inference error (%s); falling back to SAFE",
+                "XLM-R inference error (%s); falling back to SAFE",
                 exc,
             )
             return safe_fallback_output()
@@ -264,7 +306,7 @@ class XLMRMiniLMAdapter:
         except Exception as exc:  # noqa: BLE001 — defensive boundary
             self.last_latency_ms = (time.perf_counter() - start) * 1000.0
             log.warning(
-                "XLM-R MiniLM-L6 classification error (%s); falling back to SAFE",
+                "XLM-R classification error (%s); falling back to SAFE",
                 exc,
             )
             return safe_fallback_output()
@@ -276,53 +318,72 @@ class XLMRMiniLMAdapter:
     # Internals — model loading + encoding.
     # ------------------------------------------------------------------
     def _ensure_loaded(self) -> None:
-        if self._model is not None or self._load_failed:
+        if self._session is not None or self._load_failed:
             return
         try:
-            import torch  # type: ignore[import-not-found]  # noqa: F401
-            from transformers import (  # type: ignore[import-not-found]
-                AutoModel,
-                AutoTokenizer,
-            )
+            import numpy as np  # noqa: F401  # type: ignore[import-not-found]
+            import onnxruntime as ort  # type: ignore[import-not-found]
+            import sentencepiece as spm  # type: ignore[import-not-found]
         except Exception as exc:  # noqa: BLE001 — soft dependency
             self._load_failed = True
             (self.logger or _module_logger).warning(
-                "transformers/torch unavailable (%s); XLM-R MiniLM-L6 "
-                "adapter will return SAFE for every call",
+                "onnxruntime/sentencepiece/numpy unavailable (%s); "
+                "XLM-R adapter will return SAFE for every call",
                 exc,
             )
             return
 
-        path = self.model_path
-        # Refuse network fetches when the path looks like an HF id and
-        # there is no local cache for it. The pipeline is supposed to
-        # run fully offline; configure ``model_path`` to a local
-        # directory to enable real inference.
-        if not _looks_like_local_path(path):
-            (self.logger or _module_logger).info(
-                "XLM-R MiniLM-L6 model_path=%r is not a local directory; "
-                "transformers may need to download weights",
-                path,
+        if not Path(self.tokenizer_path).is_file():
+            self._load_failed = True
+            (self.logger or _module_logger).warning(
+                "XLM-R tokenizer not found at %r; falling back to SAFE",
+                self.tokenizer_path,
             )
+            return
+        if not Path(self.model_path).is_file():
+            self._load_failed = True
+            (self.logger or _module_logger).warning(
+                "XLM-R ONNX model not found at %r; falling back to SAFE",
+                self.model_path,
+            )
+            return
 
         try:
-            self._tokenizer = AutoTokenizer.from_pretrained(
-                path, local_files_only=True
+            tokenizer = spm.SentencePieceProcessor()
+            tokenizer.Load(self.tokenizer_path)
+        except Exception as exc:  # noqa: BLE001 — defensive boundary
+            self._load_failed = True
+            (self.logger or _module_logger).warning(
+                "Failed to load SentencePiece tokenizer from %r (%s); "
+                "falling back to SAFE",
+                self.tokenizer_path,
+                exc,
             )
-            self._model = AutoModel.from_pretrained(
-                path, local_files_only=True
+            return
+
+        try:
+            sess_options = ort.SessionOptions()
+            sess_options.graph_optimization_level = (
+                ort.GraphOptimizationLevel.ORT_ENABLE_ALL
             )
-            self._model.eval()
+            session = ort.InferenceSession(
+                self.model_path,
+                sess_options=sess_options,
+                providers=["CPUExecutionProvider"],
+            )
         except Exception as exc:  # noqa: BLE001 — model load failed
             self._load_failed = True
             (self.logger or _module_logger).warning(
-                "Failed to load XLM-R MiniLM-L6 from %r (%s); falling back to SAFE",
-                path,
+                "Failed to load XLM-R ONNX model from %r (%s); falling "
+                "back to SAFE",
+                self.model_path,
                 exc,
             )
-            self._tokenizer = None
-            self._model = None
             return
+
+        self._tokenizer = tokenizer
+        self._session = session
+        self._input_names = tuple(i.name for i in session.get_inputs())
 
         # Pre-compute prototype embeddings once. They are kept as a
         # fallback even when a trained classification head is loaded
@@ -335,18 +396,18 @@ class XLMRMiniLMAdapter:
         except Exception as exc:  # noqa: BLE001 — defensive boundary
             self._load_failed = True
             (self.logger or _module_logger).warning(
-                "Failed to encode XLM-R MiniLM-L6 category prototypes (%s); "
+                "Failed to encode XLM-R category prototypes (%s); "
                 "falling back to SAFE",
                 exc,
             )
             self._tokenizer = None
-            self._model = None
+            self._session = None
             self._prototype_embeddings = None
             return
 
         # Optional: load the trained linear head produced by
-        # ``train_xlmr_head.py``. When present, the adapter uses it as
-        # the primary embedding-stage classifier instead of the
+        # ``train_xlmr_head.py``. When present, the adapter uses it
+        # as the primary embedding-stage classifier instead of the
         # zero-shot prototype argmax.
         self._maybe_load_trained_head()
 
@@ -354,27 +415,33 @@ class XLMRMiniLMAdapter:
         """Try to load the trained Linear(384, 16) head from disk.
 
         Looks at ``head_weights_path`` (if set) or the conventional
-        ``compiler/data/xlmr_minilm_head.pt`` location next to this
-        module. Sets ``self._trained_head`` to the loaded ``nn.Linear``
-        on success, or leaves it as ``None`` to fall back to prototypes.
+        ``compiler/data/xlmr_head.npz`` location next to this module.
+        Sets ``self._trained_head`` to ``(weight, bias)`` numpy arrays
+        on success, or leaves it as ``None`` to fall back to
+        prototypes.
         """
         try:
-            import torch
-            from torch import nn
+            import numpy as np  # type: ignore[import-not-found]
         except Exception:  # noqa: BLE001 — soft dependency
             return
 
         candidate = self.head_weights_path
         if candidate is None:
             here = Path(__file__).resolve().parent
-            default = here / "data" / "xlmr_minilm_head.pt"
+            default = here / "data" / "xlmr_head.npz"
             if default.exists():
                 candidate = str(default)
         if candidate is None or not Path(candidate).exists():
             return
 
         try:
-            state = torch.load(candidate, map_location="cpu", weights_only=True)
+            with np.load(candidate) as npz:
+                if "weight" not in npz.files or "bias" not in npz.files:
+                    raise KeyError(
+                        "xlmr_head.npz must contain 'weight' and 'bias' arrays"
+                    )
+                weight = np.asarray(npz["weight"], dtype=np.float32)
+                bias = np.asarray(npz["bias"], dtype=np.float32)
         except Exception as exc:  # noqa: BLE001 — defensive boundary
             (self.logger or _module_logger).warning(
                 "Failed to load trained head from %r (%s); falling back "
@@ -384,16 +451,7 @@ class XLMRMiniLMAdapter:
             )
             return
 
-        weight = state.get("weight") if isinstance(state, dict) else None
-        bias = state.get("bias") if isinstance(state, dict) else None
-        if weight is None or bias is None:
-            (self.logger or _module_logger).warning(
-                "Trained head state at %r missing weight/bias; falling "
-                "back to prototype argmax",
-                candidate,
-            )
-            return
-        if tuple(weight.shape) != (16, 384) or tuple(bias.shape) != (16,):
+        if weight.shape != (16, 384) or bias.shape != (16,):
             (self.logger or _module_logger).warning(
                 "Trained head shape %s/%s does not match (16, 384) / "
                 "(16,); falling back to prototype argmax",
@@ -402,43 +460,105 @@ class XLMRMiniLMAdapter:
             )
             return
 
-        head = nn.Linear(384, 16, bias=True)
-        head.load_state_dict(state)
-        head.eval()
-        self._trained_head = head
+        self._trained_head = (weight, bias)
         (self.logger or _module_logger).info(
-            "Loaded trained XLM-R MiniLM-L6 head from %s", candidate
+            "Loaded trained XLM-R head from %s", candidate
         )
 
+    # ------------------------------------------------------------------
+    # Tokenisation.
+    # ------------------------------------------------------------------
+    def _tokenize(
+        self, texts: list[str]
+    ) -> tuple[Any, Any]:
+        """Tokenise ``texts`` into XLM-R-compatible input arrays.
+
+        Returns ``(input_ids, attention_mask)`` as ``int64`` numpy
+        arrays of shape ``(batch, seq_len)``. Each sequence starts
+        with ``<s>`` (0) and ends with ``</s>`` (2); shorter sequences
+        are right-padded with ``<pad>`` (1).
+        """
+        import numpy as np  # type: ignore[import-not-found]
+
+        if self._tokenizer is None:
+            raise RuntimeError("tokenizer not loaded")
+
+        sp = self._tokenizer
+        max_payload = max(2, self.max_seq_length - 2)  # leave room for <s>/</s>
+
+        rows: list[list[int]] = []
+        for text in texts:
+            pieces: list[int] = sp.EncodeAsIds(text or "")
+            # XLM-R / fairseq offset: shift SP ids by +1 except the
+            # SP <unk> (id 0) which maps to fairseq <unk> (3).
+            shifted: list[int] = [
+                _UNK_ID if pid == 0 else pid + _FAIRSEQ_OFFSET
+                for pid in pieces[:max_payload]
+            ]
+            rows.append([_BOS_ID, *shifted, _EOS_ID])
+
+        seq_len = max(len(r) for r in rows) if rows else 2
+        seq_len = min(seq_len, self.max_seq_length)
+
+        input_ids = np.full(
+            (len(rows), seq_len), fill_value=_PAD_ID, dtype=np.int64
+        )
+        attention_mask = np.zeros(
+            (len(rows), seq_len), dtype=np.int64
+        )
+        for i, row in enumerate(rows):
+            n = min(len(row), seq_len)
+            input_ids[i, :n] = row[:n]
+            attention_mask[i, :n] = 1
+
+        return input_ids, attention_mask
+
+    def _build_session_inputs(
+        self, input_ids: Any, attention_mask: Any
+    ) -> dict[str, Any]:
+        """Map standard tokenizer outputs onto the ONNX session input names."""
+        import numpy as np  # type: ignore[import-not-found]
+
+        feed: dict[str, Any] = {}
+        names = self._input_names or ("input_ids", "attention_mask")
+        for name in names:
+            if name == "input_ids":
+                feed[name] = input_ids
+            elif name == "attention_mask":
+                feed[name] = attention_mask
+            elif name == "token_type_ids":
+                feed[name] = np.zeros_like(input_ids)
+            else:
+                # Unknown input — be conservative and zero-fill.
+                feed[name] = np.zeros_like(input_ids)
+        return feed
+
     def _encode_batch(self, texts: list[str]) -> Any:
-        """Encode ``texts`` and return a (len(texts), hidden) tensor.
+        """Encode ``texts`` and return a ``(len(texts), hidden)`` numpy array.
 
         Uses mean-pooling across the sequence with attention masking,
         then L2-normalises each row so cosine similarity reduces to a
         plain dot product.
         """
-        import torch  # type: ignore[import-not-found]
+        import numpy as np  # type: ignore[import-not-found]
 
-        if self._tokenizer is None or self._model is None:
+        if self._tokenizer is None or self._session is None:
             raise RuntimeError("model not loaded")
-        encoded = self._tokenizer(
-            texts,
-            padding=True,
-            truncation=True,
-            max_length=self.max_seq_length,
-            return_tensors="pt",
-        )
-        with torch.no_grad():
-            output = self._model(**encoded)
-        # Mean-pool over tokens with attention mask.
-        last_hidden = output.last_hidden_state  # (batch, seq, hidden)
-        mask = encoded["attention_mask"].unsqueeze(-1).float()
-        summed = (last_hidden * mask).sum(dim=1)
-        counts = mask.sum(dim=1).clamp(min=1.0)
+
+        input_ids, attention_mask = self._tokenize(texts)
+        feed = self._build_session_inputs(input_ids, attention_mask)
+        outputs = self._session.run(None, feed)
+        # Convention: first output is ``last_hidden_state``
+        # ``(batch, seq, hidden)``.
+        last_hidden = np.asarray(outputs[0], dtype=np.float32)
+        mask = attention_mask.astype(np.float32)[..., None]
+        summed = (last_hidden * mask).sum(axis=1)
+        counts = mask.sum(axis=1)
+        counts = np.maximum(counts, 1.0)
         pooled = summed / counts
-        # L2 normalize.
-        norms = pooled.norm(dim=1, keepdim=True).clamp(min=1e-12)
-        return pooled / norms
+        norms = np.linalg.norm(pooled, axis=1, keepdims=True)
+        norms = np.maximum(norms, 1e-12)
+        return (pooled / norms).astype(np.float32)
 
     def _prototype_softmax(self, embedding: Any) -> list[float]:
         """Zero-shot prototype path: cosine + low-temperature softmax.
@@ -448,12 +568,7 @@ class XLMRMiniLMAdapter:
         head raises during inference.
         """
         sims = self._prototype_embeddings @ embedding
-        sims_list = (
-            sims.detach().cpu().tolist()
-            if hasattr(sims, "detach")
-            else list(sims)
-        )
-        sims_list = [float(s) for s in sims_list]
+        sims_list = [float(s) for s in _to_list(sims)]
         temp = self.softmax_temperature if self.softmax_temperature > 0 else 1.0
         scaled = [s / temp for s in sims_list]
         max_scaled = max(scaled)
@@ -462,7 +577,7 @@ class XLMRMiniLMAdapter:
         return [e / z for e in exps]
 
     def _encode(self, text: str) -> Any:
-        """Encode a single ``text`` and return a 1D tensor."""
+        """Encode a single ``text`` and return a 1D numpy array."""
         batch = self._encode_batch([text or ""])
         return batch[0]
 
@@ -481,8 +596,6 @@ class XLMRMiniLMAdapter:
         URL risk above 0.8, NSFW media). Otherwise the highest-cosine
         prototype wins, gated by ``similarity_threshold``.
         """
-        import torch  # type: ignore[import-not-found]
-
         if self._prototype_embeddings is None:
             return safe_fallback_output()
 
@@ -610,10 +723,10 @@ class XLMRMiniLMAdapter:
         #
         #   1. **Trained head (preferred):** a ``Linear(384, 16)``
         #      fitted by ``train_xlmr_head.py`` on a small labelled
-        #      corpus (see ``training_data.py``). Logits are normalised
-        #      with a plain softmax — no temperature scaling needed
-        #      because the linear layer learns its own scale during
-        #      training.
+        #      corpus (see ``training_data.py``). Logits are
+        #      normalised with a plain softmax — no temperature
+        #      scaling needed because the linear layer learns its own
+        #      scale during training.
         #   2. **Zero-shot prototypes (fallback):** cosine similarity
         #      against the fixed ``CATEGORY_PROTOTYPES`` embeddings,
         #      passed through a low-temperature softmax. XLM-R's
@@ -626,12 +739,8 @@ class XLMRMiniLMAdapter:
         # protected-speech demotion downstream) is identical.
         if self._trained_head is not None:
             try:
-                import torch  # type: ignore[import-not-found]
-
-                with torch.no_grad():
-                    logits = self._trained_head(embedding.unsqueeze(0))[0]
-                    probs_t = torch.softmax(logits, dim=0)
-                probs = [float(p) for p in probs_t.detach().cpu().tolist()]
+                weight, bias = self._trained_head
+                probs = _softmax(_to_list(weight @ embedding + bias))
             except Exception as exc:  # noqa: BLE001 — defensive boundary
                 (self.logger or _module_logger).warning(
                     "Trained head inference failed (%s); falling back "
@@ -664,7 +773,7 @@ class XLMRMiniLMAdapter:
                 ),
                 "actions": _zero_actions(),
                 "reason_codes": _with_context([]),
-                "rationale_id": f"xlmr_minilm_safe_{head_tag}_v1",
+                "rationale_id": f"xlmr_safe_{head_tag}_v1",
             }
 
         # Otherwise return the predicted category at default severity 2
@@ -680,7 +789,7 @@ class XLMRMiniLMAdapter:
             "actions": {**_zero_actions(), "label_only": True},
             "reason_codes": _with_context([]),
             "rationale_id": (
-                f"xlmr_minilm_category_{best_idx}_{head_tag}_v1"
+                f"xlmr_category_{best_idx}_{head_tag}_v1"
             ),
         }
 
@@ -688,12 +797,23 @@ class XLMRMiniLMAdapter:
 # ---------------------------------------------------------------------------
 # Helpers.
 # ---------------------------------------------------------------------------
-_module_logger = logging.getLogger("kchat.guardrail.xlmr_minilm")
+_module_logger = logging.getLogger("kchat.guardrail.xlmr")
 
 
-def _looks_like_local_path(path: str) -> bool:
-    """Return True iff ``path`` looks like a filesystem directory."""
-    return bool(path) and Path(path).is_dir()
+def _to_list(arr: Any) -> list[float]:
+    """Convert a numpy / torch / list-like 1D tensor into a Python list."""
+    if hasattr(arr, "tolist"):
+        return list(arr.tolist())
+    return list(arr)
+
+
+def _softmax(values: list[float]) -> list[float]:
+    if not values:
+        return []
+    max_v = max(values)
+    exps = [math.exp(v - max_v) for v in values]
+    z = sum(exps) or 1.0
+    return [e / z for e in exps]
 
 
 def _coerce_to_output_schema(parsed: dict[str, Any]) -> dict[str, Any]:
@@ -750,7 +870,7 @@ def _coerce_to_output_schema(parsed: dict[str, Any]) -> dict[str, Any]:
 
     rationale_id = parsed.get("rationale_id")
     if not isinstance(rationale_id, str) or not rationale_id:
-        rationale_id = "xlmr_minilm_default_rationale_v1"
+        rationale_id = "xlmr_default_rationale_v1"
 
     out: dict[str, Any] = {
         "severity": severity,
@@ -786,21 +906,17 @@ def _coerce_to_output_schema(parsed: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-# ``json`` is unused below but imported lazily for parity with the
-# old adapter — keep the import resolved so static analysers stay happy.
-_ = json
-
-
 # Make ``isinstance(adapter, EncoderAdapter)`` cheap for tests that import
 # the protocol.
-_PROTOCOL_REFERENCE: EncoderAdapter = XLMRMiniLMAdapter()  # type: ignore[assignment]
+_PROTOCOL_REFERENCE: EncoderAdapter = XLMRAdapter()  # type: ignore[assignment]
 del _PROTOCOL_REFERENCE
 
 
 __all__ = [
     "CATEGORY_PROTOTYPES",
-    "XLMR_MINILM_MODEL_ID",
-    "XLMR_MINILM_MODEL_NAME",
-    "XLMRMiniLMAdapter",
+    "DEFAULT_ONNX_MODEL_PATH",
+    "DEFAULT_TOKENIZER_PATH",
+    "XLMR_MODEL_NAME",
+    "XLMRAdapter",
     "safe_fallback_output",
 ]
