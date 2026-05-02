@@ -1,7 +1,7 @@
 # KChat Guardrail Skills — Progress
 
 **Status:** Complete | 100% + demo layer
-**Current phase:** Phase 6 complete — 100 jurisdiction/community skills + XLM-R MiniLM-L6 encoder classifier integration with trained linear head + protected-speech context demotion
+**Current phase:** Phase 6 complete — 100 jurisdiction/community skills + XLM-R encoder classifier integration with trained linear head + protected-speech context demotion (ONNX Runtime; PyTorch / `transformers` dropped from on-device runtime)
 **Last updated:** 2026-05-02
 
 This file tracks delivery against the phased plan in
@@ -147,6 +147,43 @@ This file tracks delivery against the phased plan in
 
 ## Changelog
 
+### 2026-05-02 — XLM-R unification & ONNX conversion
+
+- Renamed "XLM-R MiniLM-L6" → "XLM-R" throughout all docs and code.
+  The canonical name for the on-device encoder backend is now plain
+  **XLM-R**; the underlying source artifact (the multilingual XLM-R
+  MiniLM checkpoint) is documented only inside
+  `tools/export_xlmr_onnx.py` as the export source.
+- Converted `XLMRMiniLMAdapter` → `XLMRAdapter`, now loads an ONNX
+  INT8 model via `onnxruntime` and tokenises with `sentencepiece`
+  directly. The runtime no longer imports `transformers` / `torch`.
+- Dropped PyTorch and `transformers` as on-device runtime
+  dependencies in `pyproject.toml` and `requirements.txt`; replaced
+  them with `onnxruntime` + `sentencepiece` + `numpy`. The trainer
+  `train_xlmr_head.py` and the export script still require
+  `transformers` + `torch` but those run **offline** only and are
+  not shipped to devices.
+- Added `tools/export_xlmr_onnx.py` for the one-time ONNX export
+  (HuggingFace → `torch.onnx.export()` → INT8 quantisation via
+  `onnxruntime.quantization`) and head conversion (`.pt` → `.npz`).
+- Head weights converted from `.pt` (PyTorch state_dict) to `.npz`
+  (numpy arrays for `weight` and `bias`); the on-device adapter
+  loads them with `numpy.load()` and runs `weight @ embedding +
+  bias` as a pure numpy matrix multiply.
+- File renames: `xlmr_minilm_adapter.py` → `xlmr_adapter.py`;
+  `data/xlmr_minilm_head.pt` → `data/xlmr_head.npz`;
+  `data/xlmr_minilm_head.json` → `data/xlmr_head.json`;
+  `tests/global/test_xlmr_minilm_adapter.py` →
+  `test_xlmr_adapter.py`;
+  `benchmarks/xlmr_minilm_l6_results.json` →
+  `benchmarks/xlmr_results.json`;
+  `benchmarks/xlmr_minilm_l6_mock_results.json` →
+  `benchmarks/xlmr_mock_results.json`.
+- Tests rewritten to use numpy stubs in place of torch tensors;
+  `XLMRAdapter` test suite still exercises Protocol conformance,
+  fallback to SAFE when the ONNX model is missing, schema coercion,
+  trained-head vs prototype paths, and signal-priority overrides.
+
 ### 2026-04-30 — Vietnam (vi-VN) demo expansion
 
 - `tools/demo_guardrail.py` — adds 8 Vietnam scenarios on top of the
@@ -209,14 +246,17 @@ This file tracks delivery against the phased plan in
   current architecture is encoder-only.
 - Benchmark suite re-run via `tools/run_benchmark.sh`.
 
-### 2026-05-01 — XLM-R MiniLM-L6 encoder classifier integration
+### 2026-05-01 — XLM-R encoder classifier integration
 
-- `kchat-skills/compiler/xlmr_minilm_adapter.py` — `XLMRMiniLMAdapter`
-  implementing the `EncoderAdapter` Protocol against the
-  `nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large` encoder
-  loaded through `transformers`. The adapter holds a single
-  `AutoModel` + `AutoTokenizer` pair, runs each classification as a
-  cosine-similarity argmax against a bank of 16 category prototype
+- `kchat-skills/compiler/xlmr_minilm_adapter.py` (now
+  [`xlmr_adapter.py`](kchat-skills/compiler/xlmr_adapter.py) after
+  the 2026-05-02 ONNX migration) — `XLMRMiniLMAdapter` (now
+  `XLMRAdapter`) implementing the `EncoderAdapter` Protocol against
+  the multilingual XLM-R encoder. The adapter originally held a
+  `transformers` `AutoModel` + `AutoTokenizer` pair; it now holds a
+  single `onnxruntime.InferenceSession` plus a SentencePiece
+  tokenizer. It runs each classification as a cosine-similarity
+  argmax against a bank of 16 category prototype
   embeddings, and blends the result with the deterministic local
   signals (URL risk, PII patterns, scam patterns, lexicon hits, media
   descriptors). Falls back to a SAFE output when the encoder weights
@@ -248,10 +288,11 @@ This file tracks delivery against the phased plan in
   multilingual labelled corpus (25 SAFE + 10 examples per category
   1-15, covering English, Spanish, Vietnamese, German, Japanese,
   Arabic, Bengali). `train_xlmr_head.py` fits a `Linear(384, 16)`
-  on top of the frozen XLM-R MiniLM-L6 [CLS] embeddings with
+  on top of the frozen XLM-R [CLS] embeddings with
   AdamW + class-weighted cross-entropy and ships the resulting
-  `state_dict` at `kchat-skills/compiler/data/xlmr_minilm_head.pt`
-  (88.5% train accuracy). `XLMRMiniLMAdapter` loads the head at
+  `state_dict` at `kchat-skills/compiler/data/xlmr_head.npz` after
+  conversion via `tools/export_xlmr_onnx.py` (88.5% train
+  accuracy). `XLMRAdapter` loads the head at
   startup and uses its softmax over logits as the embedding-stage
   classifier, falling back to the zero-shot prototype path when
   the head file is missing or fails to load.
@@ -264,7 +305,7 @@ This file tracks delivery against the phased plan in
   as SCAM_FRAUD even though the surrounding overlay attaches
   EDUCATION_CONTEXT. Locked in by five regression tests in
   `tests/global/test_pipeline.py` plus four head-specific tests in
-  `tests/global/test_xlmr_minilm_adapter.py`.
+  `tests/global/test_xlmr_adapter.py`.
 
   Net result: 27/27 sample cases now match the expected category
   (up from 26/27). Real-encoder benchmark p95 ≈ 18 ms with the
@@ -274,11 +315,11 @@ This file tracks delivery against the phased plan in
 
 - Sample-message corpus (`kchat-skills/samples/sample_messages.yaml`)
   and the `tools/run_guardrail_demo.py` driver — the driver
-  instantiates `XLMRMiniLMAdapter` (or `MockEncoderAdapter` with
+  instantiates `XLMRAdapter` (or `MockEncoderAdapter` with
   `--mock`) and runs the pipeline end-to-end against the curated
   sample corpus. (Historical note: an earlier prototype driver shipped
   in this slot used a generative backend; that path was removed when
-  the encoder-only `XLMRMiniLMAdapter` landed.)
+  the encoder-only `XLMRAdapter` landed.)
 - `kchat-skills/samples/sample_messages.yaml` — curated sample data
   layer with 27 messages covering safe / scam / PII / child-safety /
   hate / harassment / health-misinfo / civic-misinfo / marketplace /
@@ -290,16 +331,16 @@ This file tracks delivery against the phased plan in
 - `kchat-skills/samples/README.md` — sample-data format reference,
   privacy contract, and usage examples.
 - `tools/run_guardrail_demo.py` — end-to-end demo script: checks for
-  XLM-R MiniLM-L6 weight availability, loads samples, compiles a
-  classifier-bundle prompt via `SkillPackCompiler` (with optional
+  XLM-R ONNX model + tokenizer availability, loads samples, compiles
+  a classifier-bundle prompt via `SkillPackCompiler` (with optional
   `--jurisdiction` / `--community`), runs the pipeline with either
-  `XLMRMiniLMAdapter` or `MockEncoderAdapter` (`--mock`), prints a
+  `XLMRAdapter` or `MockEncoderAdapter` (`--mock`), prints a
   results table, optionally runs `PipelineBenchmark` (`--benchmark`)
   and commits results (`--commit-results`).
 - `kchat-skills/benchmarks/` — committed benchmark results directory
-  with reproduction instructions; `xlmr_minilm_l6_results.json` is
-  generated on demand by the demo script.
-- `kchat-skills/tests/global/test_xlmr_minilm_adapter.py` — adapter
+  with reproduction instructions; `xlmr_results.json` is generated
+  on demand by the demo script.
+- `kchat-skills/tests/global/test_xlmr_adapter.py` — adapter
   Protocol conformance, fallback behaviour, output schema coercion,
   classification-head behaviour with stub embeddings, and
   signal-priority overrides.
@@ -396,7 +437,7 @@ This file tracks delivery against the phased plan in
   `BenchmarkCase`, `BenchmarkReport` + `default_benchmark_cases`.
   Measures p50 / p95 / p99 / mean / max / min per-message latency
   against `MockEncoderAdapter` (or any other `EncoderAdapter`, e.g.
-  the `XLMRMiniLMAdapter`); `passed` iff p95 ≤ 250 ms.
+  the `XLMRAdapter`); `passed` iff p95 ≤ 250 ms.
 - `kchat-skills/tests/global/test_benchmark.py` — constructor /
   invariant checks, per-taxonomy parametrisation (all 16 cats),
   baseline-only / jurisdiction-only / full-stack latency targets,

@@ -1,9 +1,9 @@
-"""Training corpus for the XLM-R MiniLM-L6 classification head.
+"""Training corpus for the XLM-R classification head.
 
 This module exposes :data:`TRAINING_EXAMPLES`, a list of ``(text, category)``
 tuples used by :mod:`train_xlmr_head` to fit the small linear head sitting
 on top of the frozen encoder. It replaces the original zero-shot prototype
-argmax — see :mod:`xlmr_minilm_adapter` for the runtime path.
+argmax — see :mod:`xlmr_adapter` for the runtime path.
 
 Design constraints (see ``PROPOSAL.md`` "Privacy contract" and
 ``ARCHITECTURE.md`` "Hybrid Local Pipeline"):
@@ -40,7 +40,7 @@ from __future__ import annotations
 
 # ---------------------------------------------------------------------------
 # Taxonomy category ids (kept in sync with ``encoder_adapter.CAT_*`` and
-# ``xlmr_minilm_adapter.CATEGORY_PROTOTYPES``).
+# ``xlmr_adapter.CATEGORY_PROTOTYPES``).
 # ---------------------------------------------------------------------------
 CAT_SAFE = 0
 CAT_CHILD_SAFETY = 1

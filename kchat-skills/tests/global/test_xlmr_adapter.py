@@ -1,21 +1,20 @@
-"""Tests for ``XLMRMiniLMAdapter``.
+"""Tests for ``XLMRAdapter``.
 
-Module under test: ``kchat-skills/compiler/xlmr_minilm_adapter.py``.
-The adapter is **not** unit-tested against a real downloaded
-encoder in CI — that would require network access. Instead we:
+Module under test: ``kchat-skills/compiler/xlmr_adapter.py``.
+The adapter is **not** unit-tested against a real exported encoder
+in CI — that would require shipping the ONNX model. Instead we:
 
 * Verify Protocol conformance.
 * Verify the SAFE fallback path when the encoder cannot be loaded
-  (the default, since the test environment doesn't have model
-  weights cached).
+  (the default, since the test environment doesn't have an ONNX
+  artefact on disk).
 * Verify the classification head's behaviour on top of a stub
-  encoder (deterministic embeddings injected directly).
+  encoder (deterministic numpy embeddings injected directly).
 * Verify schema conformance, determinism, and signal-priority
   ordering against ``output_schema.json``.
 
-See ``tools/run_guardrail_demo.py`` for the full end-to-end
-exercise that does require a locally-cached XLM-R MiniLM-L6
-checkpoint.
+See ``tools/run_guardrail_demo.py`` for the full end-to-end exercise
+that does require a locally-exported ``models/xlmr.onnx`` checkpoint.
 """
 from __future__ import annotations
 
@@ -28,11 +27,12 @@ from encoder_adapter import (  # type: ignore[import-not-found]
     CAT_SAFE,
     EncoderAdapter,
 )
-from xlmr_minilm_adapter import (  # type: ignore[import-not-found]
+from xlmr_adapter import (  # type: ignore[import-not-found]
     CATEGORY_PROTOTYPES,
-    XLMR_MINILM_MODEL_ID,
-    XLMR_MINILM_MODEL_NAME,
-    XLMRMiniLMAdapter,
+    DEFAULT_ONNX_MODEL_PATH,
+    DEFAULT_TOKENIZER_PATH,
+    XLMR_MODEL_NAME,
+    XLMRAdapter,
     _coerce_to_output_schema,
     safe_fallback_output,
 )
@@ -86,23 +86,23 @@ def _stub_loaded_adapter(monkeypatch: pytest.MonkeyPatch, *, hidden: int = 8):
     The stub's prototype embeddings are a one-hot identity matrix
     (16 × hidden), and ``_encode`` returns a one-hot vector keyed off
     the input text so the cosine-similarity argmax is fully
-    determined by the input. This bypasses transformers / torch model
-    loading entirely so the test doesn't require network or weights.
+    determined by the input. This bypasses onnxruntime / sentencepiece
+    loading entirely so the test doesn't require a real ONNX export.
     """
-    import torch  # type: ignore[import-not-found]
+    np = pytest.importorskip("numpy")
 
-    adapter = XLMRMiniLMAdapter()
+    adapter = XLMRAdapter()
 
     n_categories = len(CATEGORY_PROTOTYPES)
     width = max(hidden, n_categories)
-    eye = torch.eye(n_categories, width)
+    eye = np.eye(n_categories, width, dtype=np.float32)
 
-    def fake_ensure_loaded(self: XLMRMiniLMAdapter) -> None:
+    def fake_ensure_loaded(self: XLMRAdapter) -> None:
         self._tokenizer = object()
-        self._model = object()
+        self._session = object()
         self._prototype_embeddings = eye
 
-    def fake_encode(self: XLMRMiniLMAdapter, text: str) -> Any:
+    def fake_encode(self: XLMRAdapter, text: str) -> Any:
         # Map a few keywords → category indices for deterministic
         # tests; everything else maps to SAFE.
         keyword_map = {
@@ -118,34 +118,34 @@ def _stub_loaded_adapter(monkeypatch: pytest.MonkeyPatch, *, hidden: int = 8):
             if kw in lowered:
                 idx = cat
                 break
-        vec = torch.zeros(width)
+        vec = np.zeros(width, dtype=np.float32)
         vec[idx] = 1.0
         return vec
 
     monkeypatch.setattr(
-        XLMRMiniLMAdapter, "_ensure_loaded", fake_ensure_loaded
+        XLMRAdapter, "_ensure_loaded", fake_ensure_loaded
     )
-    monkeypatch.setattr(XLMRMiniLMAdapter, "_encode", fake_encode)
+    monkeypatch.setattr(XLMRAdapter, "_encode", fake_encode)
     return adapter
 
 
 # ---------------------------------------------------------------------------
 # Protocol conformance.
 # ---------------------------------------------------------------------------
-def test_xlmr_minilm_adapter_satisfies_protocol():
-    adapter = XLMRMiniLMAdapter()
+def test_xlmr_adapter_satisfies_protocol():
+    adapter = XLMRAdapter()
     assert isinstance(adapter, EncoderAdapter)
 
 
-def test_xlmr_minilm_adapter_has_classify_method():
-    adapter = XLMRMiniLMAdapter()
+def test_xlmr_adapter_has_classify_method():
+    adapter = XLMRAdapter()
     assert callable(getattr(adapter, "classify", None))
 
 
-def test_default_constants_advertise_xlmr_minilm():
-    assert XLMR_MINILM_MODEL_NAME == "XLM-R-MiniLM-L6"
-    assert "MiniLM" in XLMR_MINILM_MODEL_ID
-    assert "XLMR" in XLMR_MINILM_MODEL_ID or "xlmr" in XLMR_MINILM_MODEL_ID
+def test_default_constants_advertise_xlmr():
+    assert XLMR_MODEL_NAME == "XLM-R"
+    assert DEFAULT_ONNX_MODEL_PATH.endswith(".onnx")
+    assert DEFAULT_TOKENIZER_PATH.endswith(".spm")
     assert len(CATEGORY_PROTOTYPES) == 16
 
 
@@ -153,7 +153,10 @@ def test_default_constants_advertise_xlmr_minilm():
 # Fallback when model unavailable.
 # ---------------------------------------------------------------------------
 def test_unavailable_model_returns_safe(output_schema):
-    adapter = XLMRMiniLMAdapter(model_path="/does/not/exist")
+    adapter = XLMRAdapter(
+        model_path="/does/not/exist.onnx",
+        tokenizer_path="/does/not/exist.spm",
+    )
     out = adapter.classify(_input())
     jsonschema.validate(instance=out, schema=output_schema)
     assert out == safe_fallback_output()
@@ -162,13 +165,19 @@ def test_unavailable_model_returns_safe(output_schema):
 
 
 def test_unavailable_model_records_latency():
-    adapter = XLMRMiniLMAdapter(model_path="/does/not/exist")
+    adapter = XLMRAdapter(
+        model_path="/does/not/exist.onnx",
+        tokenizer_path="/does/not/exist.spm",
+    )
     adapter.classify(_input())
     assert adapter.last_latency_ms >= 0.0
 
 
 def test_unavailable_model_is_deterministic_safe():
-    adapter = XLMRMiniLMAdapter(model_path="/does/not/exist")
+    adapter = XLMRAdapter(
+        model_path="/does/not/exist.onnx",
+        tokenizer_path="/does/not/exist.spm",
+    )
     a = adapter.classify(_input("anything"))
     b = adapter.classify(_input("anything"))
     assert a == b
@@ -258,7 +267,7 @@ def test_coerce_keeps_well_formed_counter_updates():
 def test_stub_encoder_classifies_safe_text(
     monkeypatch, output_schema
 ):
-    pytest.importorskip("torch")
+    pytest.importorskip("numpy")
     adapter = _stub_loaded_adapter(monkeypatch)
     out = adapter.classify(_input("hello friends"))
     jsonschema.validate(instance=out, schema=output_schema)
@@ -269,7 +278,7 @@ def test_stub_encoder_classifies_safe_text(
 def test_stub_encoder_classifies_scam_text(
     monkeypatch, output_schema
 ):
-    pytest.importorskip("torch")
+    pytest.importorskip("numpy")
     adapter = _stub_loaded_adapter(monkeypatch)
     out = adapter.classify(_input("this is a scam"))
     jsonschema.validate(instance=out, schema=output_schema)
@@ -278,7 +287,7 @@ def test_stub_encoder_classifies_scam_text(
 
 
 def test_stub_encoder_is_deterministic(monkeypatch):
-    pytest.importorskip("torch")
+    pytest.importorskip("numpy")
     adapter = _stub_loaded_adapter(monkeypatch)
     a = adapter.classify(_input("scam alert"))
     b = adapter.classify(_input("scam alert"))
@@ -286,7 +295,7 @@ def test_stub_encoder_is_deterministic(monkeypatch):
 
 
 def test_stub_encoder_records_latency(monkeypatch):
-    pytest.importorskip("torch")
+    pytest.importorskip("numpy")
     adapter = _stub_loaded_adapter(monkeypatch)
     adapter.classify(_input("hello"))
     assert adapter.last_latency_ms >= 0.0
@@ -298,7 +307,7 @@ def test_stub_encoder_records_latency(monkeypatch):
 def test_child_safety_lexicon_overrides_embedding(
     monkeypatch, output_schema
 ):
-    pytest.importorskip("torch")
+    pytest.importorskip("numpy")
     adapter = _stub_loaded_adapter(monkeypatch)
     out = adapter.classify(
         _input(
@@ -316,7 +325,7 @@ def test_child_safety_lexicon_overrides_embedding(
 
 
 def test_pii_signal_overrides_embedding(monkeypatch, output_schema):
-    pytest.importorskip("torch")
+    pytest.importorskip("numpy")
     adapter = _stub_loaded_adapter(monkeypatch)
     out = adapter.classify(
         _input("scam phish", pii_patterns_hit=["EMAIL", "PHONE"])
@@ -327,7 +336,7 @@ def test_pii_signal_overrides_embedding(monkeypatch, output_schema):
 
 
 def test_url_risk_signal_overrides_embedding(monkeypatch, output_schema):
-    pytest.importorskip("torch")
+    pytest.importorskip("numpy")
     adapter = _stub_loaded_adapter(monkeypatch)
     out = adapter.classify(_input("hello", url_risk=0.95))
     jsonschema.validate(instance=out, schema=output_schema)
@@ -338,7 +347,7 @@ def test_url_risk_signal_overrides_embedding(monkeypatch, output_schema):
 def test_scam_pattern_signal_overrides_embedding(
     monkeypatch, output_schema
 ):
-    pytest.importorskip("torch")
+    pytest.importorskip("numpy")
     adapter = _stub_loaded_adapter(monkeypatch)
     out = adapter.classify(
         _input("hello", scam_patterns_hit=["ADVANCE_FEE"])
@@ -349,7 +358,7 @@ def test_scam_pattern_signal_overrides_embedding(
 
 
 def test_lexicon_hate_signal_drives_category(monkeypatch, output_schema):
-    pytest.importorskip("torch")
+    pytest.importorskip("numpy")
     adapter = _stub_loaded_adapter(monkeypatch)
     out = adapter.classify(
         _input(
@@ -367,7 +376,7 @@ def test_lexicon_hate_signal_drives_category(monkeypatch, output_schema):
 def test_media_nsfw_signal_drives_sexual_adult(
     monkeypatch, output_schema
 ):
-    pytest.importorskip("torch")
+    pytest.importorskip("numpy")
     adapter = _stub_loaded_adapter(monkeypatch)
     out = adapter.classify(
         _input(
@@ -383,7 +392,7 @@ def test_media_nsfw_signal_drives_sexual_adult(
 # Output range invariants.
 # ---------------------------------------------------------------------------
 def test_categories_always_in_range(monkeypatch, output_schema):
-    pytest.importorskip("torch")
+    pytest.importorskip("numpy")
     adapter = _stub_loaded_adapter(monkeypatch)
     for text in ["hello", "scam", "phish", "hate", "porn", "weapon", ""]:
         out = adapter.classify(_input(text))
@@ -404,21 +413,20 @@ def test_safe_fallback_categories_in_range():
 # Trained linear head loading + classification.
 # ---------------------------------------------------------------------------
 def _make_synthetic_head_weights(tmp_path, target_category: int):
-    """Write a synthetic Linear(384, 16) state_dict that maps any
+    """Write a synthetic Linear(384, 16) ``.npz`` archive that maps any
     embedding to ``target_category`` with high confidence.
 
     The weight matrix is a rank-1 tensor whose target row is filled
     with 1s and every other row is filled with -1s, so for any input
     embedding the target logit dominates.
     """
-    import torch  # type: ignore[import-not-found]
+    import numpy as np  # type: ignore[import-not-found]
 
-    weight = -torch.ones(16, 384)
-    weight[target_category] = torch.ones(384)
-    bias = torch.zeros(16)
-    state = {"weight": weight, "bias": bias}
-    path = tmp_path / "synthetic_head.pt"
-    torch.save(state, path)
+    weight = -np.ones((16, 384), dtype=np.float32)
+    weight[target_category] = np.ones(384, dtype=np.float32)
+    bias = np.zeros(16, dtype=np.float32)
+    path = tmp_path / "synthetic_head.npz"
+    np.savez(path, weight=weight, bias=bias)
     return path
 
 
@@ -428,39 +436,37 @@ def test_trained_head_loads_and_drives_classification(
     """When a trained head file is present, the adapter uses it as
     the primary embedding-stage classifier and tags the rationale_id
     with ``_trained``."""
-    pytest.importorskip("torch")
+    np = pytest.importorskip("numpy")
     head_path = _make_synthetic_head_weights(
         tmp_path, target_category=7  # SCAM_FRAUD
     )
-    adapter = XLMRMiniLMAdapter(head_weights_path=str(head_path))
+    adapter = XLMRAdapter(head_weights_path=str(head_path))
     adapter._maybe_load_trained_head()
     assert adapter._trained_head is not None
 
     # Plug in the same stub encoder used by the prototype tests so we
     # can drive classify() without real model weights.
-    import torch
-
     width = 384
     n = len(CATEGORY_PROTOTYPES)
-    eye = torch.zeros(n, width)
+    eye = np.zeros((n, width), dtype=np.float32)
     for i in range(n):
         eye[i, i] = 1.0
 
     def fake_ensure_loaded(self) -> None:
         self._tokenizer = object()
-        self._model = object()
+        self._session = object()
         self._prototype_embeddings = eye
         # Don't reset _trained_head — it's set above.
 
     def fake_encode(self, text: str):
-        v = torch.zeros(width)
+        v = np.zeros(width, dtype=np.float32)
         v[0] = 1.0
         return v
 
     monkeypatch.setattr(
-        XLMRMiniLMAdapter, "_ensure_loaded", fake_ensure_loaded
+        XLMRAdapter, "_ensure_loaded", fake_ensure_loaded
     )
-    monkeypatch.setattr(XLMRMiniLMAdapter, "_encode", fake_encode)
+    monkeypatch.setattr(XLMRAdapter, "_encode", fake_encode)
 
     out = adapter.classify(_input("any text"))
     jsonschema.validate(instance=out, schema=output_schema)
@@ -474,9 +480,9 @@ def test_trained_head_missing_falls_back_to_prototypes(
 ):
     """When the trained head file is absent, the adapter must still
     classify via the prototype path and tag rationale with ``_proto``."""
-    pytest.importorskip("torch")
-    adapter = XLMRMiniLMAdapter(
-        head_weights_path=str(tmp_path / "does_not_exist.pt")
+    pytest.importorskip("numpy")
+    adapter = XLMRAdapter(
+        head_weights_path=str(tmp_path / "does_not_exist.npz")
     )
     adapter._maybe_load_trained_head()
     assert adapter._trained_head is None
@@ -490,19 +496,19 @@ def test_trained_head_missing_falls_back_to_prototypes(
 
 
 def test_trained_head_rejects_wrong_shape(tmp_path):
-    """A malformed state_dict (wrong-shape weight) must NOT load —
-    the adapter should silently fall back to ``None`` so the
-    prototype path takes over."""
-    import torch  # type: ignore[import-not-found]
+    """A malformed .npz (wrong-shape weight) must NOT load — the
+    adapter should silently fall back to ``None`` so the prototype
+    path takes over."""
+    np = pytest.importorskip("numpy")
 
-    state = {
-        "weight": torch.zeros(8, 64),  # wrong shape
-        "bias": torch.zeros(8),
-    }
-    path = tmp_path / "bad_head.pt"
-    torch.save(state, path)
+    path = tmp_path / "bad_head.npz"
+    np.savez(
+        path,
+        weight=np.zeros((8, 64), dtype=np.float32),  # wrong shape
+        bias=np.zeros(8, dtype=np.float32),
+    )
 
-    adapter = XLMRMiniLMAdapter(head_weights_path=str(path))
+    adapter = XLMRAdapter(head_weights_path=str(path))
     adapter._maybe_load_trained_head()
     assert adapter._trained_head is None
 
@@ -514,29 +520,27 @@ def test_trained_head_then_deterministic_signal_takes_precedence(
     (PII, SCAM, LEXICON, NSFW) win over the embedding-head argmax,
     and their reason codes are emitted *without* protected-speech
     context hints."""
-    pytest.importorskip("torch")
+    np = pytest.importorskip("numpy")
     head_path = _make_synthetic_head_weights(
         tmp_path, target_category=11  # would return WEAPONS_DRUGS
     )
-    adapter = XLMRMiniLMAdapter(head_weights_path=str(head_path))
+    adapter = XLMRAdapter(head_weights_path=str(head_path))
     adapter._maybe_load_trained_head()
 
-    import torch
-
-    eye = torch.eye(16, 384)
+    eye = np.eye(16, 384, dtype=np.float32)
 
     def fake_ensure_loaded(self) -> None:
         self._tokenizer = object()
-        self._model = object()
+        self._session = object()
         self._prototype_embeddings = eye
 
     monkeypatch.setattr(
-        XLMRMiniLMAdapter, "_ensure_loaded", fake_ensure_loaded
+        XLMRAdapter, "_ensure_loaded", fake_ensure_loaded
     )
     monkeypatch.setattr(
-        XLMRMiniLMAdapter,
+        XLMRAdapter,
         "_encode",
-        lambda self, text: torch.eye(16, 384)[0],
+        lambda self, text: np.eye(16, 384, dtype=np.float32)[0],
     )
 
     # PII-driven input under journalism context — the deterministic

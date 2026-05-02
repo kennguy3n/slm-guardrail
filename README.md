@@ -8,7 +8,7 @@
 ## What is this?
 
 This project provides a **skill-based guardrail system** for the
-**XLM-R MiniLM-L6** encoder classifier running locally on user devices
+**XLM-R** encoder classifier running locally on user devices
 within [KChat](https://github.com/kennguy3n/slm-chat-demo), an
 end-to-end encrypted (E2EE) messaging app for large communities.
 
@@ -190,7 +190,7 @@ categories have a severity floor of 5 regardless of model confidence.
 │
 ├── benchmarks/
 │   ├── README.md
-│   └── xlmr_minilm_l6_results.json # committed benchmark results (generated)
+│   └── xlmr_results.json    # committed benchmark results (generated)
 │
 ├── compiler/
 │   ├── pipeline.md
@@ -477,27 +477,33 @@ pip install -r requirements.txt
 pip install -e ".[test]"
 ```
 
-### Running with XLM-R MiniLM-L6
+### Running with XLM-R
 
 The skill packs ship with a backend-agnostic
 [`EncoderAdapter`](kchat-skills/compiler/encoder_adapter.py) protocol;
-the [`XLMRMiniLMAdapter`](kchat-skills/compiler/xlmr_minilm_adapter.py)
-implementation loads the **XLM-R MiniLM-L6** encoder
-(`nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large`) via
-`transformers`. The encoder is ~80 MB, loads in well under a second on
-CPU, and runs inference in tens of milliseconds per message — well
-inside the 250 ms p95 envelope.
+the [`XLMRAdapter`](kchat-skills/compiler/xlmr_adapter.py) implementation
+loads an **XLM-R** encoder (a multilingual transformer encoder
+exported once to ONNX INT8 — see
+[`tools/export_xlmr_onnx.py`](tools/export_xlmr_onnx.py) for the
+exact source artifact and conversion pipeline) via
+[`onnxruntime`](https://onnxruntime.ai). On-device
+the runtime depends on `onnxruntime` + `sentencepiece` + `numpy` only
+(no PyTorch / `transformers`). The exported model is ~25 MB, loads in
+well under a second on CPU, and runs inference in tens of milliseconds
+per message — well inside the 250 ms p95 envelope.
 
 Two interchangeable embedding-stage classifiers are supported:
 
 1. **Trained linear head** — when
-   [`kchat-skills/compiler/data/xlmr_minilm_head.pt`](kchat-skills/compiler/data/)
+   [`kchat-skills/compiler/data/xlmr_head.npz`](kchat-skills/compiler/data/)
    is present, the adapter loads it and uses the head's softmax over
    logits as the embedding-stage classifier. The committed checkpoint
    is a `Linear(384, 16)` trained on the 175-example multilingual
    corpus in
    [`training_data.py`](kchat-skills/compiler/training_data.py) via
-   [`train_xlmr_head.py`](kchat-skills/compiler/train_xlmr_head.py)
+   [`train_xlmr_head.py`](kchat-skills/compiler/train_xlmr_head.py),
+   then converted from the trainer's `.pt` to the runtime `.npz` via
+   [`tools/export_xlmr_onnx.py`](tools/export_xlmr_onnx.py)
    (88.5% train accuracy). Rationale ids end in `_trained_v1`.
 2. **Zero-shot prototype fallback** — when the trained head is missing
    or fails to load, the adapter falls back to a low-temperature
@@ -509,27 +515,28 @@ PRIVATE_DATA, SCAM_FRAUD, lexicon, NSFW media) run first and beat the
 embedding-stage classifier.
 
 ```bash
-# 1. Install the encoder dependencies (already in requirements.txt /
-#    pyproject's `demo` extra)
+# 1. Install the runtime dependencies (already in requirements.txt /
+#    pyproject's `demo` extra). The adapter only needs onnxruntime,
+#    sentencepiece and numpy.
 pip install -r requirements.txt
 
-# 2. Cache XLM-R MiniLM-L6 weights locally (~80 MB)
-huggingface-cli download nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large \
-  --local-dir models/xlmr-minilm-l6
-# Or let transformers populate the HF cache on first import:
-#   python -c "from transformers import AutoTokenizer, AutoModel; \
-#       AutoTokenizer.from_pretrained('nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large'); \
-#       AutoModel.from_pretrained('nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large')"
+# 2. One-time ONNX export from the HuggingFace checkpoint. This
+#    requires transformers + torch + onnx, but only at export time —
+#    they are NOT runtime dependencies.
+pip install transformers torch onnx onnxruntime sentencepiece
+python tools/export_xlmr_onnx.py --output-dir models
+# -> writes models/xlmr.onnx (INT8-quantised) and models/xlmr.spm
 
-# 3. Run the demo against the local checkpoint
-python tools/run_guardrail_demo.py --model-path models/xlmr-minilm-l6
+# 3. Run the demo against the local ONNX checkpoint
+python tools/run_guardrail_demo.py \
+    --model-path models/xlmr.onnx --tokenizer-path models/xlmr.spm
 python tools/run_guardrail_demo.py --jurisdiction us --community workplace \
-    --model-path models/xlmr-minilm-l6
+    --model-path models/xlmr.onnx --tokenizer-path models/xlmr.spm
 
 # 4. Run benchmarks and commit the results
 python tools/run_guardrail_demo.py --benchmark --commit-results \
-    --model-path models/xlmr-minilm-l6
-# -> writes kchat-skills/benchmarks/xlmr_minilm_l6_results.json
+    --model-path models/xlmr.onnx --tokenizer-path models/xlmr.spm
+# -> writes kchat-skills/benchmarks/xlmr_results.json
 
 # Mock-only mode (no model weights required) for quick smoke tests
 python tools/run_guardrail_demo.py --mock
@@ -540,7 +547,7 @@ The demo loads
 (format documented in
 [`kchat-skills/samples/README.md`](kchat-skills/samples/README.md)),
 compiles the active skill bundle through `SkillPackCompiler`, runs the
-full hybrid pipeline against either `XLMRMiniLMAdapter` or
+full hybrid pipeline against either `XLMRAdapter` or
 `MockEncoderAdapter`, and prints a per-case table plus an optional
 `PipelineBenchmark` report. See
 [`kchat-skills/benchmarks/README.md`](kchat-skills/benchmarks/README.md)
@@ -624,12 +631,12 @@ kchat-skills/
 │   └── README.md
 ├── benchmarks/           # committed benchmark results (Phase 6)
 │   ├── README.md
-│   └── xlmr_minilm_l6_results.json # generated by tools/run_guardrail_demo.py --commit-results
+│   └── xlmr_results.json    # generated by tools/run_guardrail_demo.py --commit-results
 ├── compiler/             # skill-pack compiler (Phase 3-4)
 │   ├── counters.py           # device-local expiring counter store (Phase 1)
 │   ├── pipeline.py           # 7-step hybrid local pipeline (Phase 3)
 │   ├── encoder_adapter.py    # EncoderAdapter Protocol + MockEncoderAdapter (Phase 3)
-│   ├── xlmr_minilm_adapter.py # XLMRMiniLMAdapter — XLM-R MiniLM-L6 encoder classifier (Phase 6)
+│   ├── xlmr_adapter.py        # XLMRAdapter — XLM-R encoder classifier, ONNX Runtime (Phase 6)
 │   ├── threshold_policy.py   # hard-coded threshold enforcement (Phase 3)
 │   ├── metric_validator.py   # 7-metric validator (Phase 3)
 │   ├── compiler.py           # skill-pack compiler pipeline (Phase 4)
@@ -648,7 +655,7 @@ kchat-skills/
 │   │   ├── test_counters.py
 │   │   ├── test_pipeline.py        # 7-step hybrid pipeline
 │   │   ├── test_encoder_adapter.py # EncoderAdapter Protocol / MockEncoderAdapter
-│   │   ├── test_xlmr_minilm_adapter.py # XLMRMiniLMAdapter — XLM-R MiniLM-L6
+│   │   ├── test_xlmr_adapter.py        # XLMRAdapter — XLM-R, ONNX Runtime
 │   │   ├── test_threshold_policy.py # hard-coded threshold policy
 │   │   ├── test_metric_validator.py # 7-metric validator (Phase 3)
 │   │   ├── test_compiler.py         # skill-pack compiler (Phase 4)
@@ -681,7 +688,7 @@ kchat-skills/
 
 tools/                    # repo-level utilities (run from repo root)
 ├── regenerate_compiled_examples.py  # refresh compiled_examples/*.txt
-├── run_guardrail_demo.py            # sample-data demo (mock or XLM-R MiniLM-L6)
+├── run_guardrail_demo.py            # sample-data demo (mock or XLM-R / ONNX Runtime)
 └── demo_guardrail.py                # cross-community / cross-country demo
 
 results/                  # demo run outputs (JSON + Markdown reports)
@@ -784,7 +791,7 @@ The Phase 6 benchmark harness at
 [`kchat-skills/compiler/benchmark.py`](kchat-skills/compiler/benchmark.py)
 wraps `GuardrailPipeline` plus an ``EncoderAdapter`` (typically
 `MockEncoderAdapter` for deterministic regression tests, or
-`XLMRMiniLMAdapter` for real encoder timings) into a
+`XLMRAdapter` for real encoder timings) into a
 deterministic measurement loop. `PipelineBenchmark.run(cases,
 iterations=100)` records wall-clock latency per iteration using
 `time.perf_counter` and returns a `BenchmarkReport` with p50 / p95 /
