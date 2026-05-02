@@ -35,6 +35,25 @@ demo = [
     "sentencepiece>=0.1.99",
     "numpy>=1.24.0",
 ]
+# One-time ONNX export deps for `tools/export_xlmr_onnx.py`. Not
+# required at runtime — the on-device adapter only needs onnxruntime
+# + sentencepiece + numpy. ``transformers<5`` is pinned because v5
+# changed the positional signature of ``XLMRobertaModel.forward()``
+# and breaks the legacy ``torch.onnx`` tracer used by the export
+# script (see the export script's module docstring for details).
+export = [
+    "transformers<5",
+    # torch.onnx.export(..., dynamo=False) requires torch>=2.5 (the
+    # ``dynamo`` kwarg was added then). We pass it explicitly in
+    # tools/export_xlmr_onnx.py because the dynamo path produces a
+    # graph that onnxruntime cannot load (see the export script's
+    # module docstring for details).
+    "torch>=2.5",
+    "onnx>=1.15",
+    "onnxscript>=0.1",
+    "onnxruntime>=1.16.0",
+    "sentencepiece>=0.1.99",
+]
 
 [tool.pytest.ini_options]
 minversion = "8.0"

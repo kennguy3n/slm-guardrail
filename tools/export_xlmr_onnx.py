@@ -23,7 +23,20 @@ Usage::
 
     # 1. Export ONNX + tokenizer + head .npz from a HuggingFace cache
     #    of `nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large`.
-    pip install transformers torch onnx onnxruntime sentencepiece
+    #
+    #    The export uses the legacy (non-dynamo) tracer path
+    #    (``torch.onnx.export(..., dynamo=False)``) — the dynamo
+    #    exporter on torch >= 2.5 emits an INT8 graph with
+    #    ``tensor(float16)`` ``DequantizeLinear`` scales that
+    #    ``onnxruntime`` rejects, and the FP32 graph it produces
+    #    breaks dynamic-shape ``scaled_dot_product_attention`` at
+    #    inference. The legacy tracer requires ``transformers<5``
+    #    because v5 changed ``XLMRobertaModel.forward()`` so the
+    #    positional ``(input_ids, attention_mask)`` trace fails with
+    #    ``got multiple values for argument 'use_cache'``.
+    pip install -e ".[export]"
+    # or: pip install "transformers<5" torch onnx onnxruntime \
+    #         sentencepiece onnxscript
     python tools/export_xlmr_onnx.py
 
     # 2. Override the source model id (offline / custom checkpoints).
@@ -141,6 +154,10 @@ def export_onnx(
         },
         opset_version=opset,
         do_constant_folding=True,
+        # Legacy tracer: dynamo=True breaks INT8 quant + SDPA dynamic
+        # shapes for this model on onnxruntime 1.16+. See module
+        # docstring for the full story.
+        dynamo=False,
     )
 
     if not quantize_int8:
