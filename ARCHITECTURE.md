@@ -308,10 +308,29 @@ The reference encoder backend is
   XLM-R vocabulary, so the same checkpoint covers all 100+ XLM-R
   languages without per-language assets.
 - **Determinism.** No sampling, no temperature, no token budget for
-  generation. Classification reduces to argmax over a fixed bank of
-  16 *category prototype* embeddings, so identical input always
-  produces identical output (matches the `is_offline` invariant:
-  identical results online vs offline).
+  generation. The embedding-stage classifier is either a trained
+  `Linear(384, 16)` head loaded from
+  `kchat-skills/compiler/data/xlmr_minilm_head.pt` (88.5% train
+  accuracy on a 175-example multilingual corpus, see
+  [`training_data.py`](kchat-skills/compiler/training_data.py) and
+  [`train_xlmr_head.py`](kchat-skills/compiler/train_xlmr_head.py))
+  or, when that file is missing, a zero-shot softmax over cosine
+  similarities against a fixed bank of 16 *category prototype*
+  embeddings. Both paths are pure forward passes with no sampling, so
+  identical input always produces identical output (matches the
+  `is_offline` invariant: identical results online vs offline).
+- **Protected-speech context demotion.** The pipeline derives
+  `context_hints` from the active community overlay and the
+  `quoted_from_user` flag (see
+  [`pipeline.derive_context_hints()`](kchat-skills/compiler/pipeline.py)),
+  packs them into `local_signals.context_hints`, and the threshold
+  policy demotes any non-SAFE / non-CHILD_SAFETY embedding-head
+  verdict carrying a NEWS_CONTEXT / EDUCATION_CONTEXT /
+  COUNTERSPEECH_CONTEXT / QUOTED_SPEECH_CONTEXT reason code to SAFE
+  with `rationale_id = safe_protected_speech_v1`. Demotion is scoped
+  to the embedding-head path only — deterministic-signal branches
+  (CHILD_SAFETY, PRIVATE_DATA, SCAM_FRAUD, lexicon, NSFW media)
+  emit their reason codes verbatim and bypass the demotion entirely.
 - **Constrained output.** The classification head emits a Python dict
   that is then run through `_coerce_to_output_schema` — any field
   outside the schema bounds (category, severity, confidence,

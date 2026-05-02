@@ -482,10 +482,29 @@ The skill packs ship with a backend-agnostic
 [`XLMRMiniLMAdapter`](kchat-skills/compiler/xlmr_minilm_adapter.py)
 implementation loads the **XLM-R MiniLM-L6** encoder
 (`nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large`) via
-`transformers` and classifies messages by cosine similarity against a
-fixed bank of category prototype embeddings. The encoder is ~80 MB,
-loads in well under a second on CPU, and runs inference in tens of
-milliseconds per message — well inside the 250 ms p95 envelope.
+`transformers`. The encoder is ~80 MB, loads in well under a second on
+CPU, and runs inference in tens of milliseconds per message — well
+inside the 250 ms p95 envelope.
+
+Two interchangeable embedding-stage classifiers are supported:
+
+1. **Trained linear head** — when
+   [`kchat-skills/compiler/data/xlmr_minilm_head.pt`](kchat-skills/compiler/data/)
+   is present, the adapter loads it and uses the head's softmax over
+   logits as the embedding-stage classifier. The committed checkpoint
+   is a `Linear(384, 16)` trained on the 175-example multilingual
+   corpus in
+   [`training_data.py`](kchat-skills/compiler/training_data.py) via
+   [`train_xlmr_head.py`](kchat-skills/compiler/train_xlmr_head.py)
+   (88.5% train accuracy). Rationale ids end in `_trained_v1`.
+2. **Zero-shot prototype fallback** — when the trained head is missing
+   or fails to load, the adapter falls back to a low-temperature
+   softmax over cosine similarities against a fixed bank of category
+   prototype embeddings. Rationale ids end in `_proto_v1`.
+
+In either case, deterministic detector branches (CHILD_SAFETY,
+PRIVATE_DATA, SCAM_FRAUD, lexicon, NSFW media) run first and beat the
+embedding-stage classifier.
 
 ```bash
 # 1. Install the encoder dependencies (already in requirements.txt /

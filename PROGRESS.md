@@ -1,7 +1,7 @@
 # KChat Guardrail Skills — Progress
 
 **Status:** Complete | 100% + demo layer
-**Current phase:** Phase 6 complete — 100 jurisdiction/community skills + XLM-R MiniLM-L6 encoder classifier integration
+**Current phase:** Phase 6 complete — 100 jurisdiction/community skills + XLM-R MiniLM-L6 encoder classifier integration with trained linear head + protected-speech context demotion
 **Last updated:** 2026-05-01
 
 This file tracks delivery against the phased plan in
@@ -211,6 +211,48 @@ This file tracks delivery against the phased plan in
   llama.cpp's `/v1/chat/completions`) — the encoder approach is
   faster on CPU, fully deterministic, ~12× smaller (~80 MB vs ~1 GB),
   and avoids the unpredictability of generative output formatting.
+
+### 2026-05-01 — Protected-speech context demotion + trained linear head
+
+- **Pipeline-level context inference.**
+  `kchat-skills/compiler/pipeline.derive_context_hints()` infers four
+  protected-speech contexts (NEWS_CONTEXT, EDUCATION_CONTEXT,
+  COUNTERSPEECH_CONTEXT, QUOTED_SPEECH_CONTEXT) from
+  `message.quoted_from_user` plus the active community overlay id.
+  The hints are packed into `local_signals.context_hints` so the
+  schema (`local_signal_schema.json`) and the threshold policy can
+  see them.
+- **Threshold policy demotion rule.**
+  `threshold_policy.ThresholdPolicy` adds Rule 2: any non-SAFE /
+  non-CHILD_SAFETY verdict carrying a protected-speech reason code
+  is demoted to SAFE with `rationale_id = safe_protected_speech_v1`.
+  The CHILD_SAFETY floor is preserved above all else.
+- **Trained linear head.**
+  `kchat-skills/compiler/training_data.py` ships a 175-example
+  multilingual labelled corpus (25 SAFE + 10 examples per category
+  1-15, covering English, Spanish, Vietnamese, German, Japanese,
+  Arabic, Bengali). `train_xlmr_head.py` fits a `Linear(384, 16)`
+  on top of the frozen XLM-R MiniLM-L6 [CLS] embeddings with
+  AdamW + class-weighted cross-entropy and ships the resulting
+  `state_dict` at `kchat-skills/compiler/data/xlmr_minilm_head.pt`
+  (88.5% train accuracy). `XLMRMiniLMAdapter` loads the head at
+  startup and uses its softmax over logits as the embedding-stage
+  classifier, falling back to the zero-shot prototype path when
+  the head file is missing or fails to load.
+- **Protected-speech demotion is scoped to the embedding-head path
+  only.** The earlier-in-this-session attempt to forward
+  `context_hints` from every non-CHILD_SAFETY adapter branch into
+  `reason_codes` was reverted: deterministic-signal branches (PII,
+  SCAM_FRAUD, lexicon, NSFW media) now emit their reason codes
+  verbatim, so a phishing URL in a school group is still flagged
+  as SCAM_FRAUD even though the surrounding overlay attaches
+  EDUCATION_CONTEXT. Locked in by five regression tests in
+  `tests/global/test_pipeline.py` plus four head-specific tests in
+  `tests/global/test_xlmr_minilm_adapter.py`.
+
+  Net result: 27/27 sample cases now match the expected category
+  (up from 26/27). Real-encoder benchmark p95 ≈ 18 ms with the
+  trained head loaded.
 
 ### 2026-04-30 — Sample data layer
 

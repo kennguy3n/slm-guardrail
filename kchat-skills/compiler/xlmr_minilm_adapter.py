@@ -203,11 +203,13 @@ class XLMRMiniLMAdapter:
     similarity_threshold: float = 0.30
     softmax_temperature: float = 0.01
     min_margin: float = 0.10
+    head_weights_path: Optional[str] = None
     logger: Optional[logging.Logger] = None
     last_latency_ms: float = field(default=0.0, init=False)
     _tokenizer: Any = field(default=None, init=False, repr=False)
     _model: Any = field(default=None, init=False, repr=False)
     _prototype_embeddings: Any = field(default=None, init=False, repr=False)
+    _trained_head: Any = field(default=None, init=False, repr=False)
     _load_failed: bool = field(default=False, init=False, repr=False)
 
     # ------------------------------------------------------------------
@@ -322,7 +324,10 @@ class XLMRMiniLMAdapter:
             self._model = None
             return
 
-        # Pre-compute prototype embeddings once.
+        # Pre-compute prototype embeddings once. They are kept as a
+        # fallback even when a trained classification head is loaded
+        # — if the head file goes missing or its shape doesn't match,
+        # the adapter degrades gracefully to prototype argmax.
         try:
             self._prototype_embeddings = self._encode_batch(
                 list(CATEGORY_PROTOTYPES)
@@ -337,6 +342,73 @@ class XLMRMiniLMAdapter:
             self._tokenizer = None
             self._model = None
             self._prototype_embeddings = None
+            return
+
+        # Optional: load the trained linear head produced by
+        # ``train_xlmr_head.py``. When present, the adapter uses it as
+        # the primary embedding-stage classifier instead of the
+        # zero-shot prototype argmax.
+        self._maybe_load_trained_head()
+
+    def _maybe_load_trained_head(self) -> None:
+        """Try to load the trained Linear(384, 16) head from disk.
+
+        Looks at ``head_weights_path`` (if set) or the conventional
+        ``compiler/data/xlmr_minilm_head.pt`` location next to this
+        module. Sets ``self._trained_head`` to the loaded ``nn.Linear``
+        on success, or leaves it as ``None`` to fall back to prototypes.
+        """
+        try:
+            import torch
+            from torch import nn
+        except Exception:  # noqa: BLE001 — soft dependency
+            return
+
+        candidate = self.head_weights_path
+        if candidate is None:
+            here = Path(__file__).resolve().parent
+            default = here / "data" / "xlmr_minilm_head.pt"
+            if default.exists():
+                candidate = str(default)
+        if candidate is None or not Path(candidate).exists():
+            return
+
+        try:
+            state = torch.load(candidate, map_location="cpu", weights_only=True)
+        except Exception as exc:  # noqa: BLE001 — defensive boundary
+            (self.logger or _module_logger).warning(
+                "Failed to load trained head from %r (%s); falling back "
+                "to prototype argmax",
+                candidate,
+                exc,
+            )
+            return
+
+        weight = state.get("weight") if isinstance(state, dict) else None
+        bias = state.get("bias") if isinstance(state, dict) else None
+        if weight is None or bias is None:
+            (self.logger or _module_logger).warning(
+                "Trained head state at %r missing weight/bias; falling "
+                "back to prototype argmax",
+                candidate,
+            )
+            return
+        if tuple(weight.shape) != (16, 384) or tuple(bias.shape) != (16,):
+            (self.logger or _module_logger).warning(
+                "Trained head shape %s/%s does not match (16, 384) / "
+                "(16,); falling back to prototype argmax",
+                tuple(weight.shape),
+                tuple(bias.shape),
+            )
+            return
+
+        head = nn.Linear(384, 16, bias=True)
+        head.load_state_dict(state)
+        head.eval()
+        self._trained_head = head
+        (self.logger or _module_logger).info(
+            "Loaded trained XLM-R MiniLM-L6 head from %s", candidate
+        )
 
     def _encode_batch(self, texts: list[str]) -> Any:
         """Encode ``texts`` and return a (len(texts), hidden) tensor.
@@ -367,6 +439,27 @@ class XLMRMiniLMAdapter:
         # L2 normalize.
         norms = pooled.norm(dim=1, keepdim=True).clamp(min=1e-12)
         return pooled / norms
+
+    def _prototype_softmax(self, embedding: Any) -> list[float]:
+        """Zero-shot prototype path: cosine + low-temperature softmax.
+
+        Used either as the primary embedding-stage classifier when no
+        trained head is available, or as a fallback when the trained
+        head raises during inference.
+        """
+        sims = self._prototype_embeddings @ embedding
+        sims_list = (
+            sims.detach().cpu().tolist()
+            if hasattr(sims, "detach")
+            else list(sims)
+        )
+        sims_list = [float(s) for s in sims_list]
+        temp = self.softmax_temperature if self.softmax_temperature > 0 else 1.0
+        scaled = [s / temp for s in sims_list]
+        max_scaled = max(scaled)
+        exps = [math.exp(s - max_scaled) for s in scaled]
+        z = sum(exps) or 1.0
+        return [e / z for e in exps]
 
     def _encode(self, text: str) -> Any:
         """Encode a single ``text`` and return a 1D tensor."""
@@ -407,16 +500,16 @@ class XLMRMiniLMAdapter:
         # verdict back to SAFE — see ``threshold_policy.py``.
         #
         # IMPORTANT: ``_with_context()`` is **only** applied on the
-        # embedding-head branch below, where the encoder may have been
-        # confused by surface tokens that look harmful but are
-        # protected speech (e.g. a news quote about a violent attack).
-        # It is **not** applied on the deterministic-signal branches
-        # (PII / SCAM / LEXICON / NSFW) — those signals are concrete
-        # and must not be silenced just because the message lives in a
-        # journalism / education / counterspeech community. Letting
-        # protected-speech demotion silence a phishing URL in a school
-        # group is exactly the bug the regression tests in
-        # ``test_pipeline.py`` lock down.
+        # embedding-head branches below (zero-shot prototype path AND
+        # trained-head path), where the encoder may have been confused
+        # by surface tokens that look harmful but are protected speech
+        # (e.g. a news quote about a violent attack). It is **not**
+        # applied on the deterministic-signal branches (PII / SCAM /
+        # LEXICON / NSFW) — those signals are concrete and must not
+        # be silenced just because the message lives in a journalism /
+        # education / counterspeech community. Letting protected-speech
+        # demotion silence a phishing URL in a school group is exactly
+        # the bug ``test_protected_speech_does_not_demote_*`` locks down.
         def _with_context(codes: list[str]) -> list[str]:
             merged = list(codes)
             for hint in context_hints:
@@ -512,27 +605,42 @@ class XLMRMiniLMAdapter:
                     "rationale_id": "sexual_adult_media_v1",
                 }
 
-        # --- Embedding head: softmax-calibrated cosine similarity.
-        # Both ``embedding`` and ``self._prototype_embeddings`` are
-        # already L2-normalised, so cosine = dot product. XLM-R's
-        # multilingual embedding space is dense (raw cosine values
-        # typically cluster between 0.93 and 0.96 across all 16
-        # prototypes), so we apply a low-temperature softmax to get
-        # well-separated probabilities, then require a meaningful
-        # top-1 vs top-2 margin before committing to a non-SAFE label.
-        sims = self._prototype_embeddings @ embedding
-        sims_list = sims.detach().cpu().tolist() if hasattr(
-            sims, "detach"
-        ) else list(sims)
-        sims_list = [float(s) for s in sims_list]
+        # --- Embedding head.
+        # Two paths are supported:
+        #
+        #   1. **Trained head (preferred):** a ``Linear(384, 16)``
+        #      fitted by ``train_xlmr_head.py`` on a small labelled
+        #      corpus (see ``training_data.py``). Logits are normalised
+        #      with a plain softmax — no temperature scaling needed
+        #      because the linear layer learns its own scale during
+        #      training.
+        #   2. **Zero-shot prototypes (fallback):** cosine similarity
+        #      against the fixed ``CATEGORY_PROTOTYPES`` embeddings,
+        #      passed through a low-temperature softmax. XLM-R's
+        #      multilingual embedding space is dense (raw cosine
+        #      values typically cluster between 0.93 and 0.96), so the
+        #      temperature amplifies relative differences.
+        #
+        # Both paths feed into the same argmax + top-1/top-2 margin
+        # gate below, so the rest of the head (uncertainty handling,
+        # protected-speech demotion downstream) is identical.
+        if self._trained_head is not None:
+            try:
+                import torch  # type: ignore[import-not-found]
 
-        # Softmax with low temperature.
-        temp = self.softmax_temperature if self.softmax_temperature > 0 else 1.0
-        scaled = [s / temp for s in sims_list]
-        max_scaled = max(scaled)
-        exps = [math.exp(s - max_scaled) for s in scaled]
-        z = sum(exps) or 1.0
-        probs = [e / z for e in exps]
+                with torch.no_grad():
+                    logits = self._trained_head(embedding.unsqueeze(0))[0]
+                    probs_t = torch.softmax(logits, dim=0)
+                probs = [float(p) for p in probs_t.detach().cpu().tolist()]
+            except Exception as exc:  # noqa: BLE001 — defensive boundary
+                (self.logger or _module_logger).warning(
+                    "Trained head inference failed (%s); falling back "
+                    "to prototype argmax",
+                    exc,
+                )
+                probs = self._prototype_softmax(embedding)
+        else:
+            probs = self._prototype_softmax(embedding)
 
         # Argmax + top-2 margin.
         ranked = sorted(
@@ -542,6 +650,8 @@ class XLMRMiniLMAdapter:
         best_prob = probs[best_idx]
         runner_prob = probs[ranked[1]] if len(ranked) > 1 else 0.0
         margin = best_prob - runner_prob
+
+        head_tag = "trained" if self._trained_head is not None else "proto"
 
         # SAFE wins when the encoder is uncertain (small margin) or
         # when the SAFE prototype itself is the argmax.
@@ -553,8 +663,8 @@ class XLMRMiniLMAdapter:
                     0.05, min(0.95, float(probs[CAT_SAFE]))
                 ),
                 "actions": _zero_actions(),
-                "reason_codes": [],
-                "rationale_id": "xlmr_minilm_safe_v1",
+                "reason_codes": _with_context([]),
+                "rationale_id": f"xlmr_minilm_safe_{head_tag}_v1",
             }
 
         # Otherwise return the predicted category at default severity 2
@@ -569,7 +679,9 @@ class XLMRMiniLMAdapter:
             "confidence": confidence,
             "actions": {**_zero_actions(), "label_only": True},
             "reason_codes": _with_context([]),
-            "rationale_id": f"xlmr_minilm_category_{best_idx}_v1",
+            "rationale_id": (
+                f"xlmr_minilm_category_{best_idx}_{head_tag}_v1"
+            ),
         }
 
 

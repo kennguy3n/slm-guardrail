@@ -398,3 +398,158 @@ def test_safe_fallback_categories_in_range():
     assert 0 <= out["category"] <= 15
     assert 0 <= out["severity"] <= 5
     assert 0.0 <= out["confidence"] <= 1.0
+
+
+# ---------------------------------------------------------------------------
+# Trained linear head loading + classification.
+# ---------------------------------------------------------------------------
+def _make_synthetic_head_weights(tmp_path, target_category: int):
+    """Write a synthetic Linear(384, 16) state_dict that maps any
+    embedding to ``target_category`` with high confidence.
+
+    The weight matrix is a rank-1 tensor whose target row is filled
+    with 1s and every other row is filled with -1s, so for any input
+    embedding the target logit dominates.
+    """
+    import torch  # type: ignore[import-not-found]
+
+    weight = -torch.ones(16, 384)
+    weight[target_category] = torch.ones(384)
+    bias = torch.zeros(16)
+    state = {"weight": weight, "bias": bias}
+    path = tmp_path / "synthetic_head.pt"
+    torch.save(state, path)
+    return path
+
+
+def test_trained_head_loads_and_drives_classification(
+    monkeypatch, tmp_path, output_schema
+):
+    """When a trained head file is present, the adapter uses it as
+    the primary embedding-stage classifier and tags the rationale_id
+    with ``_trained``."""
+    pytest.importorskip("torch")
+    head_path = _make_synthetic_head_weights(
+        tmp_path, target_category=7  # SCAM_FRAUD
+    )
+    adapter = XLMRMiniLMAdapter(head_weights_path=str(head_path))
+    adapter._maybe_load_trained_head()
+    assert adapter._trained_head is not None
+
+    # Plug in the same stub encoder used by the prototype tests so we
+    # can drive classify() without real model weights.
+    import torch
+
+    width = 384
+    n = len(CATEGORY_PROTOTYPES)
+    eye = torch.zeros(n, width)
+    for i in range(n):
+        eye[i, i] = 1.0
+
+    def fake_ensure_loaded(self) -> None:
+        self._tokenizer = object()
+        self._model = object()
+        self._prototype_embeddings = eye
+        # Don't reset _trained_head — it's set above.
+
+    def fake_encode(self, text: str):
+        v = torch.zeros(width)
+        v[0] = 1.0
+        return v
+
+    monkeypatch.setattr(
+        XLMRMiniLMAdapter, "_ensure_loaded", fake_ensure_loaded
+    )
+    monkeypatch.setattr(XLMRMiniLMAdapter, "_encode", fake_encode)
+
+    out = adapter.classify(_input("any text"))
+    jsonschema.validate(instance=out, schema=output_schema)
+    # Synthetic head pins prediction to category 7 regardless of input.
+    assert out["category"] == 7
+    assert "_trained" in out["rationale_id"]
+
+
+def test_trained_head_missing_falls_back_to_prototypes(
+    monkeypatch, tmp_path, output_schema
+):
+    """When the trained head file is absent, the adapter must still
+    classify via the prototype path and tag rationale with ``_proto``."""
+    pytest.importorskip("torch")
+    adapter = XLMRMiniLMAdapter(
+        head_weights_path=str(tmp_path / "does_not_exist.pt")
+    )
+    adapter._maybe_load_trained_head()
+    assert adapter._trained_head is None
+
+    # Use the existing prototype-path stub.
+    adapter = _stub_loaded_adapter(monkeypatch)
+    # Sanity: prototype path tags rationale with ``_proto``.
+    out = adapter.classify(_input("hello"))
+    jsonschema.validate(instance=out, schema=output_schema)
+    assert "_proto" in out["rationale_id"]
+
+
+def test_trained_head_rejects_wrong_shape(tmp_path):
+    """A malformed state_dict (wrong-shape weight) must NOT load —
+    the adapter should silently fall back to ``None`` so the
+    prototype path takes over."""
+    import torch  # type: ignore[import-not-found]
+
+    state = {
+        "weight": torch.zeros(8, 64),  # wrong shape
+        "bias": torch.zeros(8),
+    }
+    path = tmp_path / "bad_head.pt"
+    torch.save(state, path)
+
+    adapter = XLMRMiniLMAdapter(head_weights_path=str(path))
+    adapter._maybe_load_trained_head()
+    assert adapter._trained_head is None
+
+
+def test_trained_head_then_deterministic_signal_takes_precedence(
+    monkeypatch, tmp_path, output_schema
+):
+    """Even with a trained head loaded, deterministic-signal branches
+    (PII, SCAM, LEXICON, NSFW) win over the embedding-head argmax,
+    and their reason codes are emitted *without* protected-speech
+    context hints."""
+    pytest.importorskip("torch")
+    head_path = _make_synthetic_head_weights(
+        tmp_path, target_category=11  # would return WEAPONS_DRUGS
+    )
+    adapter = XLMRMiniLMAdapter(head_weights_path=str(head_path))
+    adapter._maybe_load_trained_head()
+
+    import torch
+
+    eye = torch.eye(16, 384)
+
+    def fake_ensure_loaded(self) -> None:
+        self._tokenizer = object()
+        self._model = object()
+        self._prototype_embeddings = eye
+
+    monkeypatch.setattr(
+        XLMRMiniLMAdapter, "_ensure_loaded", fake_ensure_loaded
+    )
+    monkeypatch.setattr(
+        XLMRMiniLMAdapter,
+        "_encode",
+        lambda self, text: torch.eye(16, 384)[0],
+    )
+
+    # PII-driven input under journalism context — the deterministic
+    # branch must beat the trained head AND the reason codes must
+    # NOT carry NEWS_CONTEXT.
+    out = adapter.classify(
+        _input(
+            "leaked email",
+            pii_patterns_hit=[{"kind": "email"}],
+            context_hints=["NEWS_CONTEXT"],
+        )
+    )
+    jsonschema.validate(instance=out, schema=output_schema)
+    assert out["category"] == 9  # PRIVATE_DATA, not 11 from the head
+    assert out["reason_codes"] == ["PRIVATE_DATA_PATTERN"]
+    assert "NEWS_CONTEXT" not in out["reason_codes"]
