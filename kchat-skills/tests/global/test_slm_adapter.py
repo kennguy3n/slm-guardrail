@@ -1,7 +1,11 @@
-"""Tests for the SLM runtime adapter protocol + MockSLMAdapter.
+"""Tests for the encoder classifier runtime adapter protocol +
+MockSLMAdapter.
 
 Module under test: ``kchat-skills/compiler/slm_adapter.py``. See
 ARCHITECTURE.md "Hybrid Local Pipeline" step 4 and PHASES.md Phase 3.
+The protocol class name (``SLMAdapter``) is preserved for backwards
+compatibility — it now matches any encoder-classifier backend, not
+just generative SLMs.
 """
 from __future__ import annotations
 
@@ -26,6 +30,7 @@ def _input(**signals: Any) -> dict[str, Any]:
         "scam_patterns_hit": [],
         "lexicon_hits": [],
         "media_descriptors": [],
+        "context_hints": [],
     }
     local_signals.update(signals)
     return {
@@ -78,7 +83,7 @@ def test_mock_adapter_is_deterministic():
     inp = _input(pii_patterns_hit=["EMAIL"])
     a = adapter.classify(inp)
     b = adapter.classify(inp)
-    assert a == b, "MockSLMAdapter must be deterministic at temperature 0.0"
+    assert a == b, "MockSLMAdapter must be deterministic"
 
 
 # ---------------------------------------------------------------------------

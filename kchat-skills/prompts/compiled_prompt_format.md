@@ -2,19 +2,27 @@
 
 The on-device guardrail compiler takes the **active skill bundle** —
 global baseline + jurisdiction overlays + community overlay + runtime
-context — and emits a single compact text prompt that fits within the
-SLM's instruction budget (**< 1800 tokens**, output budget **< 600
-tokens**, temperature **0.0**). See ARCHITECTURE.md "Compiled Prompt
-Example" (lines 627–660).
+context — and emits a single compact text prompt that records the
+classifier-bundle configuration. The compiled prompt remains pinned
+to the historic instruction budget (**< 1800 tokens**, output budget
+**< 600 tokens**) so the bundle stays compatible with future
+generative-classifier backends, but the reference XLM-R MiniLM-L6
+encoder consumes the bundle directly (no chat-completion call,
+deterministic argmax over fixed prototypes — "temperature **0.0**"
+is kept in the schema for back-compat but is not used by the encoder).
+See ARCHITECTURE.md "Compiled Prompt Example" (lines 627–660).
 
 ## Sections
 
 Every compiled prompt is composed of six sections, in this exact order:
 
 ### `[INSTRUCTION]`
-The runtime SLM instruction (the 10-rule block from
+The runtime classifier-bundle instruction (the 10-rule block from
 [`runtime_instruction.txt`](./runtime_instruction.txt)). Always
-present, byte-for-byte identical, never paraphrased.
+present, byte-for-byte identical, never paraphrased. The encoder
+backend does not consume this block at inference time, but the
+compiler still pins it into the bundle as a human- and
+reviewer-readable record of the classifier's allowed actions.
 
 ### `[GLOBAL_BASELINE]`
 Compact summary of the global baseline:
@@ -42,9 +50,9 @@ A single instance of the structured input contract defined by
 the message currently being evaluated.
 
 ### `[OUTPUT]`
-Reserved for the SLM. The model emits exactly one JSON object
-conforming to `kchat.guardrail.output.v1`. The runtime rejects any
-output that does not validate.
+Reserved for the encoder classifier. The model emits exactly one JSON
+object conforming to `kchat.guardrail.output.v1`. The runtime rejects
+any output that does not validate.
 
 ## Budget
 

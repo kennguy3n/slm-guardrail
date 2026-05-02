@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
-"""End-to-end demo for the KChat SLM Guardrail pipeline.
+"""End-to-end demo for the KChat Guardrail pipeline.
 
 Spec references:
 
 * PHASES.md Phase 3 / Phase 6 — sample-data demonstration + perf benchmark.
 * ARCHITECTURE.md "Hybrid Local Pipeline" — drives the full pipeline
-  end-to-end against either ``MockSLMAdapter`` (no server required) or
-  ``LlamaCppSLMAdapter`` against a running ``llama-server``.
+  end-to-end against either ``MockSLMAdapter`` (no encoder weights
+  required) or ``XLMRMiniLMAdapter`` against a locally-cached
+  XLM-R MiniLM-L6 checkpoint.
 
 Usage::
 
-    # 1. Mock adapter — works without any model.
+    # 1. Mock adapter — works without any model weights.
     python tools/run_guardrail_demo.py --mock
 
-    # 2. Real Bonsai-1.7B running under llama.cpp's `llama-server`.
+    # 2. Real XLM-R MiniLM-L6 encoder.
     python tools/run_guardrail_demo.py
     python tools/run_guardrail_demo.py --jurisdiction us --community workplace
 
@@ -25,11 +26,8 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import subprocess
 import sys
 import time
-import urllib.error
-import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -48,46 +46,74 @@ from benchmark import (  # type: ignore[import-not-found]  # noqa: E402
     PipelineBenchmark,
 )
 from compiler import SkillPackCompiler  # type: ignore[import-not-found]  # noqa: E402
-from llama_cpp_adapter import (  # type: ignore[import-not-found]  # noqa: E402
-    BONSAI_MODEL_NAME,
-    BONSAI_MODEL_URL,
-    LlamaCppSLMAdapter,
-)
 from pipeline import (  # type: ignore[import-not-found]  # noqa: E402
     GuardrailPipeline,
     SkillBundle,
 )
 from slm_adapter import MockSLMAdapter  # type: ignore[import-not-found]  # noqa: E402
 from threshold_policy import ThresholdPolicy  # type: ignore[import-not-found]  # noqa: E402
+from xlmr_minilm_adapter import (  # type: ignore[import-not-found]  # noqa: E402
+    XLMR_MINILM_MODEL_ID,
+    XLMR_MINILM_MODEL_NAME,
+    XLMRMiniLMAdapter,
+)
 
 
-SERVER_INSTRUCTIONS = """\
-llama-server is not running on {server_url}. To start it:
+MODEL_INSTRUCTIONS = """\
+XLM-R MiniLM-L6 weights are not available at: {model_path}
 
-    # Build llama.cpp from kennguy3n/llama.cpp (branch: prism)
-    git clone --branch prism https://github.com/kennguy3n/llama.cpp.git
-    cd llama.cpp
-    cmake -B build && cmake --build build --config Release
+The encoder is ~80 MB. Two ways to make it available:
 
-    # Download the Bonsai-1.7B GGUF model
-    wget {model_url} -O Bonsai-1.7B.gguf
+1) Hugging Face cache (recommended for one-off local runs):
+       pip install transformers torch sentencepiece
+       python -c "from transformers import AutoTokenizer, AutoModel; \\
+           AutoTokenizer.from_pretrained('{model_id}'); \\
+           AutoModel.from_pretrained('{model_id}')"
+   The weights land in ~/.cache/huggingface and the next run picks
+   them up automatically.
 
-    # Start llama-server
-    ./build/bin/llama-server -m Bonsai-1.7B.gguf --port 8080 -c 4096
+2) Local checkout (recommended for offline / CI / mobile bundling):
+       huggingface-cli download {model_id} --local-dir ./models/xlmr-minilm-l6
+       python tools/run_guardrail_demo.py --model-path ./models/xlmr-minilm-l6
 
-Or rerun this script with --mock to use the deterministic MockSLMAdapter
-(no server required).
+Or rerun this script with --mock to use the deterministic
+MockSLMAdapter (no model weights required).
 """
 
 
-def is_server_alive(server_url: str, *, timeout: float = 1.0) -> bool:
-    """Return ``True`` iff ``GET {server_url}/health`` responds 2xx."""
-    url = server_url.rstrip("/") + "/health"
-    try:
-        with urllib.request.urlopen(url, timeout=timeout) as resp:  # noqa: S310
-            return 200 <= resp.status < 300
-    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError):
+def is_model_available(model_path: str) -> bool:
+    """Return ``True`` iff ``model_path`` resolves to usable encoder weights.
+
+    Accepts either a local directory containing the standard
+    ``config.json`` + tokenizer / weight files, or a Hugging Face
+    model id whose tokenizer + model can be instantiated through the
+    transformers cache. The check is local-only — it never attempts a
+    network fetch.
+    """
+    if not model_path:
         return False
+    candidate = Path(model_path)
+    if candidate.is_dir():
+        return (candidate / "config.json").exists()
+
+    # HF model id — only treat as available if the transformers cache
+    # already has it so we never trigger a download from this script.
+    try:
+        from transformers.utils import (  # type: ignore[import-not-found]
+            cached_file,
+        )
+    except Exception:  # noqa: BLE001 — transformers not installed
+        return False
+    try:
+        result = cached_file(
+            model_path,
+            "config.json",
+            _raise_exceptions_for_missing_entries=False,
+            local_files_only=True,
+        )
+    except Exception:  # noqa: BLE001 — anything fishy → not available
+        return False
+    return result is not None
 
 
 def load_samples(path: Path) -> list[dict[str, Any]]:
@@ -109,11 +135,9 @@ def load_samples(path: Path) -> list[dict[str, Any]]:
 def build_pipeline(
     *,
     use_mock: bool,
-    server_url: str,
+    model_path: str,
     jurisdiction: Optional[str],
     community: Optional[str],
-    compiled_prompt_text: str,
-    timeout_seconds: float,
 ) -> tuple[GuardrailPipeline, Any]:
     bundle = SkillBundle(
         jurisdiction_id=(
@@ -128,11 +152,7 @@ def build_pipeline(
     if use_mock:
         adapter: Any = MockSLMAdapter()
     else:
-        adapter = LlamaCppSLMAdapter(
-            server_url=server_url,
-            compiled_prompt=compiled_prompt_text,
-            timeout_seconds=timeout_seconds,
-        )
+        adapter = XLMRMiniLMAdapter(model_path=model_path)
     pipeline = GuardrailPipeline(
         skill_bundle=bundle,
         slm_adapter=adapter,
@@ -229,52 +249,52 @@ def to_benchmark_cases(
     return out
 
 
-def detect_llama_cpp_commit() -> Optional[str]:
-    """Return the commit SHA of a sibling ``llama-cpp`` checkout, or None.
+def detect_model_version(model_path: str) -> Optional[str]:
+    """Return a short version string for the loaded encoder, or None.
 
-    Looks for ``../llama-cpp`` and ``../llama.cpp`` next to this repo. If
-    neither exists or git fails, returns ``None``.
+    Reads ``config.json`` from a local checkpoint and surfaces the
+    ``transformers_version`` / ``model_type`` fields if present.
     """
-    candidates = [
-        REPO_ROOT.parent / "llama-cpp",
-        REPO_ROOT.parent / "llama.cpp",
-    ]
-    for cand in candidates:
-        git_dir = cand / ".git"
-        if not git_dir.exists():
+    candidate = Path(model_path)
+    config_paths: list[Path] = []
+    if candidate.is_dir():
+        config_paths.append(candidate / "config.json")
+    for p in config_paths:
+        if not p.is_file():
             continue
         try:
-            sha = subprocess.check_output(
-                ["git", "-C", str(cand), "rev-parse", "HEAD"],
-                text=True,
-                timeout=5,
-            ).strip()
-            if sha:
-                return sha
-        except (subprocess.CalledProcessError, OSError):
+            with p.open("r", encoding="utf-8") as f:
+                cfg = json.load(f)
+        except (OSError, json.JSONDecodeError):
             continue
+        version = cfg.get("transformers_version") or cfg.get("model_type")
+        if isinstance(version, str) and version:
+            return version
     return None
 
 
 def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Run the KChat SLM Guardrail pipeline against the sample-message "
+            "Run the KChat Guardrail pipeline against the sample-message "
             "corpus and print a results table. Optionally benchmark and "
             "commit results."
         )
     )
     parser.add_argument(
-        "--server-url",
-        default="http://localhost:8080",
-        help="Base URL of llama-server (default: http://localhost:8080).",
+        "--model-path",
+        default=XLMR_MINILM_MODEL_ID,
+        help=(
+            "Path or HF model id for the XLM-R MiniLM-L6 encoder "
+            f"(default: {XLMR_MINILM_MODEL_ID})."
+        ),
     )
     parser.add_argument(
         "--mock",
         action="store_true",
         help=(
-            "Use the deterministic MockSLMAdapter instead of llama-server. "
-            "No server required."
+            "Use the deterministic MockSLMAdapter instead of the encoder. "
+            "No model weights required."
         ),
     )
     parser.add_argument(
@@ -291,12 +311,6 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         "--samples",
         default=str(SAMPLES_PATH),
         help="Path to the sample-messages YAML (default: kchat-skills/samples/sample_messages.yaml).",
-    )
-    parser.add_argument(
-        "--timeout",
-        type=float,
-        default=30.0,
-        help="Per-call HTTP timeout for llama-server (default: 30s).",
     )
     parser.add_argument(
         "--benchmark",
@@ -329,8 +343,8 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
         default=None,
         help=(
             "Override the results filename (without extension). "
-            "Default: 'bonsai_1.7b_results' (or 'bonsai_1.7b_mock_results' "
-            "with --mock)."
+            "Default: 'xlmr_minilm_l6_results' (or "
+            "'xlmr_minilm_l6_mock_results' with --mock)."
         ),
     )
     parser.add_argument(
@@ -354,11 +368,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         print(f"error: samples file not found: {samples_path}", file=sys.stderr)
         return 2
 
-    if not args.mock and not is_server_alive(args.server_url):
+    if not args.mock and not is_model_available(args.model_path):
         print(
-            SERVER_INSTRUCTIONS.format(
-                server_url=args.server_url,
-                model_url=BONSAI_MODEL_URL,
+            MODEL_INSTRUCTIONS.format(
+                model_path=args.model_path,
+                model_id=XLMR_MINILM_MODEL_ID,
             ),
             file=sys.stderr,
         )
@@ -374,8 +388,10 @@ def main(argv: Optional[list[str]] = None) -> int:
             f"community={args.community or '-'}"
         )
 
-    # Compile the prompt — even with --mock we exercise the compiler so the
-    # demo doubles as a smoke test for the compiler config.
+    # Compile the prompt — even with --mock we exercise the compiler so
+    # the demo doubles as a smoke test for the compiler config. The
+    # compiled prompt is no longer fed to a generative model, but the
+    # compiler still validates skill-bundle merge + token budgets.
     compiler = SkillPackCompiler(repo_root=REPO_ROOT)
     compiled = compiler.compile(
         jurisdiction=args.jurisdiction,
@@ -388,16 +404,18 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     pipeline, adapter = build_pipeline(
         use_mock=args.mock,
-        server_url=args.server_url,
+        model_path=args.model_path,
         jurisdiction=args.jurisdiction,
         community=args.community,
-        compiled_prompt_text=compiled.text,
-        timeout_seconds=args.timeout,
     )
 
     print(
         "Adapter: "
-        + ("MockSLMAdapter" if args.mock else f"LlamaCppSLMAdapter -> {args.server_url}")
+        + (
+            "MockSLMAdapter"
+            if args.mock
+            else f"XLMRMiniLMAdapter -> {args.model_path}"
+        )
     )
     print()
 
@@ -437,21 +455,26 @@ def main(argv: Optional[list[str]] = None) -> int:
         if args.results_name:
             results_name = args.results_name
         elif args.mock:
-            results_name = "bonsai_1.7b_mock_results"
+            results_name = "xlmr_minilm_l6_mock_results"
         else:
-            results_name = "bonsai_1.7b_results"
+            results_name = "xlmr_minilm_l6_results"
         out_path = BENCH_DIR / f"{results_name}.json"
         record = {
-            "model_name": BONSAI_MODEL_NAME if not args.mock else "MockSLMAdapter",
-            "model_url": BONSAI_MODEL_URL if not args.mock else None,
-            "llama_cpp_repo": (
-                "https://github.com/kennguy3n/llama.cpp (branch: prism)"
+            "model_name": (
+                XLMR_MINILM_MODEL_NAME if not args.mock else "MockSLMAdapter"
+            ),
+            "model_id": (
+                XLMR_MINILM_MODEL_ID if not args.mock else None
+            ),
+            "model_version": (
+                detect_model_version(args.model_path)
                 if not args.mock
                 else None
             ),
-            "llama_cpp_commit": detect_llama_cpp_commit() if not args.mock else None,
-            "adapter": "MockSLMAdapter" if args.mock else "LlamaCppSLMAdapter",
-            "server_url": None if args.mock else args.server_url,
+            "adapter": (
+                "MockSLMAdapter" if args.mock else "XLMRMiniLMAdapter"
+            ),
+            "model_path": None if args.mock else args.model_path,
             "jurisdiction": args.jurisdiction,
             "community": args.community,
             "timestamp_utc": datetime.now(timezone.utc).isoformat(),

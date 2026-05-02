@@ -25,8 +25,8 @@ The corpus covers:
   test value `4111 1111 1111 1111`.
 - **Child safety** — discussions *about* safeguarding training in a
   minors-aware group. The corpus deliberately contains no
-  CSAM-adjacent text; the SLM must not produce a CHILD_SAFETY false
-  positive on these.
+  CSAM-adjacent text; the encoder classifier must not produce a
+  CHILD_SAFETY false positive on these.
 - **Hate / harassment** — counterspeech and discussions *about*
   harassment. These exercise the protected-speech contexts.
 - **Health misinformation** — quoted health claims with explicit
@@ -74,10 +74,10 @@ The corpus covers:
 ```
 
 `expected_category` / `expected_severity` describe the *deterministic*
-verdict the demo expects from `MockSLMAdapter`. A real SLM (Bonsai-1.7B
-via `LlamaCppSLMAdapter`) may produce a different but still
-schema-conformant output; the demo prints both so divergence is
-visible.
+verdict the demo expects from `MockSLMAdapter`. A real encoder
+classifier (XLM-R MiniLM-L6 via `XLMRMiniLMAdapter`) may produce a
+different but still schema-conformant output; the demo prints both so
+divergence is visible.
 
 ## Privacy contract
 
@@ -95,11 +95,11 @@ All fixtures comply with
 
 ## How to use
 
-### Run the demo against a local llama-server
+### Run the demo against a local XLM-R MiniLM-L6
 
 ```bash
-# 1. Start llama-server (see "Running with a real SLM" in the top-level
-#    README). Then:
+# 1. Make the XLM-R MiniLM-L6 weights available locally (see
+#    "Running with XLM-R MiniLM-L6" in the top-level README). Then:
 python tools/run_guardrail_demo.py
 ```
 
@@ -122,7 +122,7 @@ python tools/run_guardrail_demo.py \
 
 ```bash
 # Runs PipelineBenchmark over the corpus and writes
-# kchat-skills/benchmarks/bonsai_1.7b_results.json (or _mock_*.json
+# kchat-skills/benchmarks/xlmr_minilm_l6_results.json (or _mock_*.json
 # when --mock is set).
 python tools/run_guardrail_demo.py --benchmark --commit-results
 ```
@@ -139,10 +139,10 @@ When adding a case:
 3. Match `expected_category` to one of the 16 taxonomy ids in
    `kchat-skills/global/taxonomy.yaml`.
 4. Pin `expected_severity` to the deterministic detector + threshold
-   policy outcome — not the SLM's output. The detector behaviour is
-   stable across SLM swaps.
+   policy outcome — not the encoder's output. The detector behaviour
+   is stable across classifier-adapter swaps.
 5. Avoid literal harm content. The detectors react to *shapes* (URL
    TLDs, keyword combinations, PII patterns); descriptive language
-   gives the SLM room to reason.
+   gives the encoder classifier room to reason.
 6. Run `pytest kchat-skills/tests/global/test_sample_messages.py` to
    confirm the case is well-formed.

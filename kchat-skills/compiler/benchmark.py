@@ -3,10 +3,12 @@
 Spec reference: PHASES.md Phase 6 — "Performance optimization
 benchmarking". The benchmark provides a structured, deterministic
 measurement harness over :class:`~pipeline.GuardrailPipeline` and its
-:class:`~slm_adapter.MockSLMAdapter` reference. It is intended for
-regression testing — the p95 latency target is pinned at 250ms
-(ARCHITECTURE.md "Performance envelope") and the benchmark test
-refuses to pass if the target is breached.
+:class:`~slm_adapter.MockSLMAdapter` reference. The harness is
+adapter-agnostic — swap in the XLM-R MiniLM-L6 encoder classifier
+(or any other ``SLMAdapter``) and re-run to measure that backend's
+latency. It is intended for regression testing — the p95 latency
+target is pinned at 250ms (ARCHITECTURE.md "Performance envelope")
+and the benchmark test refuses to pass if the target is breached.
 
 Design notes:
 

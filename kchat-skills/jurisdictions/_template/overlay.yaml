@@ -86,7 +86,7 @@ local_definitions:
 
 # --------------------------------------------------------------------------
 # Local language assets — lexicons and normalization used by the
-# deterministic detectors before the SLM runs.
+# deterministic detectors before the encoder classifier runs.
 # --------------------------------------------------------------------------
 local_language_assets:
   # Primary language codes (IETF BCP 47). Multi-language jurisdictions

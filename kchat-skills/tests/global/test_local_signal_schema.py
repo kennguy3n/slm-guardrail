@@ -1,8 +1,8 @@
 """Validation tests for kchat-skills/global/local_signal_schema.json.
 
-The local-signal schema is the SLM input contract: a Draft-07 JSON Schema
-defining the structured object the on-device runtime hands to the SLM. See
-ARCHITECTURE.md "SLM Execution Contract".
+The local-signal schema is the encoder classifier input contract: a Draft-07
+JSON Schema defining the structured object the on-device runtime hands to
+the classifier. See ARCHITECTURE.md "Encoder Classifier Execution Contract".
 """
 from __future__ import annotations
 
@@ -43,6 +43,7 @@ KNOWN_GOOD_INPUT: dict = {
             {"lexicon_id": "global.scam.en.v1", "category": 7, "weight": 0.78}
         ],
         "media_descriptors": [],
+        "context_hints": [],
     },
     "constraints": {
         "max_output_tokens": 600,

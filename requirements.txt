@@ -1,8 +1,15 @@
-# Test and validation dependencies for KChat SLM Guardrail Skills.
-# Runtime/skill-pack files themselves are static YAML / JSON; these
-# packages are only used by the test suite and the (Phase 4) compiler.
+# Test and validation dependencies for KChat Guardrail Skills.
+# Skill-pack files themselves are static YAML / JSON; these
+# packages are used by the test suite, the (Phase 4) compiler,
+# and the XLM-R MiniLM-L6 encoder classifier adapter.
 pytest>=8.0
 PyYAML>=6.0
 jsonschema>=4.0
 # ed25519 signing / verification of compiled skill passports (Phase 4).
 cryptography>=42.0
+# XLM-R MiniLM-L6 encoder classifier (kchat-skills/compiler/xlmr_minilm_adapter.py).
+# These are runtime dependencies for the demo / benchmark scripts; the
+# adapter degrades gracefully to a SAFE fallback if they're missing.
+transformers>=4.36.0
+torch>=2.1.0
+sentencepiece>=0.1.99

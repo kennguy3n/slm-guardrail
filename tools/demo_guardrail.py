@@ -1102,7 +1102,7 @@ def build_markdown_report(
     verdict = "PASS" if p95_pass else "FAIL"
 
     summary_lines = [
-        "# KChat SLM Guardrail — Cross-Community / Cross-Country Demo",
+        "# KChat Guardrail — Cross-Community / Cross-Country Demo",
         "",
         f"**Generated:** {timestamp_iso}",
         "",

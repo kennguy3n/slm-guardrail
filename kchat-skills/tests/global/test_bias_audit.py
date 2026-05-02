@@ -330,8 +330,8 @@ class TestIntegrationWithMinorityLanguageCorpus:
         bias audit must pass.
 
         This mirrors the success case Phase 3 will produce when the
-        deterministic detectors and SLM both correctly recognise the
-        benign cases as SAFE.
+        deterministic detectors and the encoder classifier both correctly
+        recognise the benign cases as SAFE.
         """
         cases = _load_minority_language_corpus_as_bias_cases()
         auditor = BiasAuditor()

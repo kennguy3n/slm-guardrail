@@ -1,4 +1,4 @@
-# KChat SLM Guardrail Skills
+# KChat Guardrail Skills
 
 > On-device guardrail skills for privacy-first, E2EE messaging — local safety
 > assistants, not centralized moderation.
@@ -7,16 +7,16 @@
 
 ## What is this?
 
-This project provides a **skill-based guardrail system** for tiny Small
-Language Models (SLMs) running locally on user devices within
-[KChat](https://github.com/kennguy3n/slm-chat-demo), an end-to-end encrypted
-(E2EE) messaging app for large communities.
+This project provides a **skill-based guardrail system** for the
+**XLM-R MiniLM-L6** encoder classifier running locally on user devices
+within [KChat](https://github.com/kennguy3n/slm-chat-demo), an
+end-to-end encrypted (E2EE) messaging app for large communities.
 
 A guardrail skill classifies content **already visible on the user's device**,
 produces local warnings / labels / suggestions, and **never transmits message
 content, embeddings, hashes, or other content-derived evidence to servers** by
-default. The SLM acts as a **local safety assistant** for the user — it does
-not act as a centralized moderator on behalf of the platform.
+default. The classifier acts as a **local safety assistant** for the user —
+it does not act as a centralized moderator on behalf of the platform.
 
 KChat uses the **Messaging Layer Security** protocol
 ([RFC 9420](https://www.rfc-editor.org/rfc/rfc9420.html)) for group key
@@ -35,10 +35,11 @@ auditable way.
   and signer of each pack, and the reason a particular skill was activated.
 - **Layered skills.** Behaviour is composed from a *Global Baseline*, an
   optional *Jurisdiction Overlay*, and an optional *Community Overlay*.
-- **Deterministic output.** The SLM emits a constrained JSON schema. Prompts
-  are short and the taxonomy is compact so tiny models stay on-rail.
-- **Hybrid pipeline.** Cheap deterministic local detectors run first; the SLM
-  only does the contextual reasoning that detectors cannot.
+- **Deterministic output.** The encoder classifier emits a constrained JSON
+  schema via argmax over a fixed bank of category prototype embeddings, so
+  identical input always produces identical output.
+- **Hybrid pipeline.** Cheap deterministic local detectors run first; the
+  encoder classifier only does the contextual reasoning that detectors cannot.
 - **Anti-misuse.** No vague categories, signed packs, expiry dates,
   protected-speech contexts, and required legal/cultural review for every
   jurisdiction overlay.
@@ -120,7 +121,7 @@ they may not invent new categories).
 | 4     | Strong warn | High-confidence harm to user or third party.                           | Hard modal; require explicit acknowledge to view.   |
 | 5     | Critical    | Imminent harm, child safety, or jurisdictional illegality.             | Block preview; surface report / crisis resources.   |
 
-Severity is computed by the SLM under a hard-coded thresholds policy
+Severity is computed by the encoder classifier under a hard-coded thresholds policy
 (see [`ARCHITECTURE.md`](ARCHITECTURE.md#decision-policy)). Child-safety
 categories have a severity floor of 5 regardless of model confidence.
 
@@ -133,7 +134,7 @@ categories have a severity floor of 5 regardless of model confidence.
 │   ├── taxonomy.yaml                # 16-category global taxonomy
 │   ├── severity.yaml                # 0–5 severity rubric
 │   ├── output_schema.json           # constrained JSON output
-│   ├── local_signal_schema.json     # SLM input contract
+│   ├── local_signal_schema.json     # encoder classifier input contract
 │   └── privacy_contract.yaml        # non-negotiable privacy rules
 │
 ├── jurisdictions/
@@ -180,7 +181,7 @@ categories have a severity floor of 5 regardless of model confidence.
 │   └── emergency_response.yaml      # ↑ Phase 6 expansion — 30 overlays
 │
 ├── prompts/
-│   ├── runtime_instruction.txt      # 10-rule SLM instruction
+│   ├── runtime_instruction.txt      # 10-rule classifier-bundle instruction
 │   └── compiled_examples/
 │
 ├── samples/
@@ -189,7 +190,7 @@ categories have a severity floor of 5 regardless of model confidence.
 │
 ├── benchmarks/
 │   ├── README.md
-│   └── bonsai_1.7b_results.json     # committed benchmark results (generated)
+│   └── xlmr_minilm_l6_results.json # committed benchmark results (generated)
 │
 ├── compiler/
 │   ├── pipeline.md
@@ -363,7 +364,7 @@ suites, and a compiler specification.
 
 Phase 0 (foundation), Phase 1 (global baseline + community overlays),
 Phase 2 (jurisdiction archetype overlays), Phase 3 (hybrid local
-pipeline + SLM integration), Phase 4 (skill-pack compiler + signing),
+pipeline + encoder classifier integration), Phase 4 (skill-pack compiler + signing),
 Phase 5 (40 country-specific jurisdiction overlays) and Phase 6
 (skill expansion to 100 packs, bias auditing, pack lifecycle,
 adversarial / obfuscation corpus, regulatory alignment, performance
@@ -373,11 +374,11 @@ The repository currently ships **100 skills** — 59 country packs +
 
 - the complete (non-stub) global baseline
   ([`kchat-skills/global/baseline.yaml`](kchat-skills/global/baseline.yaml)),
-  the SLM input contract
+  the encoder classifier input contract
   ([`local_signal_schema.json`](kchat-skills/global/local_signal_schema.json))
   and privacy contract
   ([`privacy_contract.yaml`](kchat-skills/global/privacy_contract.yaml)),
-- the runtime SLM instruction prompt
+- the runtime classifier-bundle instruction prompt
   ([`prompts/runtime_instruction.txt`](kchat-skills/prompts/runtime_instruction.txt))
   and compiled-prompt format reference
   ([`prompts/compiled_prompt_format.md`](kchat-skills/prompts/compiled_prompt_format.md)),
@@ -388,7 +389,7 @@ The repository currently ships **100 skills** — 59 country packs +
   [`kchat-skills/compiler/counters.py`](kchat-skills/compiler/counters.py),
 - the 7-step hybrid local pipeline at
   [`kchat-skills/compiler/pipeline.py`](kchat-skills/compiler/pipeline.py),
-  the backend-agnostic SLM runtime adapter at
+  the backend-agnostic encoder classifier runtime adapter at
   [`kchat-skills/compiler/slm_adapter.py`](kchat-skills/compiler/slm_adapter.py),
   and the hard-coded threshold policy at
   [`kchat-skills/compiler/threshold_policy.py`](kchat-skills/compiler/threshold_policy.py),
@@ -474,36 +475,61 @@ pip install -r requirements.txt
 pip install -e ".[test]"
 ```
 
-### Running with a real SLM
+### Running with XLM-R MiniLM-L6
 
 The skill packs ship with a backend-agnostic
 [`SLMAdapter`](kchat-skills/compiler/slm_adapter.py) protocol; the
-[`LlamaCppSLMAdapter`](kchat-skills/compiler/llama_cpp_adapter.py)
-implementation drives a running [`llama.cpp`](https://github.com/kennguy3n/llama.cpp)
-server. The on-device target model is **Bonsai-1.7B** (1.7B-parameter
-SLM in GGUF format).
+[`XLMRMiniLMAdapter`](kchat-skills/compiler/xlmr_minilm_adapter.py)
+implementation loads the **XLM-R MiniLM-L6** encoder
+(`nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large`) via
+`transformers`. The encoder is ~80 MB, loads in well under a second on
+CPU, and runs inference in tens of milliseconds per message — well
+inside the 250 ms p95 envelope.
+
+Two interchangeable embedding-stage classifiers are supported:
+
+1. **Trained linear head** — when
+   [`kchat-skills/compiler/data/xlmr_minilm_head.pt`](kchat-skills/compiler/data/)
+   is present, the adapter loads it and uses the head's softmax over
+   logits as the embedding-stage classifier. The committed checkpoint
+   is a `Linear(384, 16)` trained on the 175-example multilingual
+   corpus in
+   [`training_data.py`](kchat-skills/compiler/training_data.py) via
+   [`train_xlmr_head.py`](kchat-skills/compiler/train_xlmr_head.py)
+   (88.5% train accuracy). Rationale ids end in `_trained_v1`.
+2. **Zero-shot prototype fallback** — when the trained head is missing
+   or fails to load, the adapter falls back to a low-temperature
+   softmax over cosine similarities against a fixed bank of category
+   prototype embeddings. Rationale ids end in `_proto_v1`.
+
+In either case, deterministic detector branches (CHILD_SAFETY,
+PRIVATE_DATA, SCAM_FRAUD, lexicon, NSFW media) run first and beat the
+embedding-stage classifier.
 
 ```bash
-# 1. Build llama.cpp from kennguy3n/llama.cpp (branch: prism)
-git clone --branch prism https://github.com/kennguy3n/llama.cpp.git ../llama-cpp
-cd ../llama-cpp && cmake -B build && cmake --build build --config Release && cd -
+# 1. Install the encoder dependencies (already in requirements.txt /
+#    pyproject's `demo` extra)
+pip install -r requirements.txt
 
-# 2. Download Bonsai-1.7B.gguf (~1 GB)
-wget https://huggingface.co/prism-ml/Bonsai-1.7B-gguf/resolve/main/Bonsai-1.7B.gguf \
-  -O Bonsai-1.7B.gguf
+# 2. Cache XLM-R MiniLM-L6 weights locally (~80 MB)
+huggingface-cli download nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large \
+  --local-dir models/xlmr-minilm-l6
+# Or let transformers populate the HF cache on first import:
+#   python -c "from transformers import AutoTokenizer, AutoModel; \
+#       AutoTokenizer.from_pretrained('nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large'); \
+#       AutoModel.from_pretrained('nreimers/mMiniLMv2-L6-H384-distilled-from-XLMR-Large')"
 
-# 3. Start llama-server (serves the OpenAI-compatible /v1/chat/completions endpoint)
-./build/bin/llama-server -m Bonsai-1.7B.gguf --port 8080 -c 4096 &
+# 3. Run the demo against the local checkpoint
+python tools/run_guardrail_demo.py --model-path models/xlmr-minilm-l6
+python tools/run_guardrail_demo.py --jurisdiction us --community workplace \
+    --model-path models/xlmr-minilm-l6
 
-# 4. Run the demo
-python tools/run_guardrail_demo.py
-python tools/run_guardrail_demo.py --jurisdiction us --community workplace
+# 4. Run benchmarks and commit the results
+python tools/run_guardrail_demo.py --benchmark --commit-results \
+    --model-path models/xlmr-minilm-l6
+# -> writes kchat-skills/benchmarks/xlmr_minilm_l6_results.json
 
-# 5. Run benchmarks and commit the results
-python tools/run_guardrail_demo.py --benchmark --commit-results
-# -> writes kchat-skills/benchmarks/bonsai_1.7b_results.json
-
-# Mock-only mode (no server required) for quick smoke tests
+# Mock-only mode (no model weights required) for quick smoke tests
 python tools/run_guardrail_demo.py --mock
 ```
 
@@ -512,7 +538,7 @@ The demo loads
 (format documented in
 [`kchat-skills/samples/README.md`](kchat-skills/samples/README.md)),
 compiles the active skill bundle through `SkillPackCompiler`, runs the
-full hybrid pipeline against either `LlamaCppSLMAdapter` or
+full hybrid pipeline against either `XLMRMiniLMAdapter` or
 `MockSLMAdapter`, and prints a per-case table plus an optional
 `PipelineBenchmark` report. See
 [`kchat-skills/benchmarks/README.md`](kchat-skills/benchmarks/README.md)
@@ -522,7 +548,9 @@ for the benchmark methodology and committed results.
 
 The test suite validates the structural primitives of the global
 baseline (`taxonomy.yaml`, `severity.yaml`, `output_schema.json`,
-`baseline.yaml`). It is pure Python — no SLM runtime is required.
+`baseline.yaml`). It is pure Python — no encoder weights are required
+at test time (the adapter degrades to a SAFE fallback when weights are
+missing).
 
 ```bash
 pytest                                  # run all tests
@@ -585,7 +613,7 @@ kchat-skills/
 │   ├── health_support.yaml
 │   ├── political.yaml     # campaign / civic
 │   └── gaming.yaml        # public gaming community
-├── prompts/              # 10-rule SLM instruction + compiled examples
+├── prompts/              # 10-rule classifier-bundle instruction + compiled examples
 │   ├── runtime_instruction.txt
 │   ├── compiled_prompt_format.md
 │   └── compiled_examples/  # 73 reference compiled prompts (Phase 4 + Phase 5 + Phase 6)
@@ -594,12 +622,12 @@ kchat-skills/
 │   └── README.md
 ├── benchmarks/           # committed benchmark results (Phase 6)
 │   ├── README.md
-│   └── bonsai_1.7b_results.json   # generated by tools/run_guardrail_demo.py --commit-results
+│   └── xlmr_minilm_l6_results.json # generated by tools/run_guardrail_demo.py --commit-results
 ├── compiler/             # skill-pack compiler (Phase 3-4)
 │   ├── counters.py           # device-local expiring counter store (Phase 1)
 │   ├── pipeline.py           # 7-step hybrid local pipeline (Phase 3)
 │   ├── slm_adapter.py        # SLMAdapter Protocol + MockSLMAdapter (Phase 3)
-│   ├── llama_cpp_adapter.py  # LlamaCppSLMAdapter for Bonsai-1.7B / llama.cpp (Phase 6)
+│   ├── xlmr_minilm_adapter.py # XLMRMiniLMAdapter — XLM-R MiniLM-L6 encoder classifier (Phase 6)
 │   ├── threshold_policy.py   # hard-coded threshold enforcement (Phase 3)
 │   ├── metric_validator.py   # 7-metric validator (Phase 3)
 │   ├── compiler.py           # skill-pack compiler pipeline (Phase 4)
@@ -617,7 +645,8 @@ kchat-skills/
 │   │   ├── test_baseline_cases.py  # first round of baseline cases
 │   │   ├── test_counters.py
 │   │   ├── test_pipeline.py        # 7-step hybrid pipeline
-│   │   ├── test_slm_adapter.py     # SLMAdapter / MockSLMAdapter
+│   │   ├── test_slm_adapter.py     # SLMAdapter Protocol / MockSLMAdapter
+│   │   ├── test_xlmr_minilm_adapter.py # XLMRMiniLMAdapter — XLM-R MiniLM-L6
 │   │   ├── test_threshold_policy.py # hard-coded threshold policy
 │   │   ├── test_metric_validator.py # 7-metric validator (Phase 3)
 │   │   ├── test_compiler.py         # skill-pack compiler (Phase 4)
@@ -650,7 +679,7 @@ kchat-skills/
 
 tools/                    # repo-level utilities (run from repo root)
 ├── regenerate_compiled_examples.py  # refresh compiled_examples/*.txt
-├── run_guardrail_demo.py            # sample-data demo (mock or llama.cpp)
+├── run_guardrail_demo.py            # sample-data demo (mock or XLM-R MiniLM-L6)
 └── demo_guardrail.py                # cross-community / cross-country demo
 
 results/                  # demo run outputs (JSON + Markdown reports)
@@ -660,7 +689,8 @@ results/                  # demo run outputs (JSON + Markdown reports)
 
 The Phase 4 compiler resolves the global baseline plus optional
 jurisdiction and community overlays into a single compiled prompt
-(< 1800 instruction tokens) ready for the on-device SLM:
+(< 1800 instruction tokens) configuring the encoder classifier's
+allowed actions / reason codes / counters:
 
 ```bash
 # Compile the global baseline only (writes to stdout):
@@ -699,7 +729,7 @@ serialisation of every other field.
 A pack is rejected by the runtime if any of the following is true:
 the signature does not verify against the compiler's public key;
 `expires_on` is in the past or more than 18 months in the future;
-the runtime SLM is not listed in `model_compatibility`; or any of the
+the runtime model is not listed in `model_compatibility`; or any of the
 [`anti_misuse`](kchat-skills/compiler/anti_misuse.py) rules fail
 (invented categories, overlay redefining `privacy_rules`, jurisdiction
 pack missing `legal_review` / `cultural_review` signers, community
@@ -750,7 +780,9 @@ versions. Each `PackVersion` records the `skill_id`,
 
 The Phase 6 benchmark harness at
 [`kchat-skills/compiler/benchmark.py`](kchat-skills/compiler/benchmark.py)
-wraps `GuardrailPipeline` plus `MockSLMAdapter` into a
+wraps `GuardrailPipeline` plus an ``SLMAdapter`` (typically
+`MockSLMAdapter` for deterministic regression tests, or
+`XLMRMiniLMAdapter` for real encoder timings) into a
 deterministic measurement loop. `PipelineBenchmark.run(cases,
 iterations=100)` records wall-clock latency per iteration using
 `time.perf_counter` and returns a `BenchmarkReport` with p50 / p95 /

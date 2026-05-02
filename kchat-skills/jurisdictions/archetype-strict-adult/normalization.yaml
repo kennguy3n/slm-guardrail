@@ -1,6 +1,6 @@
 # Normalization rules for the archetype-strict-adult jurisdiction overlay.
 #
-# Normalization runs before deterministic detectors and SLM inference.
+# Normalization runs before deterministic detectors and encoder classifier inference.
 # Every jurisdiction pack MUST include these four fields; the compiler
 # rejects packs that omit any of them. See ARCHITECTURE.md
 # "Local Language Assets".

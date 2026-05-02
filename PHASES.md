@@ -1,4 +1,4 @@
-# KChat SLM Guardrail Skills — Development Phases
+# KChat Guardrail Skills — Development Phases
 
 This roadmap is sequential at the phase level. Within a phase, individual
 skills can be developed in parallel. Each phase produces a tagged release
@@ -18,8 +18,8 @@ should require revisiting Phase 0 artifacts.
   - `baseline.yaml` — the global baseline skill stub.
   - `taxonomy.yaml` — the 16-category global taxonomy.
   - `severity.yaml` — the 0–5 severity rubric.
-  - `output_schema.json` — the constrained SLM JSON output schema.
-- Define the SLM input contract as `local_signal_schema.json`.
+  - `output_schema.json` — the constrained encoder classifier JSON output schema.
+- Define the encoder classifier input contract as `local_signal_schema.json`.
 - Define the privacy contract as `privacy_contract.yaml`, expressing the
   eight non-negotiable privacy rules as enforceable constraints (validated
   by the compiler in Phase 4).
@@ -44,8 +44,9 @@ community overlays so the layering model can be exercised end-to-end.
   baseline YAML. This includes the privacy rules, the 16-category
   taxonomy, the severity rubric, the output schema, the input contract,
   the decision-policy thresholds, and the `skill_selection` block.
-- Implement the runtime SLM instruction prompt (the 10-rule instruction)
-  and the compiled-prompt format used by the runtime.
+- Implement the runtime classifier-bundle instruction prompt (the
+  10-rule instruction) and the compiled-prompt format used by the
+  runtime.
 - Create the first 8 community overlay skills:
   - `community.school` — minors-aware overlay.
   - `community.family` — household / kin overlay.
@@ -67,7 +68,7 @@ community overlays so the layering model can be exercised end-to-end.
 - Working `kchat.global.guardrail.baseline` skill.
 - 8 community overlay skills.
 - Test suite template + initial test cases for the global baseline.
-- Runtime SLM instruction prompt + compiled-prompt format reference.
+- Runtime classifier-bundle instruction prompt + compiled-prompt format reference.
 
 ---
 
@@ -104,7 +105,7 @@ different archetypes before spending review effort on real countries.
 
 ---
 
-## Phase 3 — Hybrid Local Pipeline + SLM Integration
+## Phase 3 — Hybrid Local Pipeline + Encoder Classifier Integration
 
 Goal: turn skill packs into actual on-device behaviour.
 
@@ -113,14 +114,15 @@ Goal: turn skill packs into actual on-device behaviour.
      transliteration).
   2. Deterministic local detectors (URL risk, PII patterns, scam
      patterns, lexicon matching, media descriptor signals).
-  3. Signal packaging into the SLM input contract.
-  4. SLM contextual classification (tiny SLM, temperature 0.0).
+  3. Signal packaging into the encoder classifier input contract.
+  4. Encoder-based contextual classification (XLM-R MiniLM-L6 —
+     deterministic argmax over fixed prototype embeddings).
   5. Severity / threshold policy enforcement.
   6. Local JSON output generation.
   7. Local expiring counter updates (device-local only).
-- Define the SLM runtime adapter interface — the boundary between the
-  pipeline and any tiny-SLM backend (so we can swap backends without
-  changing skill packs).
+- Define the runtime adapter interface — the boundary between the
+  pipeline and any encoder-classifier backend (so we can swap backends
+  without changing skill packs).
 - Implement the decision policy with hard-coded confidence thresholds
   (`label_only=0.45`, `warn=0.62`, `strong_warn=0.78`,
   `critical_intervention=0.85`) and uncertainty handling.
@@ -132,7 +134,7 @@ Goal: turn skill packs into actual on-device behaviour.
 **Deliverables**
 
 - Working hybrid pipeline implementation.
-- SLM adapter interface specification + a reference adapter.
+- Encoder classifier adapter interface specification + a reference adapter.
 - Threshold enforcement.
 - Child-safety severity-floor handling.
 - Metric-validation report against Phase 1 / Phase 2 packs.
@@ -145,8 +147,8 @@ Goal: turn authored YAML into signed, distributable skill packs that the
 runtime can verify.
 
 - Build the skill-pack compiler pipeline: policy authoring → legal /
-  cultural review → YAML skill pack → test-suite generation → SLM-prompt
-  compiler → signed compressed bundle.
+  cultural review → YAML skill pack → test-suite generation →
+  classifier-bundle compiler → signed compressed bundle.
 - Implement the skill passport with version, reviewers, model
   compatibility, and an ed25519 signature.
 - Implement validation rules for anti-misuse controls:

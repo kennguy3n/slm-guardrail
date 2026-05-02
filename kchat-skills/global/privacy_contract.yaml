@@ -8,9 +8,9 @@
 #
 # This file also encodes the broader privacy architecture from
 # ARCHITECTURE.md "Privacy Architecture": the plaintext-handling rules,
-# the closed set of allowed SLM outputs, and the absolutely forbidden
-# outputs. The compiler treats `immutable: true` as the gate; the rules,
-# `plaintext_handling`, `allowed_outputs`, and `forbidden_outputs`
+# the closed set of allowed classifier outputs, and the absolutely
+# forbidden outputs. The compiler treats `immutable: true` as the gate;
+# the rules, `plaintext_handling`, `allowed_outputs`, and `forbidden_outputs`
 # blocks are the product floor.
 
 schema_version: 1
@@ -23,9 +23,10 @@ rules:
       The model only analyzes content already decrypted and visible on
       this device to this user.
     enforceable_constraint: >-
-      Runtime asserts SLM input is sourced exclusively from on-device
-      plaintext belonging to the active user; no cross-device or
-      cross-user inputs are admissible. Compiler rejects any skill that
+      Runtime asserts classifier input is sourced exclusively from
+      on-device plaintext belonging to the active user; no cross-device
+      or cross-user inputs are admissible. Compiler rejects any skill
+      that
       requests external content sources.
 
   - id: 2
@@ -33,7 +34,7 @@ rules:
       The model must never request more context than is provided in the
       structured input.
     enforceable_constraint: >-
-      SLM output schema (kchat.guardrail.output.v1) admits no
+      Classifier output schema (kchat.guardrail.output.v1) admits no
       "request_more_context" field; runtime ignores any tool-use or
       function-call attempts. Compiler rejects skills referencing
       unknown input fields.
@@ -55,9 +56,10 @@ rules:
       message fragments longer than 8 tokens, message IDs, or any direct
       quote that could re-identify the message off-device.
     enforceable_constraint: >-
-      Runtime post-validator scans every string field in the SLM output
-      for verbatim spans of more than 8 tokens copied from the input and
-      rejects the response. Output schema has no message-id field.
+      Runtime post-validator scans every string field in the classifier
+      output for verbatim spans of more than 8 tokens copied from the
+      input and rejects the response. Output schema has no message-id
+      field.
 
   - id: 5
     rule: >-
@@ -73,9 +75,10 @@ rules:
       The model must not request, assume, or infer plaintext from other
       conversations, other devices, or other users.
     enforceable_constraint: >-
-      SLM has no network access during evaluation. Runtime constructs
-      the input contract from the active conversation only. Compiler
-      rejects skills referencing cross-conversation or cross-device
+      Classifier has no network access during evaluation. Runtime
+      constructs the input contract from the active conversation only.
+      Compiler rejects skills referencing cross-conversation or
+      cross-device
       state.
 
   - id: 7
@@ -100,10 +103,10 @@ rules:
       decision on remote service availability.
 
 plaintext_handling:
-  - Plaintext message bytes never leave the on-device SLM context.
-  - The SLM input is constructed by the local guardrail runtime, not by
-    a server.
-  - The SLM has no network access during evaluation.
+  - Plaintext message bytes never leave the on-device classifier context.
+  - The classifier input is constructed by the local guardrail runtime,
+    not by a server.
+  - The classifier has no network access during evaluation.
 
 allowed_outputs:
   - severity (integer 0..5)

@@ -22,7 +22,7 @@ references:
   taxonomy:                ./taxonomy.yaml
   severity:                ./severity.yaml
   output_schema:           ./output_schema.json
-  local_signal_schema:     ./local_signal_schema.json   # SLM input contract
+  local_signal_schema:     ./local_signal_schema.json   # encoder classifier input contract
   privacy_contract:        ./privacy_contract.yaml      # 8 non-negotiable privacy rules
   runtime_instruction:     ../prompts/runtime_instruction.txt
   compiled_prompt_format:  ../prompts/compiled_prompt_format.md
@@ -73,8 +73,9 @@ privacy_rules:
         The model must operate identically when offline; it must not
         depend on server-side completion of any safety decision.
 
-# Input contract — structured object the runtime hands to the SLM. The
-# canonical Draft-07 schema lives at `local_signal_schema.json`; this
+# Input contract — structured object the runtime hands to the encoder
+# classifier. The canonical Draft-07 schema lives at
+# `local_signal_schema.json`; this
 # block records the contract id and budget so overlays and the prompt
 # compiler can reference it without parsing JSON.
 input_contract:
@@ -86,8 +87,8 @@ input_contract:
     - local_signals
     - constraints
 
-# Decision policy thresholds — hard-coded in the runtime; the SLM cannot
-# override them. Source: ARCHITECTURE.md "Decision Policy".
+# Decision policy thresholds — hard-coded in the runtime; the encoder
+# classifier cannot override them. Source: ARCHITECTURE.md "Decision Policy".
 decision_policy:
   thresholds:
     label_only:            0.45
@@ -98,8 +99,8 @@ decision_policy:
     below_label_only:
       action: emit_safe
       note: >-
-        If the SLM's confidence falls below the lowest threshold (0.45)
-        for any non-zero category, the runtime treats the message as
+        If the classifier's confidence falls below the lowest threshold
+        (0.45) for any non-zero category, the runtime treats the message as
         SAFE (category 0, severity 0) and emits no label.
     tie_break:
       rule: lower_numbered_category_wins
@@ -161,8 +162,8 @@ child_safety_policy:
     - jurisdiction overlay declares a minor-protection rule that matches
   detectors:
     - csam_indicators              # opaque local descriptor only
-    - grooming_patterns            # lexicon + SLM contextual
-    - sextortion_patterns          # lexicon + SLM contextual
+    - grooming_patterns            # lexicon + encoder contextual
+    - sextortion_patterns          # lexicon + encoder contextual
     - request_for_private_meeting_with_minor
   actions:
     critical_intervention: true

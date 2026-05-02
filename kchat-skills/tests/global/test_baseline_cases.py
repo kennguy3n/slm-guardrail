@@ -1,20 +1,20 @@
 """First round of global-baseline test cases.
 
-Each case is a (local_signal input, expected SLM output) pair conforming
-to ``kchat-skills/global/local_signal_schema.json`` and
+Each case is a (local_signal input, expected classifier output) pair
+conforming to ``kchat-skills/global/local_signal_schema.json`` and
 ``kchat-skills/global/output_schema.json``.
 
-These cases define the *classification contract* the on-device SLM must
-satisfy once it is integrated in Phase 3; the test module validates only
-that every case is structurally well-formed, covers all 16 taxonomy
+These cases define the *classification contract* the on-device encoder
+classifier must satisfy once it is integrated in Phase 3; the test module
+validates only that every case is structurally well-formed, covers all 16 taxonomy
 categories, and exercises the protected-speech and threshold-boundary
 requirements from PROPOSAL.md "Success Metrics" and the decision-policy
 thresholds in ``kchat-skills/global/baseline.yaml``.
 
 Running the cases against a real model is Phase 3 work; this module is
 deliberately shaped so a future runner can import
-:data:`BASELINE_TEST_CASES` and feed each ``input`` block to the SLM,
-then compare the model's output to ``expected_output`` using
+:data:`BASELINE_TEST_CASES` and feed each ``input`` block to the
+classifier, then compare the model's output to ``expected_output`` using
 ``kchat.guardrail.output.v1`` equality semantics.
 """
 from __future__ import annotations
@@ -64,6 +64,7 @@ def _base_input(
             "scam_patterns_hit": [],
             "lexicon_hits": [],
             "media_descriptors": [],
+            "context_hints": [],
         },
         "constraints": {
             "max_output_tokens": 600,
@@ -121,7 +122,7 @@ def _case(case_id: str, description: str, **kwargs: Any) -> dict[str, Any]:
 
 # Each case:
 #   case_id, description, tags, input, expected_output.
-# The runner in Phase 3 compares SLM output to expected_output.
+# The runner in Phase 3 compares classifier output to expected_output.
 BASELINE_TEST_CASES: list[dict[str, Any]] = [
     # ---- Category 0 SAFE -------------------------------------------------
     _case(

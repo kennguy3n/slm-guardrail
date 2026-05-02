@@ -1,23 +1,26 @@
-"""SLM runtime adapter — the boundary between the hybrid local pipeline
-and any tiny-SLM backend (ONNX, TFLite, llama.cpp, Core ML, etc.).
+"""Encoder classifier runtime adapter — the boundary between the
+hybrid local pipeline and any encoder-classifier backend.
+
+Reference backend: **XLM-R MiniLM-L6** (see
+:mod:`xlmr_minilm_adapter`). The Protocol itself is deliberately
+backend-agnostic: any implementation that accepts a
+``kchat.guardrail.local_signal.v1`` instance and returns a
+``kchat.guardrail.output.v1`` instance is a valid adapter — the
+pipeline never imports a specific model runtime.
 
 Spec references:
 
-* PHASES.md Phase 3 — "Define the SLM runtime adapter interface — the
-  boundary between the pipeline and any tiny-SLM backend (so we can
-  swap backends without changing skill packs)."
-* ARCHITECTURE.md "Hybrid Local Pipeline" step 4 — "SLM contextual
-  classification (tiny SLM, temperature 0.0)".
-
-The adapter is deliberately backend-agnostic: any implementation that
-accepts a ``kchat.guardrail.local_signal.v1`` instance and returns a
-``kchat.guardrail.output.v1`` instance is a valid adapter. The
-pipeline never imports a specific model runtime.
+* PHASES.md Phase 3 — "Define the runtime adapter interface — the
+  boundary between the pipeline and any encoder-classifier backend
+  (so we can swap backends without changing skill packs)."
+* ARCHITECTURE.md "Hybrid Local Pipeline" step 4 —
+  "Encoder-based contextual classification (XLM-R MiniLM-L6)".
 
 This module ships:
 
 * :class:`SLMAdapter` — the :mod:`typing.Protocol` defining the
-  contract.
+  contract. The name is preserved for backwards compatibility; it
+  matches any encoder-classifier backend.
 * :class:`MockSLMAdapter` — a deterministic reference adapter. It
   returns fixed outputs keyed off the deterministic-local-detector
   signals so the full pipeline is testable end-to-end without a real
@@ -69,9 +72,24 @@ def _safe_output() -> dict[str, Any]:
     }
 
 
+def _safe_output_with_context(context_hints: list[str]) -> dict[str, Any]:
+    """Like :func:`_safe_output`, but echoes the protected-speech
+    context hints back into ``reason_codes`` for reviewer traceability.
+
+    The output category is already SAFE so the threshold policy's
+    protected-speech demotion rule is a no-op; the hints are kept on
+    the record purely so reviewers can see *why* a borderline message
+    was treated as SAFE (e.g. it carried ``NEWS_CONTEXT``).
+    """
+    out = _safe_output()
+    if context_hints:
+        out["reason_codes"] = list(dict.fromkeys(context_hints))
+    return out
+
+
 @runtime_checkable
 class SLMAdapter(Protocol):
-    """Adapter contract implemented by any tiny-SLM backend.
+    """Adapter contract implemented by any encoder-classifier backend.
 
     Implementations must:
 
@@ -80,8 +98,10 @@ class SLMAdapter(Protocol):
     * Return a dict matching ``kchat.guardrail.output.v1``. The
       pipeline validates the return shape; invalid outputs are
       rejected and re-coerced to SAFE.
-    * Be deterministic at temperature 0.0 — identical input must
-      produce identical output.
+    * Be deterministic — identical input must produce identical
+      output. For encoder backends this is satisfied by argmax over
+      fixed prototype embeddings; for any future generative backend
+      the adapter must pin temperature to 0.0.
     * Run with no network access. The pipeline enforces this at the
       step-3 packaging boundary; adapters are expected not to reach
       out.
@@ -95,7 +115,9 @@ class SLMAdapter(Protocol):
 class MockSLMAdapter:
     """Deterministic reference adapter for pipeline tests.
 
-    Maps deterministic-detector signals to category outputs:
+    Used in tests, demos, and any environment that does not have the
+    XLM-R MiniLM-L6 encoder weights loaded. Maps deterministic-detector
+    signals to category outputs:
 
     * ``url_risk > 0.8`` → SCAM_FRAUD (7).
     * any ``pii_patterns_hit`` → PRIVATE_DATA (9).
@@ -122,8 +144,11 @@ class MockSLMAdapter:
         scam_hits = signals.get("scam_patterns_hit") or []
         url_risk = float(signals.get("url_risk") or 0.0)
         media = signals.get("media_descriptors") or []
+        context_hints = list(signals.get("context_hints") or [])
 
-        # CHILD_SAFETY — any lexicon hit on category 1.
+        # CHILD_SAFETY — any lexicon hit on category 1. Wins over every
+        # other signal, including protected-speech context hints — the
+        # threshold policy preserves the floor above all else.
         child_lex = [h for h in lexicon_hits if h.get("category") == CAT_CHILD_SAFETY]
         if child_lex:
             weight = max(float(h.get("weight", 0.5)) for h in child_lex)
@@ -141,7 +166,25 @@ class MockSLMAdapter:
                 "resource_link_id": "child_safety_resources_v1",
             }
 
-        # PRIVATE_DATA — any PII pattern.
+        # NOTE: deterministic-signal branches below (PII / SCAM_FRAUD /
+        # LEXICON / NSFW) emit their reason codes *without* the
+        # protected-speech ``context_hints`` from the pipeline. This
+        # is intentional: the threshold policy demotes any non-SAFE /
+        # non-CHILD_SAFETY verdict carrying a protected-speech reason
+        # code to SAFE, and we do **not** want that demotion to
+        # silence a phishing URL detected in a school group chat or a
+        # PII leak in a journalism community. Protected-speech
+        # demotion only applies on the embedding-head path (mock has
+        # no embedding head; the trained adapter does — see
+        # ``xlmr_minilm_adapter.py``).
+        #
+        # The ``context_hints`` list is still consumed below: it is
+        # used by the ``_safe_output()`` fallback at the bottom of the
+        # method via the existing pipeline -> threshold-policy flow,
+        # and is also visible to the threshold policy via the pipeline
+        # ``local_signals`` view (it is *not* re-emitted here).
+
+        # PRIVATE_DATA — any PII pattern. Deterministic — never demoted.
         if pii_hits:
             confidence = min(0.95, 0.55 + 0.1 * len(pii_hits))
             return {
@@ -157,7 +200,7 @@ class MockSLMAdapter:
                 "rationale_id": "private_data_pii_v1",
             }
 
-        # SCAM_FRAUD — high URL risk or scam patterns.
+        # SCAM_FRAUD — high URL risk or scam patterns. Deterministic.
         if url_risk > 0.8 or scam_hits:
             confidence = max(url_risk, 0.55 + 0.1 * len(scam_hits))
             confidence = min(0.95, confidence)
@@ -175,13 +218,13 @@ class MockSLMAdapter:
                 "rationale_id": "scam_credential_phish_v1",
             }
 
-        # Lexicon-only hits — pick the highest-weight hit.
+        # Lexicon-only hits — pick the highest-weight hit. Deterministic.
         if lexicon_hits:
             top = max(lexicon_hits, key=lambda h: float(h.get("weight", 0.0)))
             category = int(top.get("category", CAT_SAFE))
             weight = float(top.get("weight", 0.5))
             if category == CAT_SAFE:
-                return _safe_output()
+                return _safe_output_with_context(context_hints)
             confidence = max(0.45, min(0.95, weight))
             return {
                 "severity": 3,
@@ -192,7 +235,7 @@ class MockSLMAdapter:
                 "rationale_id": f"lexicon_category_{category}_v1",
             }
 
-        # Media NSFW.
+        # Media NSFW. Deterministic — never demoted.
         for m in media:
             nsfw = m.get("nsfw_score")
             if nsfw is not None and float(nsfw) > 0.7:
@@ -206,7 +249,7 @@ class MockSLMAdapter:
                     "rationale_id": "sexual_adult_media_v1",
                 }
 
-        return _safe_output()
+        return _safe_output_with_context(context_hints)
 
 
 __all__ = ["SLMAdapter", "MockSLMAdapter"]

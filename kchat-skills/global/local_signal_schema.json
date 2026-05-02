@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "kchat.guardrail.local_signal.v1",
-  "title": "KChat Guardrail SLM Input Contract",
-  "description": "Structured input contract passed to the on-device SLM. The local guardrail runtime constructs this object from on-device signals and runtime context. The SLM reasons over local descriptors, never over raw bytes. See ARCHITECTURE.md 'SLM Execution Contract'.",
+  "title": "KChat Guardrail Encoder Classifier Input Contract",
+  "description": "Structured input contract passed to the on-device encoder classifier. The local guardrail runtime constructs this object from on-device signals and runtime context. The classifier reasons over local descriptors, never over raw bytes. See ARCHITECTURE.md 'Encoder Classifier Execution Contract'.",
   "type": "object",
   "additionalProperties": false,
   "required": ["message", "context", "local_signals", "constraints"],
@@ -87,7 +87,7 @@
         },
         "is_offline": {
           "type": "boolean",
-          "description": "When true, the SLM must produce identical output as when online."
+          "description": "When true, the classifier must produce identical output as when online."
         }
       }
     },
@@ -99,7 +99,8 @@
         "pii_patterns_hit",
         "scam_patterns_hit",
         "lexicon_hits",
-        "media_descriptors"
+        "media_descriptors",
+        "context_hints"
       ],
       "properties": {
         "url_risk": {
@@ -189,6 +190,20 @@
               }
             }
           }
+        },
+        "context_hints": {
+          "type": "array",
+          "description": "Pipeline-derived protected-speech / context flags. Forwarded by the classifier into output.reason_codes; the threshold policy demotes non-CHILD_SAFETY non-SAFE verdicts carrying these hints back to SAFE.",
+          "items": {
+            "type": "string",
+            "enum": [
+              "NEWS_CONTEXT",
+              "EDUCATION_CONTEXT",
+              "COUNTERSPEECH_CONTEXT",
+              "QUOTED_SPEECH_CONTEXT"
+            ]
+          },
+          "uniqueItems": true
         }
       }
     },

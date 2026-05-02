@@ -19,6 +19,7 @@ from pipeline import (  # type: ignore[import-not-found]
     GuardrailPipeline,
     LexiconEntry,
     SkillBundle,
+    derive_context_hints,
     detect_pii,
     detect_scam,
     extract_media_descriptors,
@@ -153,6 +154,7 @@ def _empty_local_signals() -> dict[str, Any]:
         "scam_patterns_hit": [],
         "lexicon_hits": [],
         "media_descriptors": [],
+        "context_hints": [],
     }
 
 
@@ -325,7 +327,7 @@ def test_pipeline_skips_counter_updates_without_group_id():
 
 
 # ---------------------------------------------------------------------------
-# SLM receives original text (not normalized form)
+# Classifier adapter receives original text (not normalized form)
 # ---------------------------------------------------------------------------
 class _RecordingAdapter:
     def __init__(self) -> None:
@@ -377,3 +379,280 @@ def test_bundle_jurisdiction_id_flows_into_packed_context():
         "kchat.jurisdiction.archetype-strict-marketplace.guardrail.v1"
     )
     assert ctx["community_overlay_id"] == "kchat.community.workplace.guardrail.v1"
+
+
+# ---------------------------------------------------------------------------
+# Step 2 (auxiliary) — derive_context_hints
+# ---------------------------------------------------------------------------
+class TestDeriveContextHints:
+    @staticmethod
+    def _msg(quoted: bool = False) -> dict[str, Any]:
+        return {
+            "text": "x",
+            "lang_hint": "en",
+            "has_attachment": False,
+            "attachment_kinds": [],
+            "quoted_from_user": quoted,
+            "is_outbound": False,
+        }
+
+    @staticmethod
+    def _ctx(overlay: str | None) -> dict[str, Any]:
+        return {
+            "group_kind": "small_group",
+            "group_age_mode": "mixed_age",
+            "user_role": "member",
+            "relationship_known": True,
+            "locale": "en-US",
+            "jurisdiction_id": None,
+            "community_overlay_id": overlay,
+            "is_offline": False,
+        }
+
+    def test_journalism_overlay_emits_news_context(self):
+        hints = derive_context_hints(
+            message=self._msg(quoted=False),
+            context=self._ctx("kchat.community.journalism.guardrail.v1"),
+        )
+        assert "NEWS_CONTEXT" in hints
+
+    def test_quoted_from_user_emits_quoted_speech_context(self):
+        hints = derive_context_hints(
+            message=self._msg(quoted=True),
+            context=self._ctx(None),
+        )
+        assert "QUOTED_SPEECH_CONTEXT" in hints
+
+    def test_education_overlay_emits_education_context(self):
+        hints = derive_context_hints(
+            message=self._msg(quoted=False),
+            context=self._ctx("kchat.community.education_higher.guardrail.v1"),
+        )
+        assert "EDUCATION_CONTEXT" in hints
+
+    def test_lgbtq_support_overlay_emits_counterspeech_context(self):
+        hints = derive_context_hints(
+            message=self._msg(quoted=False),
+            context=self._ctx("kchat.community.lgbtq_support.guardrail.v1"),
+        )
+        assert "COUNTERSPEECH_CONTEXT" in hints
+
+    def test_journalism_plus_quoted_emits_both(self):
+        hints = derive_context_hints(
+            message=self._msg(quoted=True),
+            context=self._ctx("kchat.community.journalism.guardrail.v1"),
+        )
+        assert "NEWS_CONTEXT" in hints
+        assert "QUOTED_SPEECH_CONTEXT" in hints
+
+    def test_unrelated_overlay_emits_nothing(self):
+        hints = derive_context_hints(
+            message=self._msg(quoted=False),
+            context=self._ctx("kchat.community.gaming.guardrail.v1"),
+        )
+        assert hints == []
+
+    def test_no_overlay_no_quoted_emits_nothing(self):
+        hints = derive_context_hints(
+            message=self._msg(quoted=False),
+            context=self._ctx(None),
+        )
+        assert hints == []
+
+
+# ---------------------------------------------------------------------------
+# Pipeline-level: protected-speech context + non-SAFE encoder verdict
+# round-trips to SAFE via threshold demotion.
+# ---------------------------------------------------------------------------
+class _AlwaysViolenceAdapter:
+    """Adapter that mimics an encoder that classifies anything as
+    VIOLENCE_THREAT (3) at confidence 0.50 — used to exercise the
+    protected-speech demotion path end-to-end."""
+
+    def classify(self, input: dict[str, Any]) -> dict[str, Any]:
+        signals = input.get("local_signals") or {}
+        context_hints = list(signals.get("context_hints") or [])
+        return {
+            "severity": 2,
+            "category": 3,
+            "confidence": 0.50,
+            "actions": {
+                "label_only": True,
+                "warn": False,
+                "strong_warn": False,
+                "critical_intervention": False,
+                "suggest_redact": False,
+            },
+            "reason_codes": list(context_hints),
+            "rationale_id": "test_violence_v1",
+        }
+
+
+def test_pipeline_news_quote_demotes_violence_to_safe():
+    """End-to-end: a quoted news message ends up SAFE even when the
+    encoder labels it VIOLENCE_THREAT."""
+    p = GuardrailPipeline(
+        skill_bundle=SkillBundle(
+            community_overlay_id="kchat.community.journalism.guardrail.v1"
+        ),
+        slm_adapter=_AlwaysViolenceAdapter(),
+    )
+    msg = {"text": "Reuters reports an attack.", "quoted_from_user": True}
+    out = p.classify(msg, _context())
+    assert out["category"] == 0
+    assert out["severity"] == 0
+    assert "NEWS_CONTEXT" in out["reason_codes"]
+    assert "QUOTED_SPEECH_CONTEXT" in out["reason_codes"]
+    assert out["rationale_id"] == "safe_protected_speech_v1"
+
+
+def test_pipeline_no_overlay_keeps_violence_label():
+    """Sanity: same encoder, no protected-speech context — verdict
+    survives the threshold policy at label_only."""
+    p = GuardrailPipeline(
+        skill_bundle=SkillBundle(),
+        slm_adapter=_AlwaysViolenceAdapter(),
+    )
+    out = p.classify({"text": "i will hurt them"}, _context())
+    assert out["category"] == 3  # VIOLENCE_THREAT
+    assert out["actions"]["label_only"] is True
+
+
+def test_pipeline_packs_context_hints_into_local_signals():
+    """The packaged input passed to the adapter must include
+    context_hints in local_signals — the schema requires it."""
+    adapter = _RecordingAdapter()
+    bundle = SkillBundle(
+        community_overlay_id="kchat.community.journalism.guardrail.v1"
+    )
+    p = GuardrailPipeline(skill_bundle=bundle, slm_adapter=adapter)
+    p.classify(
+        {"text": "headline", "quoted_from_user": True}, _context()
+    )
+    assert adapter.last_input is not None
+    hints = adapter.last_input["local_signals"]["context_hints"]
+    assert "NEWS_CONTEXT" in hints
+    assert "QUOTED_SPEECH_CONTEXT" in hints
+
+
+# ---------------------------------------------------------------------------
+# Regression: protected-speech demotion must NOT silence deterministic
+# detector signals (phishing URLs, PII, scam patterns, lexicon hits,
+# NSFW media). The threshold-policy rule is intentionally narrow so a
+# phishing URL in a school group is still flagged as SCAM_FRAUD, a PII
+# leak in a journalism community is still flagged as PRIVATE_DATA,
+# etc. — even though the surrounding context attaches a protected-
+# speech hint.
+#
+# These tests lock in the fix for the deterministic-branch demotion
+# bug found by Devin Review on commit 91ccd9f.
+# ---------------------------------------------------------------------------
+def test_phishing_url_in_school_context_stays_scam_fraud():
+    """A high-risk phishing URL posted in a school group (which carries
+    EDUCATION_CONTEXT) must NOT be demoted to SAFE."""
+    p = GuardrailPipeline(
+        skill_bundle=SkillBundle(
+            community_overlay_id="kchat.community.school.guardrail.v1"
+        ),
+        slm_adapter=MockSLMAdapter(),
+    )
+    msg = {
+        "text": "Kids click here: https://free-iphone.xyz/claim",
+        "quoted_from_user": False,
+    }
+    ctx = _context()
+    ctx["group_age_mode"] = "minor_present"
+    out = p.classify(msg, ctx)
+    assert out["category"] == 7  # SCAM_FRAUD
+    assert out["severity"] >= 3
+    # URL_RISK reason code must survive — it's the deterministic signal.
+    assert "URL_RISK" in out["reason_codes"]
+    # The protected-speech hint must NOT appear on the output of a
+    # deterministic-driven branch.
+    assert "EDUCATION_CONTEXT" not in out["reason_codes"]
+
+
+def test_pii_in_journalism_context_stays_private_data():
+    """A PII leak in a journalism community must NOT be demoted to
+    SAFE just because NEWS_CONTEXT is attached."""
+    p = GuardrailPipeline(
+        skill_bundle=SkillBundle(
+            community_overlay_id="kchat.community.journalism.guardrail.v1"
+        ),
+        slm_adapter=MockSLMAdapter(),
+    )
+    msg = {
+        "text": "leaked: john.doe@example.com / 415-555-0199",
+        "quoted_from_user": False,
+    }
+    out = p.classify(msg, _context())
+    assert out["category"] == 9  # PRIVATE_DATA
+    assert out["severity"] >= 3
+    assert "PRIVATE_DATA_PATTERN" in out["reason_codes"]
+    assert "NEWS_CONTEXT" not in out["reason_codes"]
+
+
+def test_scam_pattern_in_education_context_stays_scam_fraud():
+    """A scam pattern hit (advance-fee / fake-giveaway) in an education
+    community must NOT be demoted to SAFE."""
+    p = GuardrailPipeline(
+        skill_bundle=SkillBundle(
+            community_overlay_id="kchat.community.education.guardrail.v1"
+        ),
+        slm_adapter=MockSLMAdapter(),
+    )
+    msg = {
+        "text": (
+            "Congratulations! You have won a $500 gift card. "
+            "Claim your prize at https://win-now.click/claim"
+        ),
+        "quoted_from_user": False,
+    }
+    out = p.classify(msg, _context())
+    assert out["category"] == 7  # SCAM_FRAUD
+    assert out["severity"] >= 3
+    assert "EDUCATION_CONTEXT" not in out["reason_codes"]
+
+
+def test_quoted_phishing_url_still_flagged_as_scam_fraud():
+    """Even when the phishing URL is quoted (QUOTED_SPEECH_CONTEXT),
+    it remains a deterministic SCAM_FRAUD hit. Quoting a phishing URL
+    does not make it safe."""
+    p = GuardrailPipeline(
+        skill_bundle=SkillBundle(),
+        slm_adapter=MockSLMAdapter(),
+    )
+    msg = {
+        "text": "Friend forwarded this: https://win-now.click/claim",
+        "quoted_from_user": True,
+    }
+    out = p.classify(msg, _context())
+    assert out["category"] == 7  # SCAM_FRAUD
+    assert "URL_RISK" in out["reason_codes"]
+    assert "QUOTED_SPEECH_CONTEXT" not in out["reason_codes"]
+
+
+def test_news_quote_about_violence_still_demotes_to_safe():
+    """The original ``extremism-news-context-01`` regression: a
+    quoted news report mentioning a banned organisation + attack
+    must still be demoted to SAFE when only the embedding head fired.
+    This proves the fix did NOT regress the protected-speech path."""
+    p = GuardrailPipeline(
+        skill_bundle=SkillBundle(
+            community_overlay_id="kchat.community.journalism.guardrail.v1"
+        ),
+        slm_adapter=_AlwaysViolenceAdapter(),
+    )
+    msg = {
+        "text": (
+            "Reuters reports a banned organization claimed "
+            "responsibility for the attack."
+        ),
+        "quoted_from_user": True,
+    }
+    out = p.classify(msg, _context())
+    assert out["category"] == 0  # SAFE
+    assert out["severity"] == 0
+    assert "NEWS_CONTEXT" in out["reason_codes"]
+    assert "QUOTED_SPEECH_CONTEXT" in out["reason_codes"]
+    assert out["rationale_id"] == "safe_protected_speech_v1"

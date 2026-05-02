@@ -7,15 +7,17 @@ and PHASES.md Phase 3:
        transliteration).
     2. Deterministic local detectors (URL risk, PII patterns, scam
        patterns, lexicon matching, media descriptor signal extraction).
-    3. Signal packaging into the SLM input contract.
-    4. SLM contextual classification (tiny SLM, temperature 0.0).
+    3. Signal packaging into the classifier input contract.
+    4. Encoder-based contextual classification
+       (XLM-R MiniLM-L6, deterministic argmax over fixed prototype
+       embeddings).
     5. Severity / threshold policy enforcement.
     6. Local JSON output generation.
     7. Local expiring counter updates (device-local only).
 
 The pipeline is fully offline-capable: no step requires network
-access. The SLM receives the *original* text; normalization is used
-only for detector matching.
+access. The encoder receives the *original* text; normalization is
+used only for detector matching.
 """
 from __future__ import annotations
 
@@ -220,6 +222,71 @@ def extract_media_descriptors(
 
 
 # ---------------------------------------------------------------------------
+# Step 2 (auxiliary) — Protected-speech context hints.
+# ---------------------------------------------------------------------------
+# Community overlays whose presence implies the message lives in a
+# protected-speech context. Substring match against
+# ``context.community_overlay_id`` (case-insensitive).
+_NEWS_CONTEXT_OVERLAY_TOKENS: tuple[str, ...] = (
+    "journalism",
+    "news",
+)
+_EDUCATION_CONTEXT_OVERLAY_TOKENS: tuple[str, ...] = (
+    "education_higher",
+    "education",
+    "school",
+    "research",
+    "science",
+)
+_COUNTERSPEECH_CONTEXT_OVERLAY_TOKENS: tuple[str, ...] = (
+    "lgbtq_support",
+    "minority_support",
+    "civic",
+    "humanrights",
+)
+
+
+def derive_context_hints(
+    *,
+    message: dict[str, Any],
+    context: dict[str, Any],
+) -> list[str]:
+    """Pipeline step 2 (auxiliary): protected-speech context hints.
+
+    Returns a list of hints (subset of NEWS_CONTEXT, EDUCATION_CONTEXT,
+    COUNTERSPEECH_CONTEXT, QUOTED_SPEECH_CONTEXT) inferred from the
+    message + context envelope. The classifier forwards these into
+    ``output.reason_codes``; the threshold policy uses them to demote
+    non-CHILD_SAFETY non-SAFE verdicts back to SAFE — protecting news
+    coverage, education, and counterspeech from false positives.
+
+    Quoted-speech context is always derived from
+    ``message.quoted_from_user``. News / education / counterspeech are
+    inferred from ``context.community_overlay_id`` substrings.
+    """
+    hints: list[str] = []
+    overlay_id = (context.get("community_overlay_id") or "").lower()
+
+    if any(tok in overlay_id for tok in _NEWS_CONTEXT_OVERLAY_TOKENS):
+        hints.append("NEWS_CONTEXT")
+    if any(tok in overlay_id for tok in _EDUCATION_CONTEXT_OVERLAY_TOKENS):
+        hints.append("EDUCATION_CONTEXT")
+    if any(tok in overlay_id for tok in _COUNTERSPEECH_CONTEXT_OVERLAY_TOKENS):
+        hints.append("COUNTERSPEECH_CONTEXT")
+    if bool(message.get("quoted_from_user", False)):
+        hints.append("QUOTED_SPEECH_CONTEXT")
+
+    # De-duplicate while preserving insertion order.
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for h in hints:
+        if h not in seen:
+            seen.add(h)
+            deduped.append(h)
+    return deduped
+
+
+# ---------------------------------------------------------------------------
 # Step 3 — Signal packaging (construct the input contract).
 # ---------------------------------------------------------------------------
 @dataclass
@@ -255,9 +322,10 @@ def pack_signals(
 ) -> dict[str, Any]:
     """Pipeline step 3: pack the structured ``kchat.guardrail.local_signal.v1``.
 
-    The pipeline supplies the ``constraints`` block (temperature 0.0,
-    max_output_tokens 600, output_format json, schema_id pinned) so the
-    SLM adapter cannot drift them.
+    The pipeline supplies the ``constraints`` block (output_format
+    json, schema_id pinned). ``temperature`` and ``max_output_tokens``
+    are kept for backwards compatibility with older skill packs but
+    are ignored by encoder-classifier backends like XLM-R MiniLM-L6.
     """
     return {
         "message": message,
@@ -285,8 +353,11 @@ class GuardrailPipeline:
         Compiled active skill bundle (global baseline + optional
         jurisdiction overlay + optional community overlay).
     slm_adapter
-        Any :class:`SLMAdapter` implementation — the real model or
-        :class:`MockSLMAdapter` in tests.
+        Any :class:`SLMAdapter` implementation — the real encoder
+        classifier (e.g. ``XLMRMiniLMAdapter``) or
+        :class:`MockSLMAdapter` in tests. The attribute name is kept
+        for backwards compatibility with existing skill packs and
+        callers; any encoder-classifier backend is acceptable.
     threshold_policy
         Hard-coded threshold enforcer. Defaults to a fresh
         :class:`ThresholdPolicy`.
@@ -323,22 +394,10 @@ class GuardrailPipeline:
             case_fold=bool(norm.get("case_fold", True)),
         )
 
-        # --- Step 2: Deterministic local detectors.
-        local_signals = {
-            "url_risk": score_url_risk(normalized),
-            "pii_patterns_hit": detect_pii(normalized),
-            "scam_patterns_hit": detect_scam(normalized),
-            "lexicon_hits": match_lexicons(
-                normalized, self.skill_bundle.lexicons
-            ),
-            "media_descriptors": extract_media_descriptors(
-                message.get("media_descriptors")
-            ),
-        }
-
-        # --- Step 3: Signal packaging.
+        # --- Step 3: Signal packaging (assemble message + context first
+        # so context hints can be derived in step 2 below).
         packed_message = {
-            "text": text,  # SLM receives *original* text, not normalized.
+            "text": text,  # encoder receives *original* text, not normalized.
             "lang_hint": message.get("lang_hint"),
             "has_attachment": bool(message.get("has_attachment", False)),
             "attachment_kinds": list(message.get("attachment_kinds") or []),
@@ -365,13 +424,32 @@ class GuardrailPipeline:
             ),
             "is_offline": bool(context.get("is_offline", False)),
         }
+
+        # --- Step 2: Deterministic local detectors + context hints.
+        local_signals = {
+            "url_risk": score_url_risk(normalized),
+            "pii_patterns_hit": detect_pii(normalized),
+            "scam_patterns_hit": detect_scam(normalized),
+            "lexicon_hits": match_lexicons(
+                normalized, self.skill_bundle.lexicons
+            ),
+            "media_descriptors": extract_media_descriptors(
+                message.get("media_descriptors")
+            ),
+            "context_hints": derive_context_hints(
+                message=packed_message,
+                context=packed_context,
+            ),
+        }
+
         packed = pack_signals(
             message=packed_message,
             context=packed_context,
             local_signals=local_signals,
         )
 
-        # --- Step 4: SLM contextual classification.
+        # --- Step 4: Encoder-based contextual classification
+        # (XLM-R MiniLM-L6 reference backend; any SLMAdapter works).
         raw_output = self.slm_adapter.classify(packed)
 
         # --- Step 5: Severity / threshold policy enforcement.
@@ -444,6 +522,7 @@ __all__ = [
     "GuardrailPipeline",
     "LexiconEntry",
     "SkillBundle",
+    "derive_context_hints",
     "detect_pii",
     "detect_scam",
     "extract_media_descriptors",
