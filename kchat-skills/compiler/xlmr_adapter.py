@@ -31,6 +31,14 @@ The adapter:
    strong, embeddings break ties otherwise.
 5. Coerces the final dict to the ``kchat.guardrail.output.v1`` schema
    and returns it. Out-of-range fields collapse to a SAFE fallback.
+6. Attaches the raw mean-pooled, L2-normalised XLM-R embedding to
+   the returned dict under the internal key ``_embedding`` (a 384-dim
+   ``list[float]``). The underscore prefix signals this is not a
+   first-class ``kchat.guardrail.output.v1`` field; downstream
+   consumers (notably ``chat-storage-search``) cache the embedding in
+   their ``search_vector`` table so a message's XLM-R encoder pass is
+   computed at most once across the guardrail and search pipelines.
+   The schema permits ``_*`` extras via ``patternProperties``.
 
 Design constraints inherited from the EncoderAdapter contract:
 
@@ -82,6 +90,11 @@ XLMR_MODEL_NAME = "XLM-R"
 # Default location of the ONNX-exported encoder relative to the repo
 # root. ``tools/export_xlmr_onnx.py`` produces this artefact.
 DEFAULT_ONNX_MODEL_PATH = "models/xlmr.onnx"
+# Optional INT4 (block-wise weight-only) variant of the same encoder.
+# Produced by ``tools/export_xlmr_onnx.py --quantize-int4`` and
+# preferred on storage-constrained devices. ~50 MB on disk vs the
+# ~107 MB INT8 default.
+DEFAULT_ONNX_INT4_MODEL_PATH = "models/xlmr.int4.onnx"
 # Default location of the SentencePiece tokenizer model. XLM-R uses
 # SentencePiece BPE; the export script copies the tokenizer alongside
 # the ONNX model.
@@ -185,13 +198,28 @@ class XLMRAdapter:
     ----------
     model_path
         Local filesystem path to the ONNX-exported XLM-R encoder.
-        Defaults to :data:`DEFAULT_ONNX_MODEL_PATH`. The adapter only
-        loads the model on first :meth:`classify` call so constructing
-        one is cheap.
+        Defaults to :data:`DEFAULT_ONNX_MODEL_PATH` (the INT8
+        ``models/xlmr.onnx`` file). Callers running on
+        storage-constrained devices may pass
+        :data:`DEFAULT_ONNX_INT4_MODEL_PATH` to load the ~50 MB INT4
+        variant produced by ``tools/export_xlmr_onnx.py
+        --quantize-int4``. See also ``prefer_int4`` for an
+        auto-resolving alternative. The adapter only loads the model
+        on first :meth:`classify` call so constructing one is cheap.
     tokenizer_path
         Local filesystem path to the SentencePiece tokenizer model
         (``.spm`` / ``.model`` file). Defaults to
         :data:`DEFAULT_TOKENIZER_PATH`.
+    prefer_int4
+        When True and ``model_path`` is left at the INT8 default,
+        the adapter prefers the INT4 file
+        (:data:`DEFAULT_ONNX_INT4_MODEL_PATH`) if it exists on disk.
+        If the INT4 file is missing, the adapter falls back to the
+        INT8 default. Explicit ``model_path`` arguments are honoured
+        verbatim regardless of this flag — pass an explicit path
+        when you want to disable the auto-resolve. Useful as an
+        on-device storage-tier hint without forcing the caller to
+        probe the filesystem.
     max_seq_length
         Sequence length used by the tokenizer. The XLM-R encoder
         supports up to 512 tokens; 128 is plenty for short chat
@@ -239,6 +267,7 @@ class XLMRAdapter:
     softmax_temperature: float = 0.01
     min_margin: float = 0.10
     head_weights_path: Optional[str] = None
+    prefer_int4: bool = False
     logger: Optional[logging.Logger] = None
     last_latency_ms: float = field(default=0.0, init=False)
     _tokenizer: Any = field(default=None, init=False, repr=False)
@@ -311,6 +340,18 @@ class XLMRAdapter:
             )
             return safe_fallback_output()
 
+        # Attach the raw mean-pooled, L2-normalised embedding as an
+        # internal extra (key prefixed with ``_`` to signal it is not
+        # part of the public output schema). Downstream consumers
+        # (e.g. ``chat-storage-search``) cache this 384-dim vector in
+        # the ``search_vector`` table so a message's XLM-R embedding
+        # is computed at most once across guardrail + search. The
+        # field is preserved by ``_coerce_to_output_schema``.
+        try:
+            raw_output["_embedding"] = [float(x) for x in _to_list(embedding)]
+        except Exception:  # noqa: BLE001 — never block on a malformed embedding
+            pass
+
         self.last_latency_ms = (time.perf_counter() - start) * 1000.0
         return _coerce_to_output_schema(raw_output)
 
@@ -340,11 +381,30 @@ class XLMRAdapter:
                 self.tokenizer_path,
             )
             return
-        if not Path(self.model_path).is_file():
+
+        # If ``prefer_int4`` is set and the caller is using the
+        # default INT8 path, transparently swap in the INT4 file when
+        # it exists on disk. Explicit ``model_path`` arguments are
+        # honoured verbatim — callers that want a specific tier pass
+        # the path directly.
+        resolved_model_path = self.model_path
+        if (
+            self.prefer_int4
+            and resolved_model_path == DEFAULT_ONNX_MODEL_PATH
+            and Path(DEFAULT_ONNX_INT4_MODEL_PATH).is_file()
+        ):
+            (self.logger or _module_logger).info(
+                "prefer_int4 hint set; loading %s instead of the INT8 default",
+                DEFAULT_ONNX_INT4_MODEL_PATH,
+            )
+            resolved_model_path = DEFAULT_ONNX_INT4_MODEL_PATH
+            self.model_path = resolved_model_path
+
+        if not Path(resolved_model_path).is_file():
             self._load_failed = True
             (self.logger or _module_logger).warning(
                 "XLM-R ONNX model not found at %r; falling back to SAFE",
-                self.model_path,
+                resolved_model_path,
             )
             return
 
@@ -903,6 +963,18 @@ def _coerce_to_output_schema(parsed: dict[str, Any]) -> dict[str, Any]:
         if cleaned:
             out["counter_updates"] = cleaned
 
+    # Pass through internal underscore-prefixed extras (e.g. ``_embedding``
+    # — the raw mean-pooled XLM-R embedding consumed by downstream
+    # cross-pipeline caches such as ``chat-storage-search``). These
+    # keys are not part of ``kchat.guardrail.output.v1`` proper; the
+    # schema admits them via ``patternProperties: {"^_": {}}``.
+    embedding_in = parsed.get("_embedding")
+    if isinstance(embedding_in, list) and all(
+        isinstance(x, (int, float)) and not isinstance(x, bool)
+        for x in embedding_in
+    ):
+        out["_embedding"] = [float(x) for x in embedding_in]
+
     return out
 
 
@@ -914,6 +986,7 @@ del _PROTOCOL_REFERENCE
 
 __all__ = [
     "CATEGORY_PROTOTYPES",
+    "DEFAULT_ONNX_INT4_MODEL_PATH",
     "DEFAULT_ONNX_MODEL_PATH",
     "DEFAULT_TOKENIZER_PATH",
     "XLMR_MODEL_NAME",

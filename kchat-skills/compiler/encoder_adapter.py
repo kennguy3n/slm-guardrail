@@ -105,6 +105,20 @@ class EncoderAdapter(Protocol):
     * Run with no network access. The pipeline enforces this at the
       step-3 packaging boundary; adapters are expected not to reach
       out.
+
+    Optional return-shape extras (none of which the Protocol's
+    ``classify(input) -> dict`` signature mentions explicitly):
+
+    * ``_embedding``: ``list[float]`` — the raw encoder embedding
+      (e.g. the 384-dim mean-pooled XLM-R vector from
+      :class:`xlmr_adapter.XLMRAdapter`). Underscore-prefixed keys
+      are not part of ``kchat.guardrail.output.v1`` proper; the
+      schema admits them via ``patternProperties: {"^_": {}}`` so
+      cross-pipeline caches (notably ``chat-storage-search``) can
+      reuse a message's encoder pass without recomputing it.
+      Adapters that do not have a meaningful embedding (e.g.
+      :class:`MockEncoderAdapter`) MUST omit the key rather than
+      emitting a zero-vector placeholder.
     """
 
     def classify(self, input: dict[str, Any]) -> dict[str, Any]:

@@ -29,6 +29,7 @@ from encoder_adapter import (  # type: ignore[import-not-found]
 )
 from xlmr_adapter import (  # type: ignore[import-not-found]
     CATEGORY_PROTOTYPES,
+    DEFAULT_ONNX_INT4_MODEL_PATH,
     DEFAULT_ONNX_MODEL_PATH,
     DEFAULT_TOKENIZER_PATH,
     XLMR_MODEL_NAME,
@@ -557,3 +558,267 @@ def test_trained_head_then_deterministic_signal_takes_precedence(
     assert out["category"] == 9  # PRIVATE_DATA, not 11 from the head
     assert out["reason_codes"] == ["PRIVATE_DATA_PATTERN"]
     assert "NEWS_CONTEXT" not in out["reason_codes"]
+
+
+# ---------------------------------------------------------------------------
+# Cross-pipeline `_embedding` pass-through.
+# ---------------------------------------------------------------------------
+def test_embedding_present_in_classify_output(monkeypatch, output_schema):
+    """``XLMRAdapter.classify()`` exposes the raw mean-pooled
+    embedding under the ``_embedding`` key so cross-pipeline caches
+    (e.g. ``chat-storage-search``) can reuse it without recomputing."""
+    np = pytest.importorskip("numpy")
+    adapter = _stub_loaded_adapter(monkeypatch, hidden=384)
+    out = adapter.classify(_input("hello"))
+    jsonschema.validate(instance=out, schema=output_schema)
+
+    assert "_embedding" in out, (
+        "XLMRAdapter must expose the raw embedding under '_embedding'"
+    )
+    embedding = out["_embedding"]
+    assert isinstance(embedding, list)
+    assert all(isinstance(x, float) for x in embedding), (
+        "_embedding values must be plain Python floats (no numpy types) so "
+        "the dict is JSON-serialisable across the FFI boundary"
+    )
+    # 384-dim — matches the XLM-R MiniLM-L6 hidden size.
+    assert len(embedding) == 384
+
+
+def test_embedding_present_for_signal_branches(monkeypatch, output_schema):
+    """Even when a deterministic-signal branch (PII / SCAM / etc.)
+    overrides the embedding-head argmax, the raw embedding is still
+    attached so the cache stays consistent across all output paths."""
+    pytest.importorskip("numpy")
+    adapter = _stub_loaded_adapter(monkeypatch, hidden=384)
+    out = adapter.classify(_input("hello", pii_patterns_hit=["EMAIL"]))
+    jsonschema.validate(instance=out, schema=output_schema)
+    assert out["category"] == 9  # PRIVATE_DATA wins over the embedding head
+    assert "_embedding" in out
+    assert len(out["_embedding"]) == 384
+
+
+def test_embedding_is_deterministic(monkeypatch):
+    """Identical input → identical embedding (matches the EncoderAdapter
+    Protocol's determinism contract)."""
+    pytest.importorskip("numpy")
+    adapter = _stub_loaded_adapter(monkeypatch, hidden=384)
+    a = adapter.classify(_input("scam alert"))
+    b = adapter.classify(_input("scam alert"))
+    assert a["_embedding"] == b["_embedding"]
+
+
+def test_safe_fallback_omits_embedding():
+    """When the encoder cannot run, the SAFE fallback dict has no
+    ``_embedding`` key — adapters MUST NOT emit a placeholder vector
+    just to keep the schema 'consistent'."""
+    adapter = XLMRAdapter(
+        model_path="/does/not/exist.onnx",
+        tokenizer_path="/does/not/exist.spm",
+    )
+    out = adapter.classify(_input())
+    assert "_embedding" not in out
+
+
+def test_coerce_preserves_embedding(output_schema):
+    """``_coerce_to_output_schema`` must pass ``_embedding`` through
+    instead of stripping it. The schema permits ``_*`` extras via
+    ``patternProperties``."""
+    raw = {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.1,
+        "actions": {
+            "label_only": False,
+            "warn": False,
+            "strong_warn": False,
+            "critical_intervention": False,
+            "suggest_redact": False,
+        },
+        "reason_codes": [],
+        "rationale_id": "xlmr_safe_proto_v1",
+        "_embedding": [0.0] * 384,
+    }
+    out = _coerce_to_output_schema(raw)
+    jsonschema.validate(instance=out, schema=output_schema)
+    assert "_embedding" in out
+    assert len(out["_embedding"]) == 384
+
+
+def test_coerce_drops_malformed_embedding(output_schema):
+    """A malformed ``_embedding`` (non-list, non-numeric items) must
+    silently drop, not crash. The rest of the dict is unaffected."""
+    raw = {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.1,
+        "actions": {
+            "label_only": False,
+            "warn": False,
+            "strong_warn": False,
+            "critical_intervention": False,
+            "suggest_redact": False,
+        },
+        "reason_codes": [],
+        "rationale_id": "xlmr_safe_proto_v1",
+        "_embedding": "not a list",
+    }
+    out = _coerce_to_output_schema(raw)
+    jsonschema.validate(instance=out, schema=output_schema)
+    assert "_embedding" not in out
+
+
+def test_output_schema_admits_underscore_extras(output_schema):
+    """The output schema's ``patternProperties: {"^_": {}}`` rule
+    must permit any underscore-prefixed key alongside the public
+    fields without violating ``additionalProperties: false``."""
+    valid = {
+        "severity": 0,
+        "category": 0,
+        "confidence": 0.1,
+        "actions": {
+            "label_only": False,
+            "warn": False,
+            "strong_warn": False,
+            "critical_intervention": False,
+            "suggest_redact": False,
+        },
+        "reason_codes": [],
+        "rationale_id": "xlmr_safe_proto_v1",
+        "_embedding": [0.1, 0.2, 0.3],
+        "_internal_telemetry_id": "abc123",
+    }
+    jsonschema.validate(instance=valid, schema=output_schema)
+
+
+# ---------------------------------------------------------------------------
+# INT4 model_path support.
+# ---------------------------------------------------------------------------
+def test_default_int4_path_constant():
+    """The INT4 default path is ``models/xlmr.int4.onnx`` so callers
+    can opt into the smaller ~50 MB checkpoint without hard-coding
+    the filename."""
+    assert DEFAULT_ONNX_INT4_MODEL_PATH == "models/xlmr.int4.onnx"
+    assert DEFAULT_ONNX_INT4_MODEL_PATH != DEFAULT_ONNX_MODEL_PATH
+
+
+def test_prefer_int4_field_default_false():
+    """``prefer_int4`` is opt-in — the default behaviour is to load
+    the INT8 ``models/xlmr.onnx`` file so existing benchmarks stay
+    bit-for-bit reproducible."""
+    adapter = XLMRAdapter()
+    assert adapter.prefer_int4 is False
+
+
+def test_prefer_int4_resolves_to_int4_when_present(tmp_path, monkeypatch):
+    """When ``prefer_int4=True`` and the INT4 file exists on disk,
+    the adapter swaps the resolved ``model_path`` over to it."""
+    # Create dummy files at the expected paths so the load probes
+    # find them. Use ``monkeypatch.chdir`` so the relative
+    # ``DEFAULT_ONNX_*_MODEL_PATH`` constants resolve into the
+    # tmp_path sandbox.
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "models").mkdir()
+    (tmp_path / "models" / "xlmr.onnx").write_bytes(b"int8 placeholder")
+    (tmp_path / "models" / "xlmr.int4.onnx").write_bytes(b"int4 placeholder")
+    (tmp_path / "models" / "xlmr.spm").write_bytes(b"tokenizer placeholder")
+
+    adapter = XLMRAdapter(prefer_int4=True)
+    # Stub out the actual onnxruntime / sentencepiece loads — we are
+    # only exercising the path-resolution logic, not the inference
+    # session itself.
+    import onnxruntime as ort  # type: ignore[import-not-found]
+    import sentencepiece as spm  # type: ignore[import-not-found]
+
+    monkeypatch.setattr(spm, "SentencePieceProcessor", lambda: type(
+        "T", (), {"Load": lambda self, p: None}
+    )())
+    monkeypatch.setattr(
+        ort,
+        "InferenceSession",
+        lambda *a, **k: type("S", (), {"get_inputs": lambda self: ()})(),
+    )
+    # Skip the prototype-encoding step (which needs a real session).
+    monkeypatch.setattr(
+        XLMRAdapter,
+        "_encode_batch",
+        lambda self, texts: __import__("numpy").zeros(
+            (len(texts), 4), dtype=__import__("numpy").float32
+        ),
+    )
+
+    adapter._ensure_loaded()
+    assert adapter.model_path == DEFAULT_ONNX_INT4_MODEL_PATH
+
+
+def test_prefer_int4_falls_back_to_int8_when_int4_missing(
+    tmp_path, monkeypatch
+):
+    """``prefer_int4=True`` is a soft hint — when the INT4 file is
+    absent, the adapter must keep loading the INT8 default rather
+    than failing."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "models").mkdir()
+    (tmp_path / "models" / "xlmr.onnx").write_bytes(b"int8 placeholder")
+    (tmp_path / "models" / "xlmr.spm").write_bytes(b"tokenizer placeholder")
+    # NOTE: no INT4 file on disk.
+
+    adapter = XLMRAdapter(prefer_int4=True)
+    import onnxruntime as ort  # type: ignore[import-not-found]
+    import sentencepiece as spm  # type: ignore[import-not-found]
+
+    monkeypatch.setattr(spm, "SentencePieceProcessor", lambda: type(
+        "T", (), {"Load": lambda self, p: None}
+    )())
+    monkeypatch.setattr(
+        ort,
+        "InferenceSession",
+        lambda *a, **k: type("S", (), {"get_inputs": lambda self: ()})(),
+    )
+    monkeypatch.setattr(
+        XLMRAdapter,
+        "_encode_batch",
+        lambda self, texts: __import__("numpy").zeros(
+            (len(texts), 4), dtype=__import__("numpy").float32
+        ),
+    )
+
+    adapter._ensure_loaded()
+    assert adapter.model_path == DEFAULT_ONNX_MODEL_PATH
+
+
+def test_explicit_model_path_honoured_over_prefer_int4(
+    tmp_path, monkeypatch
+):
+    """Explicit ``model_path`` arguments are honoured verbatim, even
+    when ``prefer_int4=True`` and an INT4 file is present — callers
+    that want a specific tier should pass the path directly."""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "models").mkdir()
+    (tmp_path / "models" / "xlmr.int4.onnx").write_bytes(b"int4 placeholder")
+    (tmp_path / "models" / "xlmr.spm").write_bytes(b"tokenizer placeholder")
+    custom = tmp_path / "models" / "custom.onnx"
+    custom.write_bytes(b"custom placeholder")
+
+    adapter = XLMRAdapter(prefer_int4=True, model_path=str(custom))
+    import onnxruntime as ort  # type: ignore[import-not-found]
+    import sentencepiece as spm  # type: ignore[import-not-found]
+
+    monkeypatch.setattr(spm, "SentencePieceProcessor", lambda: type(
+        "T", (), {"Load": lambda self, p: None}
+    )())
+    monkeypatch.setattr(
+        ort,
+        "InferenceSession",
+        lambda *a, **k: type("S", (), {"get_inputs": lambda self: ()})(),
+    )
+    monkeypatch.setattr(
+        XLMRAdapter,
+        "_encode_batch",
+        lambda self, texts: __import__("numpy").zeros(
+            (len(texts), 4), dtype=__import__("numpy").float32
+        ),
+    )
+
+    adapter._ensure_loaded()
+    assert adapter.model_path == str(custom)

@@ -357,6 +357,32 @@ The reference encoder backend is
   `sentencepiece` are listed as runtime dependencies of the demo /
   benchmark scripts (and the test suite for stub-encoder tests).
   The skill-pack files themselves remain pure YAML / JSON.
+- **Cross-pipeline embedding cache.** The adapter returns the raw
+  384-dim XLM-R embedding alongside the classification result (key:
+  `_embedding`). Downstream consumers (e.g., chat-storage-search)
+  can cache this embedding in the `search_vector` table to avoid
+  re-computing it during semantic search — a message's XLM-R
+  encoder pass is computed at most once across guardrail and search.
+  The underscore prefix signals the field is internal (not part of
+  `kchat.guardrail.output.v1` proper); the schema admits it via
+  `patternProperties: {"^_": {}}` so consumers that do not need the
+  embedding may simply ignore it.
+- **Storage-tier model selection.** The export pipeline emits two
+  ONNX checkpoints — `models/xlmr.onnx` (~107 MB, INT8 dynamic
+  quantisation; the default) and `models/xlmr.int4.onnx` (~55 MB,
+  INT4 block-wise weight-only quantisation of both `MatMul` and
+  `Gather` ops via
+  `onnxruntime.quantization.matmul_nbits_quantizer.MatMulNBitsQuantizer`).
+  The INT4 variant is recommended for mobile devices with tight
+  storage budgets. `--validate-int4` loads both sessions, runs the
+  multilingual smoke corpus through each, and asserts a per-row
+  cosine similarity floor (default `--int4-min-cosine 0.94`).
+  Aggressive embedding-`Gather` quantisation is what unlocks the
+  storage win and also costs ~5 cosine points vs INT8 — callers
+  that need a > 0.99 cosine bar should keep shipping the INT8
+  file. `XLMRAdapter` honours an explicit `model_path` argument
+  pointed at either tier and exposes a `prefer_int4=True` hint that
+  auto-resolves to the INT4 file when present.
 
 End-to-end demonstration and benchmarking happens through
 [`tools/run_guardrail_demo.py`](tools/run_guardrail_demo.py); see

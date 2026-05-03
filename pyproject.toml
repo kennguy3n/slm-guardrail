@@ -53,6 +53,11 @@ export = [
     "onnxscript>=0.1",
     "onnxruntime>=1.16.0",
     "sentencepiece>=0.1.99",
+    # ``onnxruntime.quantization.matmul_nbits_quantizer`` (used by
+    # the ``--quantize-int4`` export path) imports ``onnx_ir`` at
+    # module level; the dependency is not declared transitively by
+    # ``onnxruntime`` itself, so we pin it here.
+    "onnx_ir>=0.1",
 ]
 
 [tool.pytest.ini_options]

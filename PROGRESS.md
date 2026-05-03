@@ -1,8 +1,8 @@
 # KChat Guardrail Skills — Progress
 
 **Status:** Complete | 100% + demo layer
-**Current phase:** Phase 6 complete — 100 jurisdiction/community skills + XLM-R encoder classifier integration with trained linear head + protected-speech context demotion (ONNX Runtime; PyTorch / `transformers` dropped from on-device runtime)
-**Last updated:** 2026-05-02
+**Current phase:** Phase 6 complete — 100 jurisdiction/community skills + XLM-R encoder classifier integration with trained linear head + protected-speech context demotion (ONNX Runtime; PyTorch / `transformers` dropped from on-device runtime) + cross-pipeline `_embedding` pass-through + optional INT4 export
+**Last updated:** 2026-05-03
 
 This file tracks delivery against the phased plan in
 [`PHASES.md`](PHASES.md). Each phase ends with a tagged release
@@ -146,6 +146,58 @@ This file tracks delivery against the phased plan in
 ---
 
 ## Changelog
+
+### 2026-05-03 — XLM-R `_embedding` pass-through + INT4 export
+
+- `XLMRAdapter.classify()` now returns the raw 384-dim mean-pooled,
+  L2-normalised XLM-R embedding alongside the classification result
+  under the internal key `_embedding` (a `list[float]`). The
+  underscore prefix signals the field is not part of
+  `kchat.guardrail.output.v1` proper; the schema admits
+  underscore-prefixed extras via `patternProperties: {"^_": {}}` so
+  downstream consumers can attach internal state without violating
+  `additionalProperties: false`. Enables cross-pipeline embedding
+  cache with `chat-storage-search` — a message's XLM-R embedding is
+  computed at most once across guardrail and search.
+  - `_coerce_to_output_schema` preserves `_embedding` instead of
+    stripping it (the deterministic-signal branches and the SAFE
+    fallback path do not emit one; only the embedding-head paths do).
+  - `EncoderAdapter` Protocol docstring documents `_embedding` as an
+    optional return-shape extra. The `classify(input) -> dict`
+    signature itself is unchanged.
+  - `MockEncoderAdapter` continues to omit the key (it has no real
+    encoder pass to expose).
+- `tools/export_xlmr_onnx.py` gains a `--quantize-int4` flag that
+  produces `models/xlmr.int4.onnx` alongside the existing
+  `models/xlmr.onnx` (INT8). Uses
+  `onnxruntime.quantization.matmul_nbits_quantizer.MatMulNBitsQuantizer`
+  with `DefaultWeightOnlyQuantConfig` (4-bit, block-size 128,
+  asymmetric, `QuantFormat.QOperator`, quantising both `MatMul` and
+  `Gather` ops). Quantising `Gather` is what brings the file under
+  the ~50 MB target — MatMul-only INT4 leaves the 250 002 × 384
+  word-embedding table at FP32 and the file stays north of 370 MB.
+  The export pre-runs `onnx.version_converter` to opset 21 because
+  `MatMulNBitsQuantizer` unconditionally bumps the model opset and
+  would otherwise leave opset-14 `ReduceMean.axes` attribute syntax
+  in place, producing a graph that fails to load with `InvalidGraph:
+  Unrecognized attribute: axes for operator ReduceMean`.
+- A `--validate-int4` step loads both the INT8 and INT4 sessions,
+  runs the same multilingual smoke corpus through each, and asserts
+  per-row cosine similarity is above the configurable
+  `--int4-min-cosine` floor (default `0.94`). Aggressive
+  embedding-`Gather` quantisation costs ~5 cosine points vs INT8
+  (observed `min ≈ 0.95`, `mean ≈ 0.96` on the smoke corpus); the
+  threshold is intentionally loose because tighter bars are not
+  reachable without giving up the storage win. Callers that need
+  > 0.99 cosine should keep shipping the INT8 file.
+- `XLMRAdapter` accepts an explicit `model_path` parameter (already
+  did) and now also exposes a `prefer_int4: bool = False` hint —
+  when set, the adapter loads `models/xlmr.int4.onnx` if it exists
+  on disk and falls back to the INT8 default otherwise. Explicit
+  `model_path` arguments are honoured verbatim regardless. The INT4
+  model is ~55 MB on disk vs ~107 MB for INT8.
+- README.md "Running with XLM-R" section documents the INT4 export
+  workflow and the storage / cosine trade-off.
 
 ### 2026-05-02 — XLM-R unification & ONNX conversion
 
