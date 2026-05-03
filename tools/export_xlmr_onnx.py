@@ -50,9 +50,10 @@ Usage::
         --head-npz kchat-skills/compiler/data/xlmr_head.npz
 
     # 4. Additionally produce an INT4 (block-wise weight-only) ONNX
-    #    file at models/xlmr.int4.onnx (~50 MB vs ~107 MB INT8) and
+    #    file at models/xlmr.int4.onnx (~55 MB vs ~107 MB INT8) and
     #    validate it against the INT8 graph by asserting per-row
-    #    cosine similarity > 0.99 on a multilingual smoke corpus.
+    #    cosine similarity above ``--int4-min-cosine`` (default 0.94)
+    #    on a multilingual smoke corpus.
     python tools/export_xlmr_onnx.py \
         --quantize-int4 --validate-int4 --output-dir models
 

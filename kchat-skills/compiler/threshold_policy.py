@@ -123,7 +123,7 @@ class ThresholdPolicy:
             r for r in reason_codes_in if r in PROTECTED_SPEECH_REASON_CODES
         ]
         if category != SAFE_CATEGORY and protected_present:
-            return {
+            demoted: dict[str, Any] = {
                 "severity": 0,
                 "category": SAFE_CATEGORY,
                 "confidence": confidence,
@@ -131,10 +131,15 @@ class ThresholdPolicy:
                 "reason_codes": sorted(set(protected_present)),
                 "rationale_id": "safe_protected_speech_v1",
             }
+            # Carry the encoder's internal extras (e.g. ``_embedding``)
+            # forward — without this the cross-pipeline cache breaks
+            # for every protected-speech demotion.
+            _carry_internal_extras(demoted, raw_output)
+            return demoted
 
         # Rule 3: Uncertainty handling.
         if category != SAFE_CATEGORY and confidence < self.LABEL_ONLY:
-            return {
+            uncertain: dict[str, Any] = {
                 "severity": 0,
                 "category": SAFE_CATEGORY,
                 "confidence": confidence,
@@ -142,6 +147,8 @@ class ThresholdPolicy:
                 "reason_codes": [],
                 "rationale_id": out.get("rationale_id") or "safe_benign_v1",
             }
+            _carry_internal_extras(uncertain, raw_output)
+            return uncertain
 
         # Rule 4: Re-derive action flags from confidence for non-SAFE
         # categories.
@@ -219,6 +226,44 @@ def _deepcopy_output(raw: dict[str, Any]) -> dict[str, Any]:
         out["resource_link_id"] = raw["resource_link_id"]
     if "counter_updates" in raw:
         out["counter_updates"] = [dict(u) for u in raw["counter_updates"]]
+    _carry_internal_extras(out, raw)
+    return out
+
+
+def _carry_internal_extras(
+    out: dict[str, Any], raw: dict[str, Any]
+) -> dict[str, Any]:
+    """Forward underscore-prefixed extras from ``raw`` to ``out``.
+
+    The public output schema (``kchat-skills/global/output_schema.json``)
+    admits arbitrary ``_*``-prefixed keys via
+    ``patternProperties: {"^_": {}}`` so adapters can attach internal
+    state without violating ``additionalProperties: false``. The
+    canonical example is ``_embedding`` — the raw 384-dim mean-pooled
+    XLM-R vector that ``XLMRAdapter.classify()`` attaches for the
+    cross-pipeline cache (``chat-storage-search``'s ``search_vector``
+    table).
+
+    Both ``_deepcopy_output`` and the early-return paths in
+    :meth:`ThresholdPolicy.apply` (rules 2 and 3) construct fresh
+    dicts containing only known schema keys; without this helper the
+    encoder's internal extras are silently dropped before the output
+    leaves :class:`compiler.pipeline.GuardrailPipeline`, and the
+    cross-pipeline cache is non-functional for every message that
+    flows through the standard pipeline. Mutates ``out`` in place
+    and returns it for chained-call ergonomics.
+
+    Lists / tuples are shallow-copied (``list(...)``) so downstream
+    consumers cannot mutate the encoder's tensors via the cached
+    value; everything else is forwarded by reference.
+    """
+    for key, value in raw.items():
+        if not isinstance(key, str) or not key.startswith("_"):
+            continue
+        if isinstance(value, (list, tuple)):
+            out[key] = list(value)
+        else:
+            out[key] = value
     return out
 
 
