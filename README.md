@@ -516,6 +516,35 @@ In either case, deterministic detector branches (CHILD_SAFETY,
 PRIVATE_DATA, SCAM_FRAUD, lexicon, NSFW media) run first and beat the
 embedding-stage classifier.
 
+The export pipeline also supports an optional INT4 (block-wise
+weight-only) variant via `python tools/export_xlmr_onnx.py
+--quantize-int4 --output-dir models`. The INT4 model is ~55 MB on
+disk vs ~107 MB for INT8 — recommended for mobile devices with tight
+storage budgets. Both `MatMul` and `Gather` ops are quantised
+(quantising `Gather` is what brings the file under the ~50 MB
+target — MatMul-only INT4 leaves the 250 002 × 384 word-embedding
+table at FP32 and the file stays north of 370 MB).
+`--validate-int4` additionally loads both the INT8 and INT4 sessions,
+runs the multilingual smoke corpus through each, and asserts per-row
+cosine similarity is above the configurable `--int4-min-cosine`
+floor (default `0.94` — empirically `min ≈ 0.95`, `mean ≈ 0.96` on
+the smoke corpus; aggressive embedding-`Gather` quantisation costs
+~5 cosine points vs INT8 and is what unlocks the storage win, so
+callers that need > 0.99 cosine should keep shipping the INT8 file).
+To load the INT4 file at runtime, either pass the explicit path to
+`XLMRAdapter(model_path="models/xlmr.int4.onnx")` or set
+`prefer_int4=True` and let the adapter auto-resolve when the INT4
+file is on disk.
+
+`XLMRAdapter.classify()` also returns the raw 384-dim mean-pooled,
+L2-normalised XLM-R embedding alongside the classification result
+under the internal key `_embedding` (a `list[float]`). The schema
+admits underscore-prefixed extras via `patternProperties: {"^_": {}}`,
+so downstream consumers (e.g. `chat-storage-search`) can cache the
+embedding in their `search_vector` table and avoid re-computing it
+during semantic search — a message's XLM-R encoder pass is computed
+at most once across guardrail and search.
+
 ```bash
 # 1. Install the runtime dependencies (already in requirements.txt /
 #    pyproject's `demo` extra). The adapter only needs onnxruntime,
@@ -538,6 +567,22 @@ pip install -e ".[export]"
 python tools/export_xlmr_onnx.py --output-dir models
 # -> writes models/xlmr.onnx (INT8-quantised, ~107 MB) and
 #    models/xlmr.spm (~5 MB SentencePiece tokenizer)
+
+# 2b. (optional) additionally produce an INT4 (block-wise weight-only)
+#     ONNX file at models/xlmr.int4.onnx. Recommended for mobile
+#     devices with tight storage budgets.
+python tools/export_xlmr_onnx.py --quantize-int4 --output-dir models
+# -> writes models/xlmr.int4.onnx (~55 MB) alongside the INT8
+#    models/xlmr.onnx (both `MatMul` and `Gather` ops quantised to
+#    4-bit; quantising the embedding `Gather` is what brings the
+#    file size down).
+
+# 2c. (optional) export and validate INT4 against INT8 — loads both
+#     sessions, runs a multilingual smoke corpus through each, and
+#     asserts per-row cosine similarity is above the configurable
+#     --int4-min-cosine floor (default 0.94).
+python tools/export_xlmr_onnx.py --quantize-int4 --validate-int4 \
+    --output-dir models
 
 # 3. Run the demo against the local ONNX checkpoint
 python tools/run_guardrail_demo.py \

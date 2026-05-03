@@ -104,7 +104,16 @@ construction.
    classifier backend, but the encoder itself runs as a deterministic argmax over
    a fixed bank of prototype embeddings — no temperature, no token
    generation. Models are expected to run on commodity phones with no
-   remote inference.
+   remote inference. The encoder returns raw 384-dim embeddings
+   alongside classification results (key: `_embedding`), enabling
+   cross-pipeline embedding reuse with `chat-storage-search` so a
+   message's XLM-R encoder pass is computed at most once across
+   guardrail and search. An optional INT4 export
+   (`models/xlmr.int4.onnx`, ~55 MB — block-wise weight-only
+   quantisation of both `MatMul` and `Gather` ops via
+   `onnxruntime`'s `MatMulNBitsQuantizer`) is available for mobile
+   devices with tight storage budgets; the storage win costs ~5
+   cosine points vs the INT8 baseline.
 2. **Deterministic taxonomy.** **16 global categories**, **6 severity
    levels** (0–5). Overlays may narrow categories or raise severity but
    may never invent new ones.

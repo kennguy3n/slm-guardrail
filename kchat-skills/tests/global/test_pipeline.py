@@ -656,3 +656,181 @@ def test_news_quote_about_violence_still_demotes_to_safe():
     assert "NEWS_CONTEXT" in out["reason_codes"]
     assert "QUOTED_SPEECH_CONTEXT" in out["reason_codes"]
     assert out["rationale_id"] == "safe_protected_speech_v1"
+
+
+# ---------------------------------------------------------------------------
+# Cross-pipeline ``_embedding`` propagation through ``GuardrailPipeline``.
+#
+# The encoder attaches an internal ``_embedding`` extra (the raw
+# 384-dim mean-pooled, L2-normalised XLM-R vector) so downstream
+# consumers like ``chat-storage-search`` can cache it in their
+# ``search_vector`` table and skip the encoder pass for semantic
+# search. The schema admits ``_*``-prefixed keys via
+# ``patternProperties: {"^_": {}}``. We need to assert the field
+# survives every threshold-policy branch — the ``ThresholdPolicy``
+# constructs fresh dicts on the protected-speech demotion and
+# uncertainty-handling rules, and an earlier version of this PR
+# silently dropped the field on those paths.
+# ---------------------------------------------------------------------------
+def _embedding_attaching_adapter(
+    *, severity: int, category: int, confidence: float, **extra: Any
+):
+    """Build a stub adapter whose ``classify`` always attaches a
+    sentinel 384-dim ``_embedding`` to the returned dict.
+
+    The sentinel embedding is deterministic (zero vector with a
+    single 1.0 in slot 0) so tests can assert exact equality at the
+    pipeline boundary, not just shape.
+    """
+    sentinel: list[float] = [0.0] * 384
+    sentinel[0] = 1.0
+
+    raw = {
+        "severity": severity,
+        "category": category,
+        "confidence": confidence,
+        "actions": {
+            "label_only": False,
+            "warn": False,
+            "strong_warn": False,
+            "critical_intervention": False,
+            "suggest_redact": False,
+        },
+        "reason_codes": [],
+        "rationale_id": "test_v1",
+        "_embedding": sentinel,
+    }
+    raw.update(extra)
+
+    class _Adapter:
+        def classify(self, input: dict[str, Any]) -> dict[str, Any]:
+            # Return a fresh copy each call so callers can't mutate
+            # our sentinel — mirrors the real adapter contract.
+            return {**raw, "_embedding": list(raw["_embedding"])}
+
+    return _Adapter(), sentinel
+
+
+class TestEmbeddingPropagation:
+    """Every threshold-policy branch must forward ``_embedding``.
+
+    The branches under test (mapped to the rules in
+    :meth:`compiler.threshold_policy.ThresholdPolicy.apply`):
+
+    * Rule 1 — child-safety floor (mutates ``_deepcopy_output`` in place)
+    * Rule 2 — protected-speech demotion (constructs a fresh dict)
+    * Rule 3 — uncertainty handling (constructs a fresh dict)
+    * Rule 4 — non-SAFE action re-derivation (mutates in place)
+    * Default SAFE pass-through (mutates in place)
+    """
+
+    @staticmethod
+    def _assert_sentinel_embedding(out: dict[str, Any], sentinel: list[float]) -> None:
+        assert "_embedding" in out, (
+            f"_embedding stripped by pipeline; keys={sorted(out)}"
+        )
+        emb = out["_embedding"]
+        assert isinstance(emb, list), f"_embedding must be list, got {type(emb).__name__}"
+        assert len(emb) == 384, f"_embedding length {len(emb)} != 384"
+        assert emb == sentinel, "sentinel _embedding mutated en route"
+
+    def test_safe_passthrough_preserves_embedding(self):
+        adapter, sentinel = _embedding_attaching_adapter(
+            severity=0, category=0, confidence=0.0
+        )
+        p = GuardrailPipeline(
+            skill_bundle=SkillBundle(),
+            encoder_adapter=adapter,
+        )
+        out = p.classify({"text": "hi there"}, _context())
+        self._assert_sentinel_embedding(out, sentinel)
+
+    def test_action_rederivation_preserves_embedding(self):
+        # Rule 4: non-SAFE category, confidence high enough to keep
+        # category but low enough that the policy re-derives actions.
+        adapter, sentinel = _embedding_attaching_adapter(
+            severity=2, category=7, confidence=0.55
+        )
+        p = GuardrailPipeline(
+            skill_bundle=SkillBundle(),
+            encoder_adapter=adapter,
+        )
+        out = p.classify({"text": "see you at dinner"}, _context())
+        self._assert_sentinel_embedding(out, sentinel)
+
+    def test_uncertainty_demotion_preserves_embedding(self):
+        # Rule 3: non-SAFE category at confidence < LABEL_ONLY (0.45).
+        # ThresholdPolicy.apply constructs a fresh dict on this branch
+        # — exactly the regression Devin Review caught.
+        adapter, sentinel = _embedding_attaching_adapter(
+            severity=3, category=7, confidence=0.10,
+        )
+        p = GuardrailPipeline(
+            skill_bundle=SkillBundle(),
+            encoder_adapter=adapter,
+        )
+        out = p.classify({"text": "hi"}, _context())
+        assert out["category"] == 0, "uncertainty handling should demote to SAFE"
+        self._assert_sentinel_embedding(out, sentinel)
+
+    def test_protected_speech_demotion_preserves_embedding(self):
+        # Rule 2: non-SAFE category with a protected-speech reason
+        # code carried by the encoder. Fresh-dict early return.
+        adapter, sentinel = _embedding_attaching_adapter(
+            severity=2,
+            category=6,  # HATE
+            confidence=0.80,
+            reason_codes=["NEWS_CONTEXT"],
+        )
+        p = GuardrailPipeline(
+            skill_bundle=SkillBundle(),
+            encoder_adapter=adapter,
+        )
+        out = p.classify({"text": "Reuters reports the speech"}, _context())
+        assert out["category"] == 0, "protected speech should demote to SAFE"
+        assert out["rationale_id"] == "safe_protected_speech_v1"
+        self._assert_sentinel_embedding(out, sentinel)
+
+    def test_child_safety_floor_preserves_embedding(self):
+        # Rule 1: CHILD_SAFETY floor mutates ``out`` in place via
+        # ``_deepcopy_output``, which now also forwards ``_embedding``.
+        adapter, sentinel = _embedding_attaching_adapter(
+            severity=2, category=1, confidence=0.50
+        )
+        p = GuardrailPipeline(
+            skill_bundle=SkillBundle(),
+            encoder_adapter=adapter,
+        )
+        out = p.classify({"text": "irrelevant"}, _context())
+        assert out["category"] == 1
+        assert out["severity"] == 5
+        assert out["actions"]["critical_intervention"] is True
+        self._assert_sentinel_embedding(out, sentinel)
+
+    def test_adapter_without_embedding_does_not_break_pipeline(self):
+        # Adapters that omit ``_embedding`` (e.g. ``MockEncoderAdapter``)
+        # MUST keep working — the field is optional, not required.
+        p = GuardrailPipeline(
+            skill_bundle=SkillBundle(),
+            encoder_adapter=MockEncoderAdapter(),
+        )
+        out = p.classify({"text": "see you at dinner"}, _context())
+        assert "_embedding" not in out, (
+            "pipeline must not synthesise _embedding when the adapter omits it"
+        )
+
+    def test_pipeline_does_not_share_embedding_between_calls(self):
+        # The forwarded ``_embedding`` must be defensively copied so a
+        # downstream consumer cannot mutate the encoder's tensor and
+        # poison subsequent calls.
+        adapter, sentinel = _embedding_attaching_adapter(
+            severity=0, category=0, confidence=0.0
+        )
+        p = GuardrailPipeline(
+            skill_bundle=SkillBundle(),
+            encoder_adapter=adapter,
+        )
+        out1 = p.classify({"text": "first"}, _context())
+        out1["_embedding"][0] = 99.0  # downstream mutation
+        out2 = p.classify({"text": "second"}, _context())
+        self._assert_sentinel_embedding(out2, sentinel)

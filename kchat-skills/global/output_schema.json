@@ -5,6 +5,11 @@
   "description": "Constrained JSON output schema emitted by the on-device encoder classifier. The runtime rejects any output that does not validate against this schema. See ARCHITECTURE.md 'Output Schema'.",
   "type": "object",
   "additionalProperties": false,
+  "patternProperties": {
+    "^_": {
+      "description": "Internal underscore-prefixed extras (e.g. ``_embedding`` — the raw mean-pooled XLM-R embedding consumed by cross-pipeline caches such as chat-storage-search). Not part of the public output contract; runtime consumers may ignore these. Permitted by the schema so adapters can attach internal state without violating ``additionalProperties: false``."
+    }
+  },
   "required": [
     "severity",
     "category",
