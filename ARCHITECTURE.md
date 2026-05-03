@@ -989,9 +989,6 @@ anti_misuse_controls:
 │   └── communities/
 │
 └── docs/
-    ├── PROPOSAL.md
-    ├── ARCHITECTURE.md
-    ├── PHASES.md
     └── regulatory/                  # Phase 6 regulatory alignment
         ├── README.md
         ├── eu_dsa_alignment.md
