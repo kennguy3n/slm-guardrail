@@ -153,13 +153,14 @@ missing.
 jurisdiction and community overlays into a single compiled prompt for
 the encoder classifier runtime:
 
-    # Compile the global baseline only:
-    python -m kchat_skills.compiler.compiler
+    # Compile the global baseline only (writes the compiled prompt to stdout):
+    python kchat-skills/compiler/compiler.py
 
     # Compile baseline + jurisdiction archetype + community overlay:
-    python -m kchat_skills.compiler.compiler \
-        --jurisdiction kchat-skills/jurisdictions/archetype-strict-adult \
-        --community    kchat-skills/communities/school
+    python kchat-skills/compiler/compiler.py \
+        --jurisdiction archetype-strict-adult \
+        --community    workplace \
+        --out          /tmp/strict_adult_workplace.txt
 
 See [`docs/COMPILER.md`](docs/COMPILER.md) for the compiler internals,
 the signing workflow (ed25519 skill passports), bias auditing,
