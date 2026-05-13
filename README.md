@@ -1,48 +1,49 @@
 # KChat Guardrail Skills
 
-> On-device guardrail skills for privacy-first, E2EE messaging — local safety
-> assistants, not centralized moderation.
-
----
+> On-device guardrail skills for privacy-first, E2EE messaging — local
+> safety assistants, not centralized moderation.
 
 ## What is this?
 
-This project provides a **skill-based guardrail system** for the
-**XLM-R** encoder classifier running locally on user devices
-within [KChat](https://github.com/kennguy3n/slm-chat-demo), an
-end-to-end encrypted (E2EE) messaging app for large communities.
+A **skill-based guardrail system** for the **XLM-R** encoder classifier
+running locally on user devices within
+[KChat](https://github.com/kennguy3n/slm-chat-demo), an end-to-end
+encrypted (E2EE) messaging app for large communities.
 
-A guardrail skill classifies content **already visible on the user's device**,
-produces local warnings / labels / suggestions, and **never transmits message
-content, embeddings, hashes, or other content-derived evidence to servers** by
-default. The classifier acts as a **local safety assistant** for the user —
-it does not act as a centralized moderator on behalf of the platform.
+A guardrail skill classifies content **already visible on the user's
+device**, produces local warnings / labels / suggestions, and **never
+transmits message content, embeddings, hashes, or other content-derived
+evidence to servers** by default. The classifier acts as a **local
+safety assistant** for the user — it does not act as a centralized
+moderator on behalf of the platform.
 
 KChat uses the **Messaging Layer Security** protocol
 ([RFC 9420](https://www.rfc-editor.org/rfc/rfc9420.html)) for group key
-agreement, forward secrecy, and post-compromise security. MLS is deliberately
-silent on application-layer policy: moderation, safety, abuse prevention, and
-community rules are explicitly outside the protocol scope. This project fills
-that gap — at the user's device, on the user's terms, in a transparent and
-auditable way.
+agreement, forward secrecy, and post-compromise security. MLS is
+deliberately silent on application-layer policy: moderation, safety,
+abuse prevention, and community rules are explicitly outside the
+protocol scope. This project fills that gap — at the user's device, on
+the user's terms, in a transparent and auditable way.
 
 ## Core Principles
 
-- **Privacy-first.** Skills analyze only locally visible content. They never
-  upload text, embeddings, hashes, message identifiers, or evidence to a
-  server by default.
-- **Transparency.** Users can see which skill packs are active, the version
-  and signer of each pack, and the reason a particular skill was activated.
-- **Layered skills.** Behaviour is composed from a *Global Baseline*, an
-  optional *Jurisdiction Overlay*, and an optional *Community Overlay*.
-- **Deterministic output.** The encoder classifier emits a constrained JSON
-  schema via argmax over a fixed bank of category prototype embeddings, so
-  identical input always produces identical output.
-- **Hybrid pipeline.** Cheap deterministic local detectors run first; the
-  encoder classifier only does the contextual reasoning that detectors cannot.
+- **Privacy-first.** Skills analyze only locally visible content. They
+  never upload text, embeddings, hashes, message identifiers, or
+  evidence to a server by default.
+- **Transparency.** Users can see which skill packs are active, the
+  version and signer of each pack, and the reason a particular skill
+  was activated.
+- **Layered skills.** Behaviour is composed from a Global Baseline, an
+  optional Jurisdiction Overlay, and an optional Community Overlay.
+- **Deterministic output.** The encoder classifier emits a constrained
+  JSON schema via argmax over a fixed bank of category prototype
+  embeddings, so identical input always produces identical output.
+- **Hybrid pipeline.** Cheap deterministic local detectors run first;
+  the encoder classifier only does the contextual reasoning that
+  detectors cannot.
 - **Anti-misuse.** No vague categories, signed packs, expiry dates,
-  protected-speech contexts, and required legal/cultural review for every
-  jurisdiction overlay.
+  protected-speech contexts, and required legal/cultural review for
+  every jurisdiction overlay.
 
 ## Skill Architecture
 
@@ -76,835 +77,109 @@ Skills compose into a runtime bundle in three layers:
 
 The active runtime bundle is therefore:
 
-```
-active_skill_bundle =
-    global_baseline
-  + jurisdiction overlays
-  + community overlay
-  + runtime context
-```
+    active_skill_bundle =
+        global_baseline
+      + jurisdiction overlays
+      + community overlay
+      + runtime context
 
 ## Global Risk Taxonomy
 
 The global baseline defines 16 categories. Every skill — including
-jurisdiction and community overlays — must classify content into exactly one
-of these IDs (overlays may *narrow* a category or raise its severity, but
-they may not invent new categories).
+jurisdiction and community overlays — must classify content into
+exactly one of these IDs (overlays may *narrow* a category or raise
+its severity, but they may not invent new categories). See
+[`kchat-skills/global/taxonomy.yaml`](kchat-skills/global/taxonomy.yaml)
+for the canonical list. The current taxonomy is:
 
-| ID  | Category               | Description                                                                                       | Typical Local Action                                  |
-| --- | ---------------------- | ------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| 0   | SAFE                   | No detected risk.                                                                                 | None.                                                 |
-| 1   | CHILD_SAFETY           | Content sexualising or endangering minors; grooming patterns; CSAM indicators.                    | Block preview, hard warn, surface report flow.        |
-| 2   | SELF_HARM              | Suicide ideation, self-injury planning, pro-ana / pro-mia content.                                | Soft warn, surface local crisis resources.            |
-| 3   | VIOLENCE_THREAT        | Credible threats of physical violence against an identifiable target.                             | Strong warn, surface report and block flows.          |
-| 4   | EXTREMISM              | Recruitment / glorification of violent extremist orgs (jurisdiction-listed).                      | Strong warn; jurisdictional override possible.        |
-| 5   | HARASSMENT             | Targeted insults, doxxing, sustained pile-on, sexual harassment.                                  | Warn, suggest mute / report.                          |
-| 6   | HATE                   | Dehumanising speech against a protected class.                                                    | Warn; protected-speech context check.                 |
-| 7   | SCAM_FRAUD             | Phishing, advance-fee fraud, fake giveaways, impersonation.                                       | Warn, mark links, surface report.                     |
-| 8   | MALWARE_LINK           | Links / attachments matching malware or credential-stealing patterns.                             | Block link preview, hard warn.                        |
-| 9   | PRIVATE_DATA           | PII / financial / credentials / location of self or others.                                       | Warn before send / before display, suggest redaction. |
-| 10  | SEXUAL_ADULT           | Adult sexual content between consenting adults.                                                   | Label; gated by group age mode + jurisdiction.        |
-| 11  | DRUGS_WEAPONS          | Sale or facilitation of drugs / firearms / regulated goods.                                       | Warn; jurisdictional override common.                 |
-| 12  | ILLEGAL_GOODS          | Stolen goods, counterfeit currency, trafficked items.                                             | Warn; surface report flow.                            |
-| 13  | MISINFORMATION_HEALTH  | Health claims contradicting public-health consensus in a high-harm context.                       | Label, link to authoritative source.                  |
-| 14  | MISINFORMATION_CIVIC   | Election / civic misinformation in a jurisdiction-flagged window.                                 | Label, link to electoral authority.                   |
-| 15  | COMMUNITY_RULE         | Content violating an explicit community-overlay rule.                                             | Label per community overlay action.                   |
+`SAFE`, `CHILD_SAFETY`, `SELF_HARM`, `VIOLENCE_THREAT`, `EXTREMISM`,
+`HARASSMENT`, `HATE`, `SCAM_FRAUD`, `MALWARE_LINK`, `PRIVATE_DATA`,
+`SEXUAL_ADULT`, `DRUGS_WEAPONS`, `ILLEGAL_GOODS`,
+`MISINFORMATION_HEALTH`, `MISINFORMATION_CIVIC`, `COMMUNITY_RULE`.
 
-## Severity Rubric
+Severity is reported on a 0–5 rubric — see
+[`kchat-skills/global/severity.yaml`](kchat-skills/global/severity.yaml).
 
-| Level | Name        | Meaning                                                                | Action                                              |
-| ----- | ----------- | ---------------------------------------------------------------------- | --------------------------------------------------- |
-| 0     | None        | No risk detected.                                                      | None.                                               |
-| 1     | Informational | Minor signal, useful as label only.                                  | Soft label; no interruption.                        |
-| 2     | Caution     | Possible issue; user benefit from awareness.                           | Inline label; expandable explanation.               |
-| 3     | Warn        | Likely policy / safety risk.                                           | Modal warning before display or send.               |
-| 4     | Strong warn | High-confidence harm to user or third party.                           | Hard modal; require explicit acknowledge to view.   |
-| 5     | Critical    | Imminent harm, child safety, or jurisdictional illegality.             | Block preview; surface report / crisis resources.   |
+## Repository Status
 
-Severity is computed by the encoder classifier under a hard-coded thresholds policy
-(see [`ARCHITECTURE.md`](ARCHITECTURE.md#decision-policy)). Child-safety
-categories have a severity floor of 5 regardless of model confidence.
+All six phases are **complete**. The repository ships **100 skills**:
 
-## Folder Structure
+| Pack family | Count | Location |
+|---|---|---|
+| Global baseline | 1 | [`kchat-skills/global/`](kchat-skills/global/) |
+| Jurisdiction archetypes | 3 | [`kchat-skills/jurisdictions/`](kchat-skills/jurisdictions/) |
+| Country packs | 59 | [`kchat-skills/jurisdictions/<cc>/`](kchat-skills/jurisdictions/) |
+| Community overlays | 38 | [`kchat-skills/communities/`](kchat-skills/communities/) |
 
-```
-/kchat-skills
-├── global/
-│   ├── baseline.yaml                # kchat.global.guardrail.baseline
-│   ├── taxonomy.yaml                # 16-category global taxonomy
-│   ├── severity.yaml                # 0–5 severity rubric
-│   ├── output_schema.json           # constrained JSON output
-│   ├── local_signal_schema.json     # encoder classifier input contract
-│   └── privacy_contract.yaml        # non-negotiable privacy rules
-│
-├── jurisdictions/
-│   ├── _template/
-│   │   └── overlay.yaml             # jurisdiction overlay template
-│   ├── archetype-strict-adult/
-│   ├── archetype-strict-hate/
-│   ├── archetype-strict-marketplace/
-│   ├── us/  de/  br/  in/  jp/       # Phase 5 wave 1 country packs
-│   ├── mx/  ca/  ar/  co/  cl/  pe/   # Phase 5 wave 2 — Americas
-│   ├── fr/  gb/  es/  it/  nl/  pl/   # Phase 5 wave 2 — Europe
-│   ├── se/  pt/  ch/  at/             # Phase 5 wave 2 — Europe (cont.)
-│   ├── kr/  id/  ph/  th/  vn/  my/   # Phase 5 wave 2 — Asia-Pacific
-│   ├── sg/  tw/  pk/  bd/             # Phase 5 wave 2 — Asia-Pacific (cont.)
-│   ├── ng/  za/  eg/  sa/  ae/  ke/   # Phase 5 wave 2 — Middle East / Africa
-│   ├── au/  nz/  tr/                  # Phase 5 wave 2 — Other
-│   ├── ru/  ua/  ro/  gr/  cz/  hu/   # Phase 6 expansion — Eastern Europe
-│   ├── dk/  fi/  no/                  # Phase 6 expansion — Nordics
-│   ├── ie/                            # Phase 6 expansion — W. Europe
-│   ├── il/  iq/  ma/  dz/             # Phase 6 expansion — MENA
-│   ├── gh/  tz/  et/                  # Phase 6 expansion — Sub-Saharan Africa
-│   └── ec/  uy/                       # Phase 6 expansion — Latin America
-│
-├── communities/                      # 38 community overlays
-│   ├── _template/
-│   │   └── overlay.yaml             # community overlay template
-│   ├── school.yaml
-│   ├── family.yaml
-│   ├── workplace.yaml
-│   ├── adult_only.yaml
-│   ├── marketplace.yaml
-│   ├── health_support.yaml
-│   ├── political.yaml
-│   ├── gaming.yaml                  # ↑ Phase 1 — original 8 overlays
-│   ├── religious.yaml  sports.yaml  creative_arts.yaml
-│   ├── education_higher.yaml  volunteer.yaml  neighborhood.yaml
-│   ├── parenting.yaml  dating.yaml  fitness.yaml  travel.yaml
-│   ├── book_club.yaml  music.yaml  photography.yaml  cooking.yaml
-│   ├── tech_support.yaml  language_learning.yaml  pet_owners.yaml
-│   ├── environmental.yaml  journalism.yaml  legal_support.yaml
-│   ├── mental_health.yaml  startup.yaml  nonprofit.yaml
-│   ├── seniors.yaml  lgbtq_support.yaml  veterans.yaml
-│   ├── hobbyist.yaml  science.yaml  open_source.yaml
-│   └── emergency_response.yaml      # ↑ Phase 6 expansion — 30 overlays
-│
-├── prompts/
-│   ├── runtime_instruction.txt      # 10-rule classifier-bundle instruction
-│   └── compiled_examples/
-│
-├── samples/
-│   ├── sample_messages.yaml         # curated demo messages
-│   └── README.md
-│
-├── benchmarks/
-│   ├── README.md
-│   └── xlmr_results.json    # committed benchmark results (generated)
-│
-├── compiler/
-│   ├── pipeline.md
-│   └── skill_passport.schema.json
-│
-├── tests/
-│   ├── global/
-│   ├── jurisdictions/
-│   └── communities/
-│
-└── docs/
-    └── regulatory/        # EU DSA / NIST AI RMF / UNICEF · ITU COP alignment
-```
+For the full country / overlay roster (ISO codes, primary languages,
+key legal references, age modes, notable category tightenings), see
+[`docs/SUPPORTED_REGIONS.md`](docs/SUPPORTED_REGIONS.md).
 
-> Top-level project documents (`PROPOSAL.md`, `ARCHITECTURE.md`,
-> `PHASES.md`, `PROGRESS.md`) live at the repository root, not under
-> `kchat-skills/docs/`.
+## Quick start
 
-## Practical First Build
+    # 1. Clone
+    git clone https://github.com/kennguy3n/slm-guardrail.git
+    cd slm-guardrail
 
-The first 12 starter skills cover the global baseline plus enough overlays
-to validate the layering model. Items marked **(landed)** ship in this
-repository today; the rest are scheduled for Phase 2.
+    # 2. (optional) create a virtualenv
+    python -m venv .venv && source .venv/bin/activate
 
-1. `kchat.global.guardrail.baseline` — the global baseline skill. **(landed)**
-2. `community.school` — minors-aware community overlay. **(landed)**
-3. `community.family` — household / kin group overlay. **(landed)**
-4. `community.workplace` — professional / B2B overlay. **(landed)**
-5. `community.adult_only` — explicitly opt-in adult overlay. **(landed)**
-6. `community.marketplace` — buy / sell / trade overlay. **(landed)**
-7. `community.health_support` — peer-support overlay (loosens self-harm
-   labels in supportive context, tightens medical-misinformation rules). **(landed)**
-8. `community.political` — campaign / civic overlay. **(landed)**
-9. `community.gaming` — large public gaming community overlay. **(landed)**
-10. `jurisdiction.archetype-strict-adult` — strict adult-content jurisdiction
-    archetype. **(landed)**
-11. `jurisdiction.archetype-strict-hate` — strict hate / extremism
-    jurisdiction archetype. **(landed)**
-12. `jurisdiction.archetype-strict-marketplace` — strict marketplace /
-    restricted-goods jurisdiction archetype. **(landed)**
-13. `kchat.jurisdiction.us.guardrail.v1` — United States country pack
-    (federal CSAM, FTO list, FTC / wire-fraud floors). **(landed)**
-14. `kchat.jurisdiction.de.guardrail.v1` — Germany country pack
-    (StGB §86a / NetzDG, Volksverhetzung StGB §130, JuSchG). **(landed)**
-15. `kchat.jurisdiction.br.guardrail.v1` — Brazil country pack
-    (ECA, Lei 7.716/89, TSE election rules). **(landed)**
-16. `kchat.jurisdiction.in.guardrail.v1` — India country pack
-    (UAPA, IPC §153A / §295A, IT Act §67). **(landed)**
-17. `kchat.jurisdiction.jp.guardrail.v1` — Japan country pack
-    (child-protection statute, tokushoho, drug & weapon laws). **(landed)**
+    # 3. Install test dependencies
+    pip install -e ".[test]"      # or: pip install -r requirements.txt
 
-These let us exercise the full bundle composition (global + jurisdiction +
-community) end-to-end across both archetypal and concrete country packs.
-Phase 5 shipped the original 40-country set; Phase 6 added 19 more
-for a total of **59 country packs**, **38 community overlays**, and
-**3 jurisdiction archetypes** — **100 skills** in all. See the
-“Supported Countries” table below for ISO codes, primary languages,
-and key legal references, and the “Community Overlays” table for
-the full list of community kinds.
+    # 4. Run the test suite
+    pytest                        # ~40 tests, <1s
 
-### Supported countries (59)
+The `XLMRAdapter` degrades to a SAFE-only fallback when
+`models/xlmr.onnx` is missing, so the test suite and demo run
+out-of-the-box. To exercise the real encoder classifier (the
+on-device runtime path), follow the ONNX export steps in
+[`docs/RUNNING_XLMR.md`](docs/RUNNING_XLMR.md).
 
-| ISO-3166 | Country | Primary languages | Key legal references |
-| --- | --- | --- | --- |
-| US | United States | en | 18 U.S.C. §§ 2251–2260, Patriot Act, FTC Act. |
-| DE | Germany | de | StGB § 86a / § 130 (Volksverhetzung), NetzDG, JuSchG. |
-| BR | Brazil | pt | ECA (Lei 8.069/1990), Lei 7.716/89, TSE election rules. |
-| IN | India | hi, en | POCSO 2012, UAPA, IPC § 153A / § 295A, IT Act § 67. |
-| JP | Japan | ja | Child-protection statute, tokushoho, drug / weapon laws. |
-| MX | Mexico | es | LGPNNA, Ley Federal contra la Delincuencia Organizada, COFEPRIS. |
-| CA | Canada | en, fr | Criminal Code s. 163.1 / terrorism, Competition Act. |
-| AR | Argentina | es | Ley 26.061 child protection, Código Penal, Ley 23.592. |
-| CO | Colombia | es | Código de la Infancia y Adolescencia, anti-terrorism law. |
-| CL | Chile | es | Ley 21.057 child protection, Ley Antiterrorista. |
-| PE | Peru | es | Código de los Niños y Adolescentes. |
-| FR | France | fr | Loi Avia / DSA, loi Gayssot, Code pénal Art. 225-1. |
-| GB | United Kingdom | en | Online Safety Act 2023, Terrorism Act 2000, Equality Act 2010. |
-| ES | Spain | es, ca, eu, gl | Ley Orgánica de Protección del Menor, Código Penal. |
-| IT | Italy | it | Codice Penale child protection + anti-terrorism. |
-| NL | Netherlands | nl | Wetboek van Strafrecht child protection + terrorism. |
-| PL | Poland | pl | Kodeks Karny child protection + anti-terrorism. |
-| SE | Sweden | sv | Brottsbalk child protection + terrorism. |
-| PT | Portugal | pt | Código Penal child protection + terrorism. |
-| CH | Switzerland | de, fr, it, rm | StGB child protection, StGB Art. 261bis anti-racism. |
-| AT | Austria | de | StGB child protection, Verbotsgesetz 1945. |
-| KR | South Korea | ko | Act on Protection of Children and Youth, NSA. |
-| ID | Indonesia | id | UU ITE, UU Perlindungan Anak, Anti-Terrorism Law. |
-| PH | Philippines | en, tl | RA 7610, Human Security Act. |
-| TH | Thailand | th | Child Protection Act B.E. 2546, lèse-majesté, CCA. |
-| VN | Vietnam | vi | Law on Children 2016, Anti-Terrorism Law. |
-| MY | Malaysia | ms, en | Child Act 2001, SOSMA. |
-| SG | Singapore | en, zh, ms, ta | Children and Young Persons Act, ISA. |
-| TW | Taiwan | zh | Child and Youth Welfare and Protection Act, anti-terrorism. |
-| PK | Pakistan | ur, en | PPC child protection, Anti-Terrorism Act 1997, PECA 2016. |
-| BD | Bangladesh | bn | Children Act 2013, Anti-Terrorism Act 2009. |
-| NG | Nigeria | en | Child Rights Act 2003, Terrorism Prevention Act, Cybercrimes Act. |
-| ZA | South Africa | en, af, zu | Children's Act 38/2005, POCDATARA. |
-| EG | Egypt | ar | Child Law 12/1996, Anti-Terrorism Law 94/2015. |
-| SA | Saudi Arabia | ar | Child Protection System, Anti-Terrorism Law, Anti-Cyber Crime Law. |
-| AE | United Arab Emirates | ar, en | Wadeema's Law, Federal Decree-Law 7/2014. |
-| KE | Kenya | en, sw | Children Act 2022, Prevention of Terrorism Act. |
-| AU | Australia | en | Criminal Code Act 1995 (child exploitation + terrorism), Online Safety Act 2021. |
-| NZ | New Zealand | en, mi | Films, Videos and Publications Classification Act, Terrorism Suppression Act. |
-| TR | Turkey | tr | TCK child protection, TMK anti-terrorism. |
-| RU | Russia | ru | Federal Law 124-FZ child protection, Federal Law 114-FZ anti-extremism, Roskomnadzor rules. |
-| UA | Ukraine | uk, ru | Law on Child Protection (1995), Law on Combating Terrorism (2003). |
-| RO | Romania | ro | Legea 272/2004 child protection, Legea 535/2004 anti-terrorism. |
-| GR | Greece | el | Greek Penal Code child protection, Law 3251/2004 anti-terrorism. |
-| CZ | Czech Republic | cs | Trestní zákoník §§ 192-193 child protection, § 311 anti-terrorism. |
-| HU | Hungary | hu | Btk. § 204 child protection, §§ 314-318 terrorism offences. |
-| DK | Denmark | da | Straffeloven § 235 child protection, § 114 anti-terrorism. |
-| FI | Finland | fi | Rikoslaki 17:18-19 child protection, 34a luku terrorism. |
-| NO | Norway | no, nb | Straffeloven § 311 child protection, § 131 anti-terrorism. |
-| IE | Ireland | en, ga | Online Safety and Media Regulation Act 2022, Child Trafficking and Pornography Act 1998. |
-| IL | Israel | he, ar | Penal Code § 214, Counter-Terrorism Law 5776-2016. |
-| IQ | Iraq | ar, ku | Juvenile Welfare Law No. 76/1983, Anti-Terrorism Law No. 13/2005. |
-| MA | Morocco | ar, fr | Code Pénal Art. 503 child protection, Loi 03-03 anti-terrorism. |
-| DZ | Algeria | ar, fr | Loi 15-12 child protection, Code Pénal Art. 87 bis anti-terrorism. |
-| GH | Ghana | en | Children's Act 1998 (Act 560), Anti-Terrorism Act 2008 (Act 762). |
-| TZ | Tanzania | sw, en | Law of the Child Act 2009, Prevention of Terrorism Act 2002. |
-| ET | Ethiopia | am, en | Criminal Code Art. 644 CSAM, Anti-Terrorism Proclamation 1176/2020. |
-| EC | Ecuador | es | Código de la Niñez y Adolescencia (CONA), COIP Art. 366 anti-terrorism. |
-| UY | Uruguay | es | Código de la Niñez y la Adolescencia (CNA), Ley 19.293 anti-terrorism. |
+## Running tests
 
-### Community Overlays (38)
+    pytest                                  # all tests
+    pytest kchat-skills/tests/global        # global-baseline only
+    pytest kchat-skills/tests/jurisdictions # minority-language FP corpus
+    pytest kchat-skills/tests/adversarial   # obfuscation / evasion corpus
 
-| Overlay | Age mode | Notable tightenings / loosenings |
-| --- | --- | --- |
-| school | minor_present | tightens HARASSMENT, BULLYING; tightens SEXUAL_ADULT |
-| family | mixed_age | tightens HARASSMENT; loosens MISINFORMATION_HEALTH for parents |
-| workplace | adult_only | tightens HARASSMENT (workplace civility); tightens PRIVATE_DATA |
-| adult_only | adult_only | loosens SEXUAL_ADULT to label_only |
-| marketplace | mixed_age | tightens SCAM_FRAUD, ILLEGAL_GOODS, MALWARE_LINK |
-| health_support | mixed_age | loosens SELF_HARM (peer support); tightens MISINFORMATION_HEALTH |
-| political | adult_only | tightens HATE, MISINFORMATION_CIVIC; tightens HARASSMENT |
-| gaming | mixed_age | tightens HARASSMENT (anti-toxicity); tightens VIOLENCE_THREAT |
-| religious | mixed_age | tightens HATE, HARASSMENT |
-| sports | mixed_age | tightens HARASSMENT (anti-pile-on), VIOLENCE_THREAT |
-| creative_arts | mixed_age | warns SEXUAL_ADULT (artistic context), enforces COMMUNITY_RULE |
-| education_higher | adult_only | loosens SEXUAL_ADULT, tightens MISINFORMATION_HEALTH |
-| volunteer | mixed_age | tightens SCAM_FRAUD, PRIVATE_DATA |
-| neighborhood | mixed_age | tightens PRIVATE_DATA, warns SCAM_FRAUD |
-| parenting | mixed_age | tightens SEXUAL_ADULT, warns MISINFORMATION_HEALTH |
-| dating | adult_only | loosens SEXUAL_ADULT, tightens SCAM_FRAUD, HARASSMENT |
-| fitness | mixed_age | warns MISINFORMATION_HEALTH, tightens DRUGS_WEAPONS |
-| travel | adult_only | tightens SCAM_FRAUD, warns PRIVATE_DATA |
-| book_club | mixed_age | warns HARASSMENT |
-| music | mixed_age | warns SEXUAL_ADULT, HARASSMENT |
-| photography | mixed_age | warns SEXUAL_ADULT, tightens PRIVATE_DATA |
-| cooking | mixed_age | warns SCAM_FRAUD, label-only MISINFORMATION_HEALTH |
-| tech_support | adult_only | tightens SCAM_FRAUD, MALWARE_LINK, PRIVATE_DATA |
-| language_learning | mixed_age | warns HATE / HARASSMENT (educational context) |
-| pet_owners | mixed_age | warns SCAM_FRAUD, tightens ILLEGAL_GOODS |
-| environmental | mixed_age | warns MISINFORMATION_HEALTH, MISINFORMATION_CIVIC |
-| journalism | adult_only | loosens EXTREMISM, warns VIOLENCE_THREAT |
-| legal_support | adult_only | tightens PRIVATE_DATA, SCAM_FRAUD |
-| mental_health | adult_only | loosens SELF_HARM (peer support), warns MISINFORMATION_HEALTH |
-| startup | adult_only | tightens SCAM_FRAUD, warns PRIVATE_DATA |
-| nonprofit | mixed_age | tightens SCAM_FRAUD, warns MISINFORMATION_CIVIC |
-| seniors | adult_only | tightens SCAM_FRAUD, PRIVATE_DATA, MISINFORMATION_HEALTH |
-| lgbtq_support | adult_only | tightens HATE, HARASSMENT |
-| veterans | adult_only | loosens SELF_HARM (peer support), tightens SCAM_FRAUD |
-| hobbyist | mixed_age | warns SCAM_FRAUD, ILLEGAL_GOODS |
-| science | mixed_age | warns MISINFORMATION_HEALTH, MISINFORMATION_CIVIC |
-| open_source | adult_only | tightens MALWARE_LINK, warns SCAM_FRAUD |
-| emergency_response | adult_only | tightens MISINFORMATION_HEALTH, SCAM_FRAUD, warns PRIVATE_DATA |
+CI runs the full suite on every PR — see
+[`.github/workflows/`](.github/workflows/) for the workflow definitions
+and the per-PR status checks for the latest results.
 
-## Getting Started
+## Compiling a skill pack
 
-All six phases are **complete**: Phase 0 (foundation), Phase 1 (global
-baseline + community overlays), Phase 2 (jurisdiction archetype
-overlays), Phase 3 (hybrid local pipeline + encoder classifier
-integration), Phase 4 (skill-pack compiler + signing), Phase 5
-(country-specific jurisdiction overlays), and Phase 6 (skill expansion
-to 100 packs, bias auditing, pack lifecycle, adversarial / obfuscation
-corpus, regulatory alignment, performance benchmarking, community
-feedback / appeal flow). The deliverables are skill *definitions*
-(YAML), prompt templates, schemas, test suites, the encoder-classifier
-adapter, and the skill-pack compiler.
+`kchat-skills/compiler/compiler.py` composes the global baseline plus
+jurisdiction and community overlays into a single compiled prompt for
+the encoder classifier runtime:
 
-The repository currently ships **100 skills** — 59 country packs +
-38 community overlays + 3 jurisdiction archetypes:
+    # Compile the global baseline only:
+    python -m kchat_skills.compiler.compiler
 
-- the complete (non-stub) global baseline
-  ([`kchat-skills/global/baseline.yaml`](kchat-skills/global/baseline.yaml)),
-  the encoder classifier input contract
-  ([`local_signal_schema.json`](kchat-skills/global/local_signal_schema.json))
-  and privacy contract
-  ([`privacy_contract.yaml`](kchat-skills/global/privacy_contract.yaml)),
-- the runtime classifier-bundle instruction prompt
-  ([`prompts/runtime_instruction.txt`](kchat-skills/prompts/runtime_instruction.txt))
-  and compiled-prompt format reference
-  ([`prompts/compiled_prompt_format.md`](kchat-skills/prompts/compiled_prompt_format.md)),
-- the 38 community overlays (8 Phase 1 originals + 30 Phase 6
-  additions) under
-  [`kchat-skills/communities/`](kchat-skills/communities/),
-- the device-local expiring counter implementation at
-  [`kchat-skills/compiler/counters.py`](kchat-skills/compiler/counters.py),
-- the 7-step hybrid local pipeline at
-  [`kchat-skills/compiler/pipeline.py`](kchat-skills/compiler/pipeline.py),
-  the backend-agnostic encoder classifier runtime adapter at
-  [`kchat-skills/compiler/encoder_adapter.py`](kchat-skills/compiler/encoder_adapter.py),
-  and the hard-coded threshold policy at
-  [`kchat-skills/compiler/threshold_policy.py`](kchat-skills/compiler/threshold_policy.py),
-- the test-suite template at
-  [`kchat-skills/tests/test_suite_template.yaml`](kchat-skills/tests/test_suite_template.yaml)
-  and the first round of baseline test cases at
-  [`kchat-skills/tests/global/test_baseline_cases.py`](kchat-skills/tests/global/test_baseline_cases.py),
-- the jurisdiction overlay template and three archetype overlays
-  (`archetype-strict-adult`, `archetype-strict-hate`,
-  `archetype-strict-marketplace`) under
-  [`kchat-skills/jurisdictions/`](kchat-skills/jurisdictions/), plus a
-  per-archetype minority-language / code-switching false-positive
-  corpus at
-  [`kchat-skills/tests/jurisdictions/test_minority_language_fp.py`](kchat-skills/tests/jurisdictions/test_minority_language_fp.py),
-- the Phase 4 skill-pack compiler at
-  [`kchat-skills/compiler/compiler.py`](kchat-skills/compiler/compiler.py)
-  with the metric validator at
-  [`kchat-skills/compiler/metric_validator.py`](kchat-skills/compiler/metric_validator.py),
-  the ed25519 skill-passport implementation at
-  [`kchat-skills/compiler/skill_passport.py`](kchat-skills/compiler/skill_passport.py)
-  (schema at
-  [`kchat-skills/compiler/skill_passport.schema.json`](kchat-skills/compiler/skill_passport.schema.json)),
-  and the anti-misuse validator at
-  [`kchat-skills/compiler/anti_misuse.py`](kchat-skills/compiler/anti_misuse.py),
-- 73 reference compiled prompts under
-  [`kchat-skills/prompts/compiled_examples/`](kchat-skills/prompts/compiled_examples/)
-  covering the global baseline, every Phase 1–2 community and
-  jurisdiction overlay combination, the 40 Phase 5 country
-  packs (`country_us.txt` through `country_tr.txt`), and the 19
-  Phase 6 country packs (`country_ru.txt` through `country_uy.txt`),
-- the 59 country packs (40 Phase 5 + 19 Phase 6) under
-  [`kchat-skills/jurisdictions/<cc>/`](kchat-skills/jurisdictions/) —
-  each with concrete legal-age, protected-class, listed-extremist-org,
-  election-rule, and override values, a `normalization.yaml`, and
-  per-language lexicons under `lexicons/` — all passing
-  [`anti_misuse.validate_pack`](kchat-skills/compiler/anti_misuse.py),
-- the Phase 6 bias auditor at
-  [`kchat-skills/compiler/bias_audit.py`](kchat-skills/compiler/bias_audit.py)
-  (per-protected-class and per-minority-language false-positive rates,
-  disparity detection, structured `BiasAuditReport`),
-- the Phase 6 pack-lifecycle store at
-  [`kchat-skills/compiler/pack_lifecycle.py`](kchat-skills/compiler/pack_lifecycle.py)
-  (`PackStore` with versioning, rollback, retention cap of 3,
-  expiry / 30-day review window, JSON round-trip),
-- the Phase 6 adversarial / obfuscation corpus under
-  [`kchat-skills/tests/adversarial/`](kchat-skills/tests/adversarial/)
-  — 60 cases across 6 evasion techniques (homoglyph, leetspeak,
-  code-switching, unicode tricks, whitespace insertion, image-text
-  evasion) with a ≥ 0.80 detection-rate floor per technique,
-- the Phase 6 regulatory-alignment documentation under
-  [`kchat-skills/docs/regulatory/`](kchat-skills/docs/regulatory/)
-  — obligation-to-artefact maps for the EU DSA, NIST AI RMF 1.0, and
-  UNICEF / ITU Child Online Protection Guidelines, with a contract
-  test pinning that every alignment doc references the source
-  artefacts it claims to map,
-- the Phase 6 performance-optimisation benchmark harness at
-  [`kchat-skills/compiler/benchmark.py`](kchat-skills/compiler/benchmark.py)
-  — `PipelineBenchmark`, `BenchmarkReport` (p50 / p95 / p99 / mean /
-  max / min latency). The contract test
-  [`test_benchmark.py`](kchat-skills/tests/global/test_benchmark.py)
-  enforces the 250 ms p95 target across the full 40-country set,
-- the Phase 6 community-feedback / appeal-flow spec at
-  [`kchat-skills/compiler/appeal_flow.py`](kchat-skills/compiler/appeal_flow.py)
-  — `AppealCase`, `AppealAggregator`, `AppealReport` with closed-enum
-  `user_context` / `recommendation`, strict privacy invariant (no
-  content text / hashes / embeddings), and a child-safety short-circuit
-  that escalates any category-1 appeal to `urgent_review`.
+    # Compile baseline + jurisdiction archetype + community overlay:
+    python -m kchat_skills.compiler.compiler \
+        --jurisdiction kchat-skills/jurisdictions/archetype-strict-adult \
+        --community    kchat-skills/communities/school
 
-### Quick start
+See [`docs/COMPILER.md`](docs/COMPILER.md) for the compiler internals,
+the signing workflow (ed25519 skill passports), bias auditing,
+pack lifecycle (versioning / rollback / retention), regulatory
+alignment, performance benchmarks, and the community appeal flow.
 
-```bash
-# 1. Clone
-git clone https://github.com/kennguy3n/slm-guardrail.git
-cd slm-guardrail
-
-# 2. (optional) create a virtualenv
-python3 -m venv .venv
-source .venv/bin/activate
-
-# 3. Install test dependencies
-pip install -r requirements.txt
-# or, equivalently:
-pip install -e ".[test]"
-```
-
-### Running with XLM-R
-
-The skill packs ship with a backend-agnostic
-[`EncoderAdapter`](kchat-skills/compiler/encoder_adapter.py) protocol;
-the [`XLMRAdapter`](kchat-skills/compiler/xlmr_adapter.py) implementation
-loads an **XLM-R** encoder (a multilingual transformer encoder
-exported once to ONNX INT8 — see
-[`tools/export_xlmr_onnx.py`](tools/export_xlmr_onnx.py) for the
-exact source artifact and conversion pipeline) via
-[`onnxruntime`](https://onnxruntime.ai). On-device
-the runtime depends on `onnxruntime` + `sentencepiece` + `numpy` only
-(no PyTorch / `transformers`). The exported model is ~107 MB INT8,
-loads in well under a second on CPU, and runs inference in single-digit
-milliseconds per message — well inside the 250 ms p95 envelope (latest
-benchmark on this VM measured p95 ≈ 3.3 ms across 100 iterations × 27
-cases; see `kchat-skills/benchmarks/xlmr_results.json`).
-
-Two interchangeable embedding-stage classifiers are supported:
-
-1. **Trained linear head** — when
-   [`kchat-skills/compiler/data/xlmr_head.npz`](kchat-skills/compiler/data/)
-   is present, the adapter loads it and uses the head's softmax over
-   logits as the embedding-stage classifier. The committed checkpoint
-   is a `Linear(384, 16)` trained on the 175-example multilingual
-   corpus in
-   [`training_data.py`](kchat-skills/compiler/training_data.py) via
-   [`train_xlmr_head.py`](kchat-skills/compiler/train_xlmr_head.py),
-   then converted from the trainer's `.pt` to the runtime `.npz` via
-   [`tools/export_xlmr_onnx.py`](tools/export_xlmr_onnx.py)
-   (88.5% train accuracy). Rationale ids end in `_trained_v1`.
-2. **Zero-shot prototype fallback** — when the trained head is missing
-   or fails to load, the adapter falls back to a low-temperature
-   softmax over cosine similarities against a fixed bank of category
-   prototype embeddings. Rationale ids end in `_proto_v1`.
-
-In either case, deterministic detector branches (CHILD_SAFETY,
-PRIVATE_DATA, SCAM_FRAUD, lexicon, NSFW media) run first and beat the
-embedding-stage classifier.
-
-The export pipeline also supports an optional INT4 (block-wise
-weight-only) variant via `python tools/export_xlmr_onnx.py
---quantize-int4 --output-dir models`. The INT4 model is ~55 MB on
-disk vs ~107 MB for INT8 — recommended for mobile devices with tight
-storage budgets. Both `MatMul` and `Gather` ops are quantised
-(quantising `Gather` is what brings the file under the ~50 MB
-target — MatMul-only INT4 leaves the 250 002 × 384 word-embedding
-table at FP32 and the file stays north of 370 MB).
-`--validate-int4` additionally loads both the INT8 and INT4 sessions,
-runs the multilingual smoke corpus through each, and asserts per-row
-cosine similarity is above the configurable `--int4-min-cosine`
-floor (default `0.94` — empirically `min ≈ 0.95`, `mean ≈ 0.96` on
-the smoke corpus; aggressive embedding-`Gather` quantisation costs
-~5 cosine points vs INT8 and is what unlocks the storage win, so
-callers that need > 0.99 cosine should keep shipping the INT8 file).
-To load the INT4 file at runtime, either pass the explicit path to
-`XLMRAdapter(model_path="models/xlmr.int4.onnx")` or set
-`prefer_int4=True` and let the adapter auto-resolve when the INT4
-file is on disk.
-
-`XLMRAdapter.classify()` also returns the raw 384-dim mean-pooled,
-L2-normalised XLM-R embedding alongside the classification result
-under the internal key `_embedding` (a `list[float]`). The schema
-admits underscore-prefixed extras via `patternProperties: {"^_": {}}`,
-so downstream consumers (e.g. `chat-storage-search`) can cache the
-embedding in their `search_vector` table and avoid re-computing it
-during semantic search — a message's XLM-R encoder pass is computed
-at most once across guardrail and search.
-
-```bash
-# 1. Install the runtime dependencies (already in requirements.txt /
-#    pyproject's `demo` extra). The adapter only needs onnxruntime,
-#    sentencepiece and numpy.
-pip install -r requirements.txt
-
-# 2. One-time ONNX export from the HuggingFace checkpoint. This
-#    requires transformers + torch + onnx + onnxscript, but only at
-#    export time — they are NOT runtime dependencies. We pin
-#    `transformers<5` because v5 changed the positional signature of
-#    `XLMRobertaModel.forward()` and breaks the legacy `torch.onnx`
-#    tracer; the export script in turn forces `dynamo=False`,
-#    because the dynamo-based exporter on torch >= 2.5 emits an
-#    INT8 graph that `onnxruntime` rejects (`tensor(float16)`
-#    `DequantizeLinear` scales) and an FP32 graph whose
-#    `scaled_dot_product_attention` fails on dynamic shapes.
-pip install -e ".[export]"
-# or, equivalently:
-# pip install "transformers<5" torch onnx onnxruntime sentencepiece onnxscript
-python tools/export_xlmr_onnx.py --output-dir models
-# -> writes models/xlmr.onnx (INT8-quantised, ~107 MB) and
-#    models/xlmr.spm (~5 MB SentencePiece tokenizer)
-
-# 2b. (optional) additionally produce an INT4 (block-wise weight-only)
-#     ONNX file at models/xlmr.int4.onnx. Recommended for mobile
-#     devices with tight storage budgets.
-python tools/export_xlmr_onnx.py --quantize-int4 --output-dir models
-# -> writes models/xlmr.int4.onnx (~55 MB) alongside the INT8
-#    models/xlmr.onnx (both `MatMul` and `Gather` ops quantised to
-#    4-bit; quantising the embedding `Gather` is what brings the
-#    file size down).
-
-# 2c. (optional) export and validate INT4 against INT8 — loads both
-#     sessions, runs a multilingual smoke corpus through each, and
-#     asserts per-row cosine similarity is above the configurable
-#     --int4-min-cosine floor (default 0.94).
-python tools/export_xlmr_onnx.py --quantize-int4 --validate-int4 \
-    --output-dir models
-
-# 3. Run the demo against the local ONNX checkpoint
-python tools/run_guardrail_demo.py \
-    --model-path models/xlmr.onnx --tokenizer-path models/xlmr.spm
-python tools/run_guardrail_demo.py --jurisdiction us --community workplace \
-    --model-path models/xlmr.onnx --tokenizer-path models/xlmr.spm
-
-# 4. Run benchmarks and commit the results
-python tools/run_guardrail_demo.py --benchmark --commit-results \
-    --model-path models/xlmr.onnx --tokenizer-path models/xlmr.spm
-# -> writes kchat-skills/benchmarks/xlmr_results.json
-
-# Mock-only mode (no model weights required) for quick smoke tests
-python tools/run_guardrail_demo.py --mock
-```
-
-The demo loads
-[`kchat-skills/samples/sample_messages.yaml`](kchat-skills/samples/sample_messages.yaml)
-(format documented in
-[`kchat-skills/samples/README.md`](kchat-skills/samples/README.md)),
-compiles the active skill bundle through `SkillPackCompiler`, runs the
-full hybrid pipeline against either `XLMRAdapter` or
-`MockEncoderAdapter`, and prints a per-case table plus an optional
-`PipelineBenchmark` report. See
-[`kchat-skills/benchmarks/README.md`](kchat-skills/benchmarks/README.md)
-for the benchmark methodology and committed results.
-
-### How to run tests
-
-The test suite validates the structural primitives of the global
-baseline (`taxonomy.yaml`, `severity.yaml`, `output_schema.json`,
-`baseline.yaml`). It is pure Python — no encoder weights are required
-at test time (the adapter degrades to a SAFE fallback when weights are
-missing).
-
-```bash
-pytest                                  # run all tests
-pytest kchat-skills/tests/global        # only the global-baseline tests
-pytest kchat-skills/tests/communities   # only the community-overlay tests
-pytest kchat-skills/tests/jurisdictions # only the jurisdiction tests
-pytest -v                               # verbose
-```
-
-### Running the demo
-
-The demo script exercises the guardrail pipeline across multiple
-community types, countries, and language scenarios:
-
-```bash
-python tools/demo_guardrail.py
-```
-
-Results are written to `results/` as both JSON (structured) and
-Markdown (human-readable) with ISO-8601 timestamps. See
-[`results/`](results/) for the latest run.
-
-### Project layout
-
-The implementation tree lives under [`kchat-skills/`](kchat-skills/),
-following the recommended folder structure documented in
-[`ARCHITECTURE.md`](ARCHITECTURE.md#recommended-folder-structure):
-
-```
-kchat-skills/
-├── global/               # global baseline skill: taxonomy, severity, schemas
-├── jurisdictions/        # jurisdiction overlay packs (Phase 2+)
-│   ├── _template/
-│   │   └── overlay.yaml
-│   ├── archetype-strict-adult/
-│   │   ├── overlay.yaml          # severity floor 5 on category 10
-│   │   ├── normalization.yaml
-│   │   └── lexicons/
-│   ├── archetype-strict-hate/
-│   │   ├── overlay.yaml          # severity floor 5 on cat 4, 4 on cat 6
-│   │   ├── normalization.yaml
-│   │   └── lexicons/
-│   ├── archetype-strict-marketplace/
-│   │   ├── overlay.yaml          # severity floor 4 on cat 11 & 12
-│   │   ├── normalization.yaml
-│   │   └── lexicons/
-│   ├── us/  de/  br/  in/  jp/   # Phase 5 wave 1
-│   ├── mx/  ca/  ar/  co/  cl/  pe/  # Phase 5 wave 2 Americas
-│   ├── fr/  gb/  es/  it/  nl/  pl/  se/  pt/  ch/  at/  # Europe
-│   ├── kr/  id/  ph/  th/  vn/  my/  sg/  tw/  pk/  bd/  # Asia-Pacific
-│   ├── ng/  za/  eg/  sa/  ae/  ke/  # Middle East / Africa
-│   └── au/  nz/  tr/              # Other
-├── communities/          # community overlay packs (Phase 1+)
-│   ├── _template/         # community overlay template
-│   ├── school.yaml        # minors-aware
-│   ├── family.yaml        # household / kin
-│   ├── workplace.yaml     # professional / B2B
-│   ├── adult_only.yaml    # opt-in adult
-│   ├── marketplace.yaml   # buy / sell / trade
-│   ├── health_support.yaml
-│   ├── political.yaml     # campaign / civic
-│   └── gaming.yaml        # public gaming community
-├── prompts/              # 10-rule classifier-bundle instruction + compiled examples
-│   ├── runtime_instruction.txt
-│   ├── compiled_prompt_format.md
-│   └── compiled_examples/  # 73 reference compiled prompts (Phase 4 + Phase 5 + Phase 6)
-├── samples/              # demo / benchmark message corpus (Phase 6)
-│   ├── sample_messages.yaml
-│   └── README.md
-├── benchmarks/           # committed benchmark results (Phase 6)
-│   ├── README.md
-│   └── xlmr_results.json    # generated by tools/run_guardrail_demo.py --commit-results
-├── compiler/             # skill-pack compiler (Phase 3-4)
-│   ├── counters.py           # device-local expiring counter store (Phase 1)
-│   ├── pipeline.py           # 7-step hybrid local pipeline (Phase 3)
-│   ├── encoder_adapter.py    # EncoderAdapter Protocol + MockEncoderAdapter (Phase 3)
-│   ├── xlmr_adapter.py        # XLMRAdapter — XLM-R encoder classifier, ONNX Runtime (Phase 6)
-│   ├── threshold_policy.py   # hard-coded threshold enforcement (Phase 3)
-│   ├── metric_validator.py   # 7-metric validator (Phase 3)
-│   ├── compiler.py           # skill-pack compiler pipeline (Phase 4)
-│   ├── skill_passport.py     # ed25519 signing / verification (Phase 4)
-│   ├── skill_passport.schema.json  # Draft-07 passport schema (Phase 4)
-│   ├── anti_misuse.py        # anti-misuse validation rules (Phase 4)
-│   ├── bias_audit.py         # bias auditor (Phase 6)
-│   ├── pack_lifecycle.py     # pack store / rollback / expiry (Phase 6)
-│   ├── benchmark.py          # performance benchmark harness (Phase 6)
-│   └── appeal_flow.py        # community feedback / appeal flow (Phase 6)
-├── tests/                # pytest validation suite
-│   ├── test_suite_template.yaml    # metrics framework (Phase 1)
-│   ├── test_test_suite_template.py
-│   ├── global/
-│   │   ├── test_baseline_cases.py  # first round of baseline cases
-│   │   ├── test_counters.py
-│   │   ├── test_pipeline.py        # 7-step hybrid pipeline
-│   │   ├── test_encoder_adapter.py # EncoderAdapter Protocol / MockEncoderAdapter
-│   │   ├── test_xlmr_adapter.py        # XLMRAdapter — XLM-R, ONNX Runtime
-│   │   ├── test_threshold_policy.py # hard-coded threshold policy
-│   │   ├── test_metric_validator.py # 7-metric validator (Phase 3)
-│   │   ├── test_compiler.py         # skill-pack compiler (Phase 4)
-│   │   ├── test_skill_passport.py   # ed25519 passport (Phase 4)
-│   │   ├── test_anti_misuse.py      # anti-misuse rules (Phase 4)
-│   │   ├── test_compiled_examples.py # compiled-prompt references
-│   │   ├── test_bias_audit.py       # bias auditor (Phase 6)
-│   │   ├── test_pack_lifecycle.py   # pack-lifecycle store (Phase 6)
-│   │   ├── test_benchmark.py        # performance benchmark (Phase 6)
-│   │   ├── test_appeal_flow.py      # appeal flow (Phase 6)
-│   │   └── test_regulatory_docs.py  # regulatory alignment docs (Phase 6)
-│   ├── jurisdictions/
-│   │   ├── test_jurisdiction_template.py
-│   │   ├── test_archetype_strict_adult.py
-│   │   ├── test_archetype_strict_hate.py
-│   │   ├── test_archetype_strict_marketplace.py
-│   │   ├── test_country_<cc>.py     # 59 per-country test files (Phase 5+6)
-│   │   └── test_minority_language_fp.py
-│   ├── adversarial/                 # Phase 6 obfuscation corpus
-│   │   ├── corpus.yaml
-│   │   ├── conftest.py
-│   │   └── test_adversarial_corpus.py
-│   └── communities/
-└── docs/                 # pointers to the root-level project docs
-    └── regulatory/                  # Phase 6 regulatory alignment
-        ├── README.md                # index
-        ├── eu_dsa_alignment.md
-        ├── nist_ai_rmf_alignment.md
-        └── unicef_itu_cop_alignment.md
-
-tools/                    # repo-level utilities (run from repo root)
-├── regenerate_compiled_examples.py  # refresh compiled_examples/*.txt
-├── run_guardrail_demo.py            # sample-data demo (mock or XLM-R / ONNX Runtime)
-└── demo_guardrail.py                # cross-community / cross-country demo
-
-results/                  # demo run outputs (JSON + Markdown reports)
-```
-
-### Compiling a skill pack
-
-The Phase 4 compiler resolves the global baseline plus optional
-jurisdiction and community overlays into a single compiled prompt
-(< 1800 instruction tokens) configuring the encoder classifier's
-allowed actions / reason codes / counters:
-
-```bash
-# Compile the global baseline only (writes to stdout):
-python kchat-skills/compiler/compiler.py > /tmp/baseline.txt
-
-# Compile baseline + jurisdiction archetype + community overlay:
-python kchat-skills/compiler/compiler.py \
-    --jurisdiction archetype-strict-marketplace \
-    --community workplace \
-    --out kchat-skills/prompts/compiled_examples/strict_marketplace_workplace.txt
-```
-
-The CLI is also available as
-`PYTHONPATH=kchat-skills/compiler python -m compiler ...`. To
-regenerate the full set of reference
-compiled examples after changing baseline / overlays, run:
-
-```bash
-python tools/regenerate_compiled_examples.py
-```
-
-### Signing workflow
-
-Every compiled bundle ships with an ed25519-signed *skill passport*
-(see [`compiler/skill_passport.py`](kchat-skills/compiler/skill_passport.py)
-and [`compiler/skill_passport.schema.json`](kchat-skills/compiler/skill_passport.schema.json)).
-The passport carries identity (`skill_id`, `skill_version`, `parent`),
-provenance (`authored_by`, `reviewed_by.legal/cultural/trust_and_safety`),
-model compatibility (`model_id` / `model_min_version` /
-`max_instruction_tokens` / `max_output_tokens`), an `expires_on`
-date (max 18 months from issuance), the per-pack `test_results`
-recorded by [`metric_validator`](kchat-skills/compiler/metric_validator.py),
-and a base64 ed25519 `signature` covering the deterministic JSON
-serialisation of every other field.
-
-A pack is rejected by the runtime if any of the following is true:
-the signature does not verify against the compiler's public key;
-`expires_on` is in the past or more than 18 months in the future;
-the runtime model is not listed in `model_compatibility`; or any of the
-[`anti_misuse`](kchat-skills/compiler/anti_misuse.py) rules fail
-(invented categories, overlay redefining `privacy_rules`, jurisdiction
-pack missing `legal_review` / `cultural_review` signers, community
-pack missing `trust_and_safety` signer, severity floors ≥ 4 without
-protected-speech `allowed_contexts`, or lexicons without provenance).
-
-### Bias Auditing
-
-The Phase 6 bias auditor at
-[`kchat-skills/compiler/bias_audit.py`](kchat-skills/compiler/bias_audit.py)
-turns a list of `BiasAuditCase` rows (each tagged with a
-`protected_class`, `language`, expected and predicted taxonomy id)
-into a structured `BiasAuditReport`. It computes the per-protected-
-class and per-minority-language false-positive rate (a case is a
-false positive when `expected_category == SAFE` but
-`predicted_category != SAFE`), flags any group that exceeds the
-0.07 ceiling — bound to the `minority_language_false_positive`
-shipping target — or shows >0.05 disparity vs. the overall mean,
-and marks the audit `passed=False` if anything is flagged. The
-compiler can invoke the auditor after the metric validator so every
-signed pack carries evidence that its behaviour does not skew
-across protected classes or languages.
-
-### Pack Lifecycle
-
-The Phase 6 pack store at
-[`kchat-skills/compiler/pack_lifecycle.py`](kchat-skills/compiler/pack_lifecycle.py)
-is a JSON-serialisable, device-local ledger of signed pack
-versions. Each `PackVersion` records the `skill_id`,
-`skill_version`, observed `signed_on` date, `expires_on`,
-`signature_valid`, and `is_active` flags. The `PackStore` exposes:
-
-- `register(passport)` — register a freshly signed `SkillPassport`,
-  marking it active and demoting the previous version;
-- `get_active(skill_id)` / `get_history(skill_id)` — current and
-  historical versions for a given pack;
-- `rollback(skill_id)` — fall back to the previously signed
-  version. Per ARCHITECTURE.md `anti_misuse_controls.technical`,
-  `MAX_RETAINED_VERSIONS = 3` versions are retained on device;
-- `check_expiry(now=None)` / `deactivate_expired(now=None)` /
-  `needs_review(days_ahead=30, now=None)` — flag and act on
-  expired packs, and surface the review queue
-  (`EXPIRY_REVIEW_WINDOW_DAYS = 30`);
-- `to_json()` / `from_json(raw)` — round-trip the ledger for
-  device-local persistence.
-
-### Performance Benchmarking
-
-The Phase 6 benchmark harness at
-[`kchat-skills/compiler/benchmark.py`](kchat-skills/compiler/benchmark.py)
-wraps `GuardrailPipeline` plus an ``EncoderAdapter`` (typically
-`MockEncoderAdapter` for deterministic regression tests, or
-`XLMRAdapter` for real encoder timings) into a
-deterministic measurement loop. `PipelineBenchmark.run(cases,
-iterations=100)` records wall-clock latency per iteration using
-`time.perf_counter` and returns a `BenchmarkReport` with p50 / p95 /
-p99 / mean / max / min / per-case-mean in milliseconds. A report
-`passed` iff the aggregate p95 is ≤ `P95_LATENCY_TARGET_MS = 250` —
-the ARCHITECTURE.md “Performance envelope” target. The contract
-test at
-[`kchat-skills/tests/global/test_benchmark.py`](kchat-skills/tests/global/test_benchmark.py)
-parametrises across all 16 taxonomy categories and across the full
-59-country set to verify latency does not regress as packs grow.
-
-### Appeal Flow
-
-The Phase 6 community-feedback spec at
-[`kchat-skills/compiler/appeal_flow.py`](kchat-skills/compiler/appeal_flow.py)
-implements `AppealCase`, `AppealAggregator` and `AppealReport`.
-`AppealCase` is privacy-contract-safe by construction — there is no
-text / message / hash / embedding field; only a closed-enum
-`user_context` in `{disagree_category, disagree_severity,
-false_positive, missing_context}` and a stable `rationale_id`.
-`AppealAggregator.aggregate(skill_id, window_days=30)` returns a
-report whose `recommendation` is one of `{no_action,
-review_suggested, urgent_review}`. Rules: any CHILD_SAFETY (cat 1)
-appeal short-circuits to `urgent_review`; per-category rate ≥ 15%
-(with at least 5 appeals) promotes to `urgent_review`; ≥ 5% promotes
-to `review_suggested`.
-
-### Regulatory Alignment
-
-The Phase 6 regulatory documentation under
-[`kchat-skills/docs/regulatory/`](kchat-skills/docs/regulatory/)
-maps each obligation of the EU Digital Services Act, NIST AI Risk
-Management Framework 1.0, and UNICEF / ITU Child Online Protection
-Guidelines to the concrete artefact(s) that satisfy it:
-
-- [`eu_dsa_alignment.md`](kchat-skills/docs/regulatory/eu_dsa_alignment.md)
-  — transparency (Art. 14, 17), notice-and-action (Art. 16, 20),
-  risk assessment (Art. 34, 35), protection of minors (Art. 28),
-  transparency reporting (Art. 24).
-- [`nist_ai_rmf_alignment.md`](kchat-skills/docs/regulatory/nist_ai_rmf_alignment.md)
-  — all four core functions (Govern, Map, Measure, Manage) plus the
-  seven trustworthy-AI characteristics.
-- [`unicef_itu_cop_alignment.md`](kchat-skills/docs/regulatory/unicef_itu_cop_alignment.md)
-  — child-rights due diligence plus a per-jurisdiction statutory
-  table for all 59 country packs.
-- [`README.md`](kchat-skills/docs/regulatory/README.md) — index
-  linking to all three.
-
-### Documentation
+## Documentation
 
 - [`PROPOSAL.md`](PROPOSAL.md) — rationale, scope, success metrics.
-- [`ARCHITECTURE.md`](ARCHITECTURE.md) — technical design: layering, privacy
-  architecture, hybrid pipeline, schemas, anti-misuse controls.
-- [`PHASES.md`](PHASES.md) — phased roadmap from foundation through scaled
-  skill library and continuous improvement.
-- [`PROGRESS.md`](PROGRESS.md) — current status and changelog.
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — technical design: layering,
+  privacy architecture, hybrid pipeline, schemas, anti-misuse controls.
+- [`PHASES.md`](PHASES.md) — phased roadmap from foundation through
+  scaled skill library and continuous improvement.
+- [`PROGRESS.md`](PROGRESS.md) — current status.
+- [`docs/SUPPORTED_REGIONS.md`](docs/SUPPORTED_REGIONS.md) — 59 country
+  packs and 38 community overlays (full roster).
+- [`docs/RUNNING_XLMR.md`](docs/RUNNING_XLMR.md) — ONNX export and the
+  full XLM-R encoder runtime path.
+- [`docs/COMPILER.md`](docs/COMPILER.md) — skill-pack compiler, signing,
+  bias auditing, pack lifecycle, regulatory alignment, benchmarks.
 - [`kchat-skills/docs/regulatory/`](kchat-skills/docs/regulatory/) —
   EU DSA / NIST AI RMF / UNICEF · ITU COP alignment.
 
@@ -917,4 +192,7 @@ Guidelines to the concrete artefact(s) that satisfy it:
 
 ## License
 
-License: TBD.
+Proprietary — Copyright 2026 KChat Contributors. All rights reserved.
+See [LICENSE](LICENSE) if present; otherwise this code is provided as a
+reference implementation under a Proprietary license. Contact the
+maintainers for licensing inquiries.
