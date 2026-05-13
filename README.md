@@ -143,9 +143,9 @@ on-device runtime path), follow the ONNX export steps in
     pytest kchat-skills/tests/jurisdictions # minority-language FP corpus
     pytest kchat-skills/tests/adversarial   # obfuscation / evasion corpus
 
-CI runs the full suite on every PR — see
-[`.github/workflows/`](.github/workflows/) for the workflow definitions
-and the per-PR status checks for the latest results.
+The suite is pure Python — no encoder weights are required at test
+time; the adapter degrades to a SAFE fallback when weights are
+missing.
 
 ## Compiling a skill pack
 

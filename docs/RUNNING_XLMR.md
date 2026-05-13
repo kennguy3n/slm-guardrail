@@ -8,11 +8,11 @@ benchmarking. For the high-level project pitch see the
 ## Overview
 
 The skill packs ship with a backend-agnostic
-[`EncoderAdapter`](kchat-skills/compiler/encoder_adapter.py) protocol;
-the [`XLMRAdapter`](kchat-skills/compiler/xlmr_adapter.py) implementation
+[`EncoderAdapter`](../kchat-skills/compiler/encoder_adapter.py) protocol;
+the [`XLMRAdapter`](../kchat-skills/compiler/xlmr_adapter.py) implementation
 loads an **XLM-R** encoder (a multilingual transformer encoder
 exported once to ONNX INT8 — see
-[`tools/export_xlmr_onnx.py`](tools/export_xlmr_onnx.py) for the
+[`tools/export_xlmr_onnx.py`](../tools/export_xlmr_onnx.py) for the
 exact source artifact and conversion pipeline) via
 [`onnxruntime`](https://onnxruntime.ai). On-device
 the runtime depends on `onnxruntime` + `sentencepiece` + `numpy` only
@@ -25,15 +25,15 @@ cases; see `kchat-skills/benchmarks/xlmr_results.json`).
 Two interchangeable embedding-stage classifiers are supported:
 
 1. **Trained linear head** — when
-   [`kchat-skills/compiler/data/xlmr_head.npz`](kchat-skills/compiler/data/)
+   [`kchat-skills/compiler/data/xlmr_head.npz`](../kchat-skills/compiler/data/)
    is present, the adapter loads it and uses the head's softmax over
    logits as the embedding-stage classifier. The committed checkpoint
    is a `Linear(384, 16)` trained on the 175-example multilingual
    corpus in
-   [`training_data.py`](kchat-skills/compiler/training_data.py) via
-   [`train_xlmr_head.py`](kchat-skills/compiler/train_xlmr_head.py),
+   [`training_data.py`](../kchat-skills/compiler/training_data.py) via
+   [`train_xlmr_head.py`](../kchat-skills/compiler/train_xlmr_head.py),
    then converted from the trainer's `.pt` to the runtime `.npz` via
-   [`tools/export_xlmr_onnx.py`](tools/export_xlmr_onnx.py)
+   [`tools/export_xlmr_onnx.py`](../tools/export_xlmr_onnx.py)
    (88.5% train accuracy). Rationale ids end in `_trained_v1`.
 2. **Zero-shot prototype fallback** — when the trained head is missing
    or fails to load, the adapter falls back to a low-temperature
@@ -128,12 +128,12 @@ python tools/run_guardrail_demo.py --mock
 ```
 
 The demo loads
-[`kchat-skills/samples/sample_messages.yaml`](kchat-skills/samples/sample_messages.yaml)
+[`kchat-skills/samples/sample_messages.yaml`](../kchat-skills/samples/sample_messages.yaml)
 (format documented in
-[`kchat-skills/samples/README.md`](kchat-skills/samples/README.md)),
+[`kchat-skills/samples/README.md`](../kchat-skills/samples/README.md)),
 compiles the active skill bundle through `SkillPackCompiler`, runs the
 full hybrid pipeline against either `XLMRAdapter` or
 `MockEncoderAdapter`, and prints a per-case table plus an optional
 `PipelineBenchmark` report. See
-[`kchat-skills/benchmarks/README.md`](kchat-skills/benchmarks/README.md)
+[`kchat-skills/benchmarks/README.md`](../kchat-skills/benchmarks/README.md)
 for the benchmark methodology and committed results.
