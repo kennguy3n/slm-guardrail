@@ -1,15 +1,14 @@
 # Skill-Pack Compiler
 
-This document covers the Phase 4+ skill-pack compiler:
-composing global + jurisdiction + community overlays, signing
-(ed25519 skill passports), bias auditing, pack lifecycle,
-performance benchmarking, the community appeal flow, and
-regulatory alignment. For the high-level project pitch see the
-[README](../README.md).
+This document covers the skill-pack compiler: composing global +
+jurisdiction + community overlays, signing (ed25519 skill
+passports), bias auditing, pack lifecycle, performance
+benchmarking, the community appeal flow, and regulatory alignment.
+For the high-level project pitch see the [README](../README.md).
 
-## Compiling a skill pack
+## Compiling a Skill Pack
 
-The Phase 4 compiler resolves the global baseline plus optional
+The compiler resolves the global baseline plus optional
 jurisdiction and community overlays into a single compiled prompt
 (< 1800 instruction tokens) configuring the encoder classifier's
 allowed actions / reason codes / counters:
@@ -34,7 +33,7 @@ compiled examples after changing baseline / overlays, run:
 python tools/regenerate_compiled_examples.py
 ```
 
-## Signing workflow
+## Signing Workflow
 
 Every compiled bundle ships with an ed25519-signed *skill passport*
 (see [`compiler/skill_passport.py`](../kchat-skills/compiler/skill_passport.py)
@@ -60,7 +59,7 @@ protected-speech `allowed_contexts`, or lexicons without provenance).
 
 ## Bias Auditing
 
-The Phase 6 bias auditor at
+The bias auditor at
 [`kchat-skills/compiler/bias_audit.py`](../kchat-skills/compiler/bias_audit.py)
 turns a list of `BiasAuditCase` rows (each tagged with a
 `protected_class`, `language`, expected and predicted taxonomy id)
@@ -77,7 +76,7 @@ across protected classes or languages.
 
 ## Pack Lifecycle
 
-The Phase 6 pack store at
+The pack store at
 [`kchat-skills/compiler/pack_lifecycle.py`](../kchat-skills/compiler/pack_lifecycle.py)
 is a JSON-serialisable, device-local ledger of signed pack
 versions. Each `PackVersion` records the `skill_id`,
@@ -100,7 +99,7 @@ versions. Each `PackVersion` records the `skill_id`,
 
 ## Performance Benchmarking
 
-The Phase 6 benchmark harness at
+The benchmark harness at
 [`kchat-skills/compiler/benchmark.py`](../kchat-skills/compiler/benchmark.py)
 wraps `GuardrailPipeline` plus an ``EncoderAdapter`` (typically
 `MockEncoderAdapter` for deterministic regression tests, or
@@ -118,7 +117,7 @@ parametrises across all 16 taxonomy categories and across the full
 
 ## Appeal Flow
 
-The Phase 6 community-feedback spec at
+The community-feedback spec at
 [`kchat-skills/compiler/appeal_flow.py`](../kchat-skills/compiler/appeal_flow.py)
 implements `AppealCase`, `AppealAggregator` and `AppealReport`.
 `AppealCase` is privacy-contract-safe by construction — there is no
@@ -134,7 +133,7 @@ to `review_suggested`.
 
 ## Regulatory Alignment
 
-The Phase 6 regulatory documentation under
+The regulatory documentation under
 [`kchat-skills/docs/regulatory/`](../kchat-skills/docs/regulatory/)
 maps each obligation of the EU Digital Services Act, NIST AI Risk
 Management Framework 1.0, and UNICEF / ITU Child Online Protection

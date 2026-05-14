@@ -1,37 +1,37 @@
-# KChat Guardrail Skills — Progress
+# KChat Guardrail Skills — Project Status
 
-**Status:** All six phases complete. The repository ships **100 skills**
-(59 country packs + 38 community overlays + 3 jurisdiction archetypes
-+ the global baseline) plus the XLM-R encoder classifier integration,
-skill-pack compiler, ed25519 skill passports, bias auditor, pack
-lifecycle store, adversarial / obfuscation corpus, regulatory
-alignment, performance benchmarks, and the community appeal flow.
+The project is stable. All planned features are implemented. The
+repository ships **100 skill packs** (1 global baseline + 3
+jurisdiction archetypes + 59 country packs + 38 community overlays)
+together with the XLM-R encoder classifier integration, the
+skill-pack compiler, ed25519 skill passports, the bias auditor, the
+pack lifecycle store, an adversarial / obfuscation corpus,
+regulatory alignment documentation, performance benchmarks, and the
+community appeal flow.
 
-This file tracks delivery against the phased plan in
-[`PHASES.md`](PHASES.md). For the per-session changelog, the
-encoder-classifier evolution history, and the
-phase-by-phase deliverable checklists, see
-[`docs/DEVELOPMENT_LOG.md`](docs/DEVELOPMENT_LOG.md).
+No active feature development. Ongoing work is limited to operational
+maintenance (see [Operational Maintenance](#operational-maintenance)
+below).
 
-## Phase summary
+For the build sequence and the artifacts produced in each phase, see
+[PHASES.md](PHASES.md). For the historical record of session-by-
+session changes, see [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
-| Phase | Focus | Status |
+## Development Summary
+
+| Area | Focus | Status |
 |---|---|---|
-| 0 | Foundation: repo scaffold, taxonomy, severity rubric, output schema, privacy contract | Complete |
-| 1 | Global baseline skill + first 8 community overlays + first round of test cases | Complete |
-| 2 | Jurisdiction archetype overlays (`strict-adult`, `strict-hate`, `strict-marketplace`) | Complete |
-| 3 | Hybrid local pipeline + encoder classifier integration (XLM-R via ONNX) | Complete |
-| 4 | Skill-pack compiler + signing (ed25519 skill passports) | Complete |
-| 5 | Country-specific expansion — 40 country packs (Phase 5 wave) | Complete |
-| 6 | Scale + audit + continuous improvement: 19 additional country packs, 30 additional community overlays, bias auditing, pack lifecycle, adversarial corpus, regulatory alignment, performance benchmarks, appeal flow | Complete |
+| Foundation | Repo scaffold, taxonomy, severity rubric, output schema, privacy contract | Complete |
+| Global Baseline + Community Overlays | Global baseline skill + first 8 community overlays + first round of test cases | Complete |
+| Jurisdiction Archetypes | Archetype overlays (`strict-adult`, `strict-hate`, `strict-marketplace`) | Complete |
+| Hybrid Local Pipeline | Pipeline + encoder classifier integration (XLM-R via ONNX) | Complete |
+| Compiler + Signing | Skill-pack compiler + ed25519 skill passports | Complete |
+| Country-Specific Expansion | 40 country packs in the first expansion wave | Complete |
+| Scale + Audit | 19 additional country packs, 30 additional community overlays, bias auditing, pack lifecycle, adversarial corpus, regulatory alignment, performance benchmarks, appeal flow | Complete |
 
-## Known gaps and next steps
+## Operational Maintenance
 
-The platform is feature-frozen at the end of Phase 6. There is no
-in-flight skill or compiler work on `main`.
-
-Upcoming operational items — to be tracked in
-[`PHASES.md`](PHASES.md) when scheduled:
+Ongoing operational items the project owners track:
 
 - **Skill-pack roster maintenance.** Re-validate each of the 59
   country packs against upstream legal changes on a quarterly
@@ -42,9 +42,9 @@ Upcoming operational items — to be tracked in
   and re-run the bias auditor before publishing a new pack
   generation.
 - **Community feedback ingestion.** The appeal-flow plumbing exists
-  end-to-end but the public-facing intake form is operator-driven;
-  promote it to a first-class deliverable once a production tenant
-  is live.
+  end-to-end; the public-facing intake form is operator-driven and
+  graduates to a first-class deliverable once a production tenant is
+  live.
 
-See [`docs/DEVELOPMENT_LOG.md`](docs/DEVELOPMENT_LOG.md) for the full
-historical record.
+See [docs/CHANGELOG.md](docs/CHANGELOG.md) for the full historical
+record.

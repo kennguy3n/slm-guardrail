@@ -1,11 +1,12 @@
-# Supported Regions
+# KChat Guardrail Skills — Supported Regions
 
-This document tracks the 59 country / jurisdiction packs and the 38
-community overlays that ship in `kchat-skills/`. The
-[README](../README.md) only references counts and links here so the
+This page lists all jurisdiction and community overlays shipped in
+the repository. It tracks the 59 country / jurisdiction packs and
+the 38 community overlays that live under `kchat-skills/`. The
+[README](../README.md) references counts and links here so the
 top-level landing page stays focused.
 
-### Supported countries (59)
+## Supported Countries (59)
 
 | ISO-3166 | Country | Primary languages | Key legal references |
 | --- | --- | --- | --- |
@@ -69,7 +70,7 @@ top-level landing page stays focused.
 | EC | Ecuador | es | Código de la Niñez y Adolescencia (CONA), COIP Art. 366 anti-terrorism. |
 | UY | Uruguay | es | Código de la Niñez y la Adolescencia (CNA), Ley 19.293 anti-terrorism. |
 
-### Community Overlays (38)
+## Community Overlays (38)
 
 | Overlay | Age mode | Notable tightenings / loosenings |
 | --- | --- | --- |

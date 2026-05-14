@@ -1,7 +1,5 @@
 # EU Digital Services Act (DSA) — Alignment Mapping
 
-Spec reference: PHASES.md Phase 6, "Regulatory alignment".
-
 This document maps each material obligation of Regulation (EU) 2022/2065
 (the Digital Services Act, "DSA") to the concrete artefact of the KChat
 on-device guardrail skill-pack system that satisfies it. Where a DSA

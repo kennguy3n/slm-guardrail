@@ -1,7 +1,5 @@
 # UNICEF / ITU Child Online Protection — Alignment Mapping
 
-Spec reference: PHASES.md Phase 6, "Regulatory alignment".
-
 This document maps the UNICEF *Child Online Protection (COP)
 Guidelines* and ITU *Guidelines for Industry on Child Online
 Protection* (2020 revision) to concrete artefacts in the KChat
