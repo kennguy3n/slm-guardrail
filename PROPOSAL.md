@@ -183,8 +183,8 @@ construction.
 
 ## Success Metrics
 
-Drawn from the test-suite metrics in the underlying analysis (§15). All
-metrics are evaluated against the test suites included in the skill packs;
+Drawn from the test-suite metrics defined in this project. All metrics
+are evaluated against the test suites included in the skill packs;
 runtime telemetry never replaces them.
 
 | Metric                              | Target          |

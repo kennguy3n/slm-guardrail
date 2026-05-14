@@ -1,4 +1,4 @@
-# Running the XLM-R Encoder Classifier
+# KChat Guardrail Skills — Running the XLM-R Encoder
 
 This document covers the on-device XLM-R encoder classifier path:
 ONNX export, INT8/INT4 quantisation, running the demo, and
@@ -81,14 +81,9 @@ pip install -r requirements.txt
 
 # 2. One-time ONNX export from the HuggingFace checkpoint. This
 #    requires transformers + torch + onnx + onnxscript, but only at
-#    export time — they are NOT runtime dependencies. We pin
-#    `transformers<5` because v5 changed the positional signature of
-#    `XLMRobertaModel.forward()` and breaks the legacy `torch.onnx`
-#    tracer; the export script in turn forces `dynamo=False`,
-#    because the dynamo-based exporter on torch >= 2.5 emits an
-#    INT8 graph that `onnxruntime` rejects (`tensor(float16)`
-#    `DequantizeLinear` scales) and an FP32 graph whose
-#    `scaled_dot_product_attention` fails on dynamic shapes.
+#    export time — they are NOT runtime dependencies. The export
+#    script requires `transformers<5`; see the comments at the top
+#    of `tools/export_xlmr_onnx.py` for version-pinning details.
 pip install -e ".[export]"
 # or, equivalently:
 # pip install "transformers<5" torch onnx onnxruntime sentencepiece onnxscript

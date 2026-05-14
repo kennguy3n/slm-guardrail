@@ -3,15 +3,18 @@
 > On-device guardrail skills for privacy-first, E2EE messaging — local
 > safety assistants, not centralized moderation.
 
-## What is this?
+## What Is This?
 
-A **skill-based guardrail system** for the **XLM-R** encoder classifier
+A **skill-based guardrail system** for an on-device **encoder classifier**
 running locally on user devices within
 [KChat](https://github.com/kennguy3n/slm-chat-demo), an end-to-end
-encrypted (E2EE) messaging app for large communities.
+encrypted (E2EE) messaging app for large communities. The reference
+backend is **XLM-R**, a multilingual transformer encoder; the
+classifier interface is backend-agnostic so other encoder backends
+can be plugged in without changing skill packs.
 
 A guardrail skill classifies content **already visible on the user's
-device**, produces local warnings / labels / suggestions, and **never
+device**, produces local warnings, labels, and suggestions, and **never
 transmits message content, embeddings, hashes, or other content-derived
 evidence to servers** by default. The classifier acts as a **local
 safety assistant** for the user — it does not act as a centralized
@@ -39,43 +42,17 @@ the user's terms, in a transparent and auditable way.
   JSON schema via argmax over a fixed bank of category prototype
   embeddings, so identical input always produces identical output.
 - **Hybrid pipeline.** Cheap deterministic local detectors run first;
-  the encoder classifier only does the contextual reasoning that
-  detectors cannot.
+  the classifier only does the contextual reasoning that detectors
+  cannot.
 - **Anti-misuse.** No vague categories, signed packs, expiry dates,
-  protected-speech contexts, and required legal/cultural review for
+  protected-speech contexts, and required legal / cultural review for
   every jurisdiction overlay.
 
 ## Skill Architecture
 
-Skills compose into a runtime bundle in three layers:
-
-```
-┌──────────────────────────────────────────────────────┐
-│ GLOBAL BASELINE SKILL                                │
-│  • Universal taxonomy (16 categories)                │
-│  • Severity rubric (0–5)                             │
-│  • Privacy rules                                     │
-│  • Output schema                                     │
-└──────────────────────────────────────────────────────┘
-                       +
-┌──────────────────────────────────────────────────────┐
-│ JURISDICTION OVERLAY SKILL  (optional)               │
-│  • Country / region-specific rules                   │
-│  • Local language assets (lexicons, transliteration) │
-│  • Legal ages, restricted symbols, election rules    │
-└──────────────────────────────────────────────────────┘
-                       +
-┌──────────────────────────────────────────────────────┐
-│ COMMUNITY OVERLAY SKILL  (optional)                  │
-│  • Group profile (school / family / workplace / …)   │
-│  • Group-specific rules and counters                 │
-│  • Set by group admin, visible to all members        │
-└──────────────────────────────────────────────────────┘
-                       +
-                  runtime context
-```
-
-The active runtime bundle is therefore:
+Skills compose into a runtime bundle in three layers — a **Global
+Baseline** (always on), an optional **Jurisdiction Overlay**, and an
+optional **Community Overlay**. The active runtime bundle is:
 
     active_skill_bundle =
         global_baseline
@@ -83,39 +60,30 @@ The active runtime bundle is therefore:
       + community overlay
       + runtime context
 
+See [ARCHITECTURE.md](ARCHITECTURE.md#skill-layering-model) for the
+full layering diagram, conflict-resolution rules, and overlay
+templates.
+
 ## Global Risk Taxonomy
 
 The global baseline defines 16 categories. Every skill — including
 jurisdiction and community overlays — must classify content into
 exactly one of these IDs (overlays may *narrow* a category or raise
-its severity, but they may not invent new categories). See
-[`kchat-skills/global/taxonomy.yaml`](kchat-skills/global/taxonomy.yaml)
-for the canonical list. The current taxonomy is:
+its severity, but they may not invent new categories). The current
+taxonomy is:
 
 `SAFE`, `CHILD_SAFETY`, `SELF_HARM`, `VIOLENCE_THREAT`, `EXTREMISM`,
 `HARASSMENT`, `HATE`, `SCAM_FRAUD`, `MALWARE_LINK`, `PRIVATE_DATA`,
 `SEXUAL_ADULT`, `DRUGS_WEAPONS`, `ILLEGAL_GOODS`,
 `MISINFORMATION_HEALTH`, `MISINFORMATION_CIVIC`, `COMMUNITY_RULE`.
 
-Severity is reported on a 0–5 rubric — see
-[`kchat-skills/global/severity.yaml`](kchat-skills/global/severity.yaml).
+Severity is reported on a 0–5 rubric. See
+[`kchat-skills/global/taxonomy.yaml`](kchat-skills/global/taxonomy.yaml),
+[`kchat-skills/global/severity.yaml`](kchat-skills/global/severity.yaml),
+and the canonical category descriptions and decision policy in
+[ARCHITECTURE.md](ARCHITECTURE.md#global-risk-taxonomy).
 
-## Repository Status
-
-All six phases are **complete**. The repository ships **100 skills**:
-
-| Pack family | Count | Location |
-|---|---|---|
-| Global baseline | 1 | [`kchat-skills/global/`](kchat-skills/global/) |
-| Jurisdiction archetypes | 3 | [`kchat-skills/jurisdictions/`](kchat-skills/jurisdictions/) |
-| Country packs | 59 | [`kchat-skills/jurisdictions/<cc>/`](kchat-skills/jurisdictions/) |
-| Community overlays | 38 | [`kchat-skills/communities/`](kchat-skills/communities/) |
-
-For the full country / overlay roster (ISO codes, primary languages,
-key legal references, age modes, notable category tightenings), see
-[`docs/SUPPORTED_REGIONS.md`](docs/SUPPORTED_REGIONS.md).
-
-## Quick start
+## Quick Start
 
     # 1. Clone
     git clone https://github.com/kennguy3n/slm-guardrail.git
@@ -136,7 +104,7 @@ out-of-the-box. To exercise the real encoder classifier (the
 on-device runtime path), follow the ONNX export steps in
 [`docs/RUNNING_XLMR.md`](docs/RUNNING_XLMR.md).
 
-## Running tests
+## Running Tests
 
     pytest                                  # all tests
     pytest kchat-skills/tests/global        # global-baseline only
@@ -147,7 +115,7 @@ The suite is pure Python — no encoder weights are required at test
 time; the adapter degrades to a SAFE fallback when weights are
 missing.
 
-## Compiling a skill pack
+## Compiling a Skill Pack
 
 `kchat-skills/compiler/compiler.py` composes the global baseline plus
 jurisdiction and community overlays into a single compiled prompt for
@@ -167,22 +135,34 @@ the signing workflow (ed25519 skill passports), bias auditing,
 pack lifecycle (versioning / rollback / retention), regulatory
 alignment, performance benchmarks, and the community appeal flow.
 
+## Repository Contents
+
+The repository ships **100 skill packs**:
+
+| Pack family | Count | Location |
+|---|---|---|
+| Global baseline | 1 | [`kchat-skills/global/`](kchat-skills/global/) |
+| Jurisdiction archetypes | 3 | [`kchat-skills/jurisdictions/`](kchat-skills/jurisdictions/) |
+| Country packs | 59 | [`kchat-skills/jurisdictions/<cc>/`](kchat-skills/jurisdictions/) |
+| Community overlays | 38 | [`kchat-skills/communities/`](kchat-skills/communities/) |
+
+For the full country / overlay roster (ISO codes, primary languages,
+key legal references, age modes, notable category tightenings), see
+[`docs/SUPPORTED_REGIONS.md`](docs/SUPPORTED_REGIONS.md).
+
 ## Documentation
 
-- [`PROPOSAL.md`](PROPOSAL.md) — rationale, scope, success metrics.
-- [`ARCHITECTURE.md`](ARCHITECTURE.md) — technical design: layering,
-  privacy architecture, hybrid pipeline, schemas, anti-misuse controls.
-- [`PHASES.md`](PHASES.md) — phased roadmap from foundation through
-  scaled skill library and continuous improvement.
-- [`PROGRESS.md`](PROGRESS.md) — current status.
-- [`docs/SUPPORTED_REGIONS.md`](docs/SUPPORTED_REGIONS.md) — 59 country
-  packs and 38 community overlays (full roster).
-- [`docs/RUNNING_XLMR.md`](docs/RUNNING_XLMR.md) — ONNX export and the
-  full XLM-R encoder runtime path.
-- [`docs/COMPILER.md`](docs/COMPILER.md) — skill-pack compiler, signing,
-  bias auditing, pack lifecycle, regulatory alignment, benchmarks.
-- [`kchat-skills/docs/regulatory/`](kchat-skills/docs/regulatory/) —
-  EU DSA / NIST AI RMF / UNICEF · ITU COP alignment.
+| Document | Purpose |
+|----------|---------|
+| [PROPOSAL.md](PROPOSAL.md) | Problem statement, design goals, scope, success metrics |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Technical reference: taxonomy, severity, privacy contract, pipeline, schemas, templates |
+| [PHASES.md](PHASES.md) | Development roadmap (all phases complete) |
+| [PROGRESS.md](PROGRESS.md) | Current project status and next steps |
+| [docs/COMPILER.md](docs/COMPILER.md) | Skill-pack compiler, signing, bias auditing, lifecycle, benchmarks |
+| [docs/RUNNING_XLMR.md](docs/RUNNING_XLMR.md) | ONNX export guide and XLM-R encoder runtime |
+| [docs/SUPPORTED_REGIONS.md](docs/SUPPORTED_REGIONS.md) | Full roster of 59 country packs and 38 community overlays |
+| [docs/CHANGELOG.md](docs/CHANGELOG.md) | Historical development changelog |
+| [kchat-skills/docs/regulatory/](kchat-skills/docs/regulatory/) | EU DSA, NIST AI RMF, UNICEF / ITU COP alignment mappings |
 
 ## References
 
@@ -194,6 +174,5 @@ alignment, performance benchmarks, and the community appeal flow.
 ## License
 
 Proprietary — Copyright 2026 KChat Contributors. All rights reserved.
-See [LICENSE](LICENSE) if present; otherwise this code is provided as a
-reference implementation under a Proprietary license. Contact the
-maintainers for licensing inquiries.
+This code is provided as a reference implementation under a
+Proprietary license. Contact the maintainers for licensing inquiries.

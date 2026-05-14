@@ -285,7 +285,7 @@ flowchart TD
 
 Steps (1)–(7) are entirely on-device; no step requires network access.
 
-### XLM-R integration
+### XLM-R Integration
 
 Step 4 (the encoder classifier) is intentionally backend-agnostic.
 The pipeline talks to whatever object is passed in through
@@ -294,95 +294,116 @@ Protocol freezes a single `classify(input) -> dict` method so backends
 can be swapped without touching skill packs or the threshold policy.
 
 The reference encoder backend is
-[`XLMRAdapter`](kchat-skills/compiler/xlmr_adapter.py) (Phase 6):
+[`XLMRAdapter`](kchat-skills/compiler/xlmr_adapter.py).
 
-- **Backend.** A locally-loaded ONNX-exported XLM-R encoder driven by
-  [`onnxruntime`](https://onnxruntime.ai) — no PyTorch /
-  `transformers` runtime dependency, no separate server, no HTTP, no
-  chat completions. The adapter holds a single
-  `onnxruntime.InferenceSession` + a SentencePiece tokenizer in
-  process and runs each classification in-line with the rest of the
-  pipeline. The on-device runtime depends on `onnxruntime` +
-  `sentencepiece` + `numpy` only.
-- **Model.** A multilingual transformer encoder (~25 MB INT8-quantised
-  ONNX), 384-dim. Tokenisation is SentencePiece with the XLM-R
-  vocabulary, so the same checkpoint covers all 100+ XLM-R languages
-  without per-language assets. The one-time export (HF → ONNX INT8 +
-  `.spm` tokenizer + head `.npz`) is done by
-  [`tools/export_xlmr_onnx.py`](tools/export_xlmr_onnx.py); reviewers
-  can audit the exact source artifact and quantisation pipeline
-  there.
-- **Determinism.** No sampling, no temperature, no token budget for
-  generation. The embedding-stage classifier is either a trained
-  `Linear(384, 16)` head loaded from
-  `kchat-skills/compiler/data/xlmr_head.npz` (88.5% train
-  accuracy on a 175-example multilingual corpus, see
-  [`training_data.py`](kchat-skills/compiler/training_data.py) and
-  [`train_xlmr_head.py`](kchat-skills/compiler/train_xlmr_head.py))
-  or, when that file is missing, a zero-shot softmax over cosine
-  similarities against a fixed bank of 16 *category prototype*
-  embeddings. Both paths are pure forward passes with no sampling, so
-  identical input always produces identical output (matches the
-  `is_offline` invariant: identical results online vs offline).
-- **Protected-speech context demotion.** The pipeline derives
-  `context_hints` from the active community overlay and the
-  `quoted_from_user` flag (see
-  [`pipeline.derive_context_hints()`](kchat-skills/compiler/pipeline.py)),
-  packs them into `local_signals.context_hints`, and the threshold
-  policy demotes any non-SAFE / non-CHILD_SAFETY embedding-head
-  verdict carrying a NEWS_CONTEXT / EDUCATION_CONTEXT /
-  COUNTERSPEECH_CONTEXT / QUOTED_SPEECH_CONTEXT reason code to SAFE
-  with `rationale_id = safe_protected_speech_v1`. Demotion is scoped
-  to the embedding-head path only — deterministic-signal branches
-  (CHILD_SAFETY, PRIVATE_DATA, SCAM_FRAUD, lexicon, NSFW media)
-  emit their reason codes verbatim and bypass the demotion entirely.
-- **Constrained output.** The classification head emits a Python dict
-  that is then run through `_coerce_to_output_schema` — any field
-  outside the schema bounds (category, severity, confidence,
-  reason codes) collapses the call to a SAFE output, just like the
-  threshold policy's degrade-to-SAFE behaviour.
-- **Skill-bundle boundary.** The compiled skill-pack prompt no longer
-  becomes a generative-model system message. Instead it configures
-  the encoder pipeline at compile time: it pins the classification
-  head's allowed actions, reason codes, and counters. The
-  `kchat.guardrail.local_signal.v1` instance is consumed directly by
-  the adapter — message text goes through the encoder, deterministic
-  signals (URL risk, PII, scam, lexicon hits, media descriptors) act
-  as *high-priority overrides* of the embedding head.
-- **Privacy-safe fallback.** If the encoder weights are missing,
-  `transformers` / `torch` are not installed, or inference raises,
-  the adapter falls back to a SAFE output (category 0, severity 0)
-  rather than raising or returning unsafe defaults.
-- **Lean dependency footprint.** `transformers`, `torch`, and
-  `sentencepiece` are listed as runtime dependencies of the demo /
-  benchmark scripts (and the test suite for stub-encoder tests).
-  The skill-pack files themselves remain pure YAML / JSON.
-- **Cross-pipeline embedding cache.** The adapter returns the raw
-  384-dim XLM-R embedding alongside the classification result (key:
-  `_embedding`). Downstream consumers (e.g., chat-storage-search)
-  can cache this embedding in the `search_vector` table to avoid
-  re-computing it during semantic search — a message's XLM-R
-  encoder pass is computed at most once across guardrail and search.
-  The underscore prefix signals the field is internal (not part of
-  `kchat.guardrail.output.v1` proper); the schema admits it via
-  `patternProperties: {"^_": {}}` so consumers that do not need the
-  embedding may simply ignore it.
-- **Storage-tier model selection.** The export pipeline emits two
-  ONNX checkpoints — `models/xlmr.onnx` (~107 MB, INT8 dynamic
-  quantisation; the default) and `models/xlmr.int4.onnx` (~55 MB,
-  INT4 block-wise weight-only quantisation of both `MatMul` and
-  `Gather` ops via
-  `onnxruntime.quantization.matmul_nbits_quantizer.MatMulNBitsQuantizer`).
-  The INT4 variant is recommended for mobile devices with tight
-  storage budgets. `--validate-int4` loads both sessions, runs the
-  multilingual smoke corpus through each, and asserts a per-row
-  cosine similarity floor (default `--int4-min-cosine 0.94`).
-  Aggressive embedding-`Gather` quantisation is what unlocks the
-  storage win and also costs ~5 cosine points vs INT8 — callers
-  that need a > 0.99 cosine bar should keep shipping the INT8
-  file. `XLMRAdapter` honours an explicit `model_path` argument
-  pointed at either tier and exposes a `prefer_int4=True` hint that
-  auto-resolves to the INT4 file when present.
+#### ONNX Runtime Backend
+
+The adapter loads a locally-exported XLM-R encoder through
+[`onnxruntime`](https://onnxruntime.ai) — no PyTorch /
+`transformers` runtime dependency, no separate server, no HTTP, no
+chat completions. It holds a single `onnxruntime.InferenceSession`
+plus a SentencePiece tokenizer in process and runs each
+classification in-line with the rest of the pipeline. The on-device
+runtime depends on `onnxruntime` + `sentencepiece` + `numpy` only.
+
+The model itself is a multilingual transformer encoder
+(~25 MB INT8-quantised ONNX), 384-dim. Tokenisation uses the XLM-R
+SentencePiece vocabulary, so the same checkpoint covers all 100+
+XLM-R languages without per-language assets. The one-time export
+(HF → ONNX INT8 + `.spm` tokenizer + head `.npz`) is performed by
+[`tools/export_xlmr_onnx.py`](tools/export_xlmr_onnx.py); reviewers
+can audit the exact source artifact and quantisation pipeline
+there.
+
+#### Determinism Guarantees
+
+No sampling, no temperature, no token budget for generation. Both
+classification paths (trained head and prototype fallback) are pure
+forward passes, so identical input always produces identical output.
+This matches the `is_offline` invariant: results are identical online
+and offline.
+
+The classification head emits a Python dict that is then run through
+`_coerce_to_output_schema` — any field outside the schema bounds
+(category, severity, confidence, reason codes) collapses the call to
+a SAFE output, just like the threshold policy's degrade-to-SAFE
+behaviour.
+
+#### Trained Linear Head
+
+When `kchat-skills/compiler/data/xlmr_head.npz` is present, the
+adapter loads it as a `Linear(384, 16)` head and uses its softmax
+over logits as the embedding-stage classifier (88.5% train accuracy
+on a 175-example multilingual corpus; see
+[`training_data.py`](kchat-skills/compiler/training_data.py) and
+[`train_xlmr_head.py`](kchat-skills/compiler/train_xlmr_head.py)).
+If the file is missing, the adapter falls back to a zero-shot softmax
+over cosine similarities against a fixed bank of 16 *category
+prototype* embeddings.
+
+The pipeline derives `context_hints` from the active community
+overlay and the `quoted_from_user` flag (see
+[`pipeline.derive_context_hints()`](kchat-skills/compiler/pipeline.py)),
+packs them into `local_signals.context_hints`, and the threshold
+policy demotes any non-SAFE / non-CHILD_SAFETY embedding-head verdict
+carrying a NEWS_CONTEXT / EDUCATION_CONTEXT / COUNTERSPEECH_CONTEXT /
+QUOTED_SPEECH_CONTEXT reason code to SAFE with
+`rationale_id = safe_protected_speech_v1`. Demotion is scoped to the
+embedding-head path only — deterministic-signal branches
+(CHILD_SAFETY, PRIVATE_DATA, SCAM_FRAUD, lexicon, NSFW media) emit
+their reason codes verbatim and bypass demotion entirely.
+
+The compiled skill-pack prompt configures the encoder pipeline at
+compile time rather than acting as a generative-model system message:
+it pins the classification head's allowed actions, reason codes, and
+counters. The `kchat.guardrail.local_signal.v1` instance is consumed
+directly by the adapter — message text goes through the encoder, and
+deterministic signals (URL risk, PII, scam, lexicon hits, media
+descriptors) act as high-priority overrides of the embedding head.
+
+#### INT4 Quantization
+
+The export pipeline emits two ONNX checkpoints:
+
+- `models/xlmr.onnx` (~107 MB) — INT8 dynamic quantisation; the
+  default.
+- `models/xlmr.int4.onnx` (~55 MB) — INT4 block-wise weight-only
+  quantisation of both `MatMul` and `Gather` ops via
+  `onnxruntime.quantization.matmul_nbits_quantizer.MatMulNBitsQuantizer`.
+
+The INT4 variant is recommended for mobile devices with tight
+storage budgets. `--validate-int4` loads both sessions, runs a
+multilingual smoke corpus through each, and asserts a per-row cosine
+similarity floor (default `--int4-min-cosine 0.94`). Aggressive
+embedding-`Gather` quantisation unlocks the storage win and also
+costs ~5 cosine points vs INT8 — callers that need a > 0.99 cosine
+bar should keep shipping the INT8 file.
+
+`XLMRAdapter` honours an explicit `model_path` argument pointed at
+either tier and exposes a `prefer_int4=True` hint that auto-resolves
+to the INT4 file when present.
+
+#### Privacy-Safe Fallback
+
+If the encoder weights are missing, `onnxruntime` is not installed,
+or inference raises, the adapter returns a SAFE output (category 0,
+severity 0) rather than raising or returning unsafe defaults. The
+skill-pack files themselves remain pure YAML / JSON; the encoder
+runtime is an optional dependency of the demo and benchmark scripts.
+
+#### Embedding Cache
+
+The adapter returns the raw 384-dim XLM-R embedding alongside the
+classification result (key: `_embedding`). Downstream consumers
+(e.g., a chat-storage search index) can cache this embedding in
+their vector table to avoid re-computing it during semantic search —
+a message's XLM-R encoder pass is computed at most once across
+guardrail and search.
+
+The underscore prefix signals the field is internal (not part of
+`kchat.guardrail.output.v1` proper); the schema admits it via
+`patternProperties: {"^_": {}}` so consumers that do not need the
+embedding may simply ignore it.
 
 End-to-end demonstration and benchmarking happens through
 [`tools/run_guardrail_demo.py`](tools/run_guardrail_demo.py); see
@@ -877,130 +898,29 @@ anti_misuse_controls:
 
 ## Recommended Folder Structure
 
+The repository is organized around the skill-layering model. Only
+the top two directory levels are listed below; explore the actual
+filesystem for per-pack files.
+
 ```
 /kchat-skills
-├── global/
-│   ├── baseline.yaml                # kchat.global.guardrail.baseline
-│   ├── taxonomy.yaml                # 16-category global taxonomy
-│   ├── severity.yaml                # 0–5 severity rubric
-│   ├── output_schema.json           # constrained JSON output
-│   ├── local_signal_schema.json     # encoder classifier input contract
-│   └── privacy_contract.yaml        # non-negotiable privacy rules
-│
-├── jurisdictions/
-│   ├── _template/
-│   │   └── overlay.yaml             # jurisdiction overlay template
-│   ├── archetype-strict-adult/
-│   │   ├── overlay.yaml             # severity_floor 5 on category 10
-│   │   ├── normalization.yaml
-│   │   └── lexicons/
-│   ├── archetype-strict-hate/
-│   │   ├── overlay.yaml             # severity_floor 5 on cat 4, 4 on cat 6
-│   │   ├── normalization.yaml
-│   │   └── lexicons/
-│   ├── archetype-strict-marketplace/
-│   │   ├── overlay.yaml             # severity_floor 4 on cat 11 & 12
-│   │   ├── normalization.yaml
-│   │   └── lexicons/
-│   ├── us/  de/  br/  in/  jp/                   # Phase 5 wave 1 (5)
-│   ├── mx/  ca/  ar/  co/  cl/  pe/               # Phase 5 wave 2 Americas (6)
-│   ├── fr/  gb/  es/  it/  nl/  pl/               # Phase 5 wave 2 Europe (10)
-│   ├── se/  pt/  ch/  at/
-│   ├── kr/  id/  ph/  th/  vn/  my/               # Phase 5 wave 2 Asia-Pacific (10)
-│   ├── sg/  tw/  pk/  bd/
-│   ├── ng/  za/  eg/  sa/  ae/  ke/               # Phase 5 wave 2 ME / Africa (6)
-│   ├── au/  nz/  tr/                              # Phase 5 wave 2 Other (3)
-│   ├── ru/  ua/  ro/  gr/  cz/  hu/               # Phase 6 — Eastern Europe (6)
-│   ├── dk/  fi/  no/                              # Phase 6 — Nordics (3)
-│   ├── ie/                                        # Phase 6 — W. Europe (1)
-│   ├── il/  iq/  ma/  dz/                         # Phase 6 — MENA (4)
-│   ├── gh/  tz/  et/                              # Phase 6 — Sub-Saharan (3)
-│   └── ec/  uy/                                   # Phase 6 — Latin America (2)
-│       ├── overlay.yaml
-│       ├── lexicons/<lang>.yaml
-│       └── normalization.yaml
-│
-├── communities/                     # 38 community overlays (Phase 1 + 6)
-│   ├── _template/
-│   │   └── overlay.yaml             # community overlay template
-│   ├── school.yaml
-│   ├── family.yaml
-│   ├── workplace.yaml
-│   ├── adult_only.yaml
-│   ├── marketplace.yaml
-│   ├── health_support.yaml
-│   ├── political.yaml
-│   ├── gaming.yaml                  # ↑ 8 Phase 1 originals
-│   ├── religious.yaml  sports.yaml  creative_arts.yaml
-│   ├── education_higher.yaml  volunteer.yaml  neighborhood.yaml
-│   ├── parenting.yaml  dating.yaml  fitness.yaml  travel.yaml
-│   ├── book_club.yaml  music.yaml  photography.yaml  cooking.yaml
-│   ├── tech_support.yaml  language_learning.yaml  pet_owners.yaml
-│   ├── environmental.yaml  journalism.yaml  legal_support.yaml
-│   ├── mental_health.yaml  startup.yaml  nonprofit.yaml
-│   ├── seniors.yaml  lgbtq_support.yaml  veterans.yaml
-│   ├── hobbyist.yaml  science.yaml  open_source.yaml
-│   └── emergency_response.yaml      # ↑ 30 Phase 6 expansion overlays
-│
-├── prompts/
-│   ├── runtime_instruction.txt      # 10-rule classifier-bundle instruction
-│   ├── compiled_prompt_format.md    # compiled-prompt section reference
-│   └── compiled_examples/           # 73 reference compiled prompts (Phase 4-6):
-│       ├── baseline_only.txt
-│       ├── community_*.txt                      # 8 community overlays
-│       ├── jurisdiction_strict_*.txt            # 3 archetype overlays
-│       ├── strict_*_*.txt                       # pair overlays
-│       └── country_<cc>.txt                     # 59 country packs
-│
-├── samples/                         # sample data for demonstration (Phase 6)
-│   ├── sample_messages.yaml         # 27 curated cases across all 16 categories
-│   └── README.md
-│
-├── benchmarks/                      # committed benchmark results (Phase 6)
-│   ├── README.md
-│   └── xlmr_results.json    # generated by tools/run_guardrail_demo.py
-│
-├── compiler/
-│   ├── pipeline.md
-│   ├── skill_passport.schema.json    # Draft-07 passport schema (Phase 4)
-│   ├── counters.py                   # device-local expiring counter store
-│   ├── pipeline.py                   # 7-step hybrid local pipeline (Phase 3)
-│   ├── encoder_adapter.py            # EncoderAdapter Protocol + MockEncoderAdapter (Phase 3)
-│   ├── xlmr_adapter.py               # XLMRAdapter — XLM-R encoder classifier, ONNX Runtime (Phase 6)
-│   ├── threshold_policy.py           # hard-coded threshold enforcement (Phase 3)
-│   ├── metric_validator.py           # 7-metric validator (Phase 3)
-│   ├── compiler.py                   # skill-pack compiler pipeline (Phase 4)
-│   ├── skill_passport.py             # ed25519 signing / verification (Phase 4)
-│   ├── anti_misuse.py                # anti-misuse validation rules (Phase 4)
-│   ├── bias_audit.py                 # bias auditor (Phase 6)
-│   ├── pack_lifecycle.py             # pack store / rollback / expiry (Phase 6)
-│   ├── benchmark.py                  # performance benchmark harness (Phase 6)
-│   └── appeal_flow.py                # community feedback / appeal flow (Phase 6)
-│
-├── tests/
-│   ├── test_suite_template.yaml     # Phase 1 metrics framework
-│   ├── test_test_suite_template.py
-│   ├── global/
-│   ├── jurisdictions/
-│   ├── adversarial/                 # Phase 6 obfuscation corpus
-│   │   ├── corpus.yaml
-│   │   ├── conftest.py
-│   │   └── test_adversarial_corpus.py
-│   └── communities/
-│
-└── docs/
-    └── regulatory/                  # Phase 6 regulatory alignment
-        ├── README.md
-        ├── eu_dsa_alignment.md
-        ├── nist_ai_rmf_alignment.md
-        └── unicef_itu_cop_alignment.md
+├── global/                # global baseline: taxonomy, severity, schemas, privacy contract
+├── jurisdictions/         # 3 archetype overlays + 59 country packs (one directory per ISO code)
+├── communities/           # 38 community overlays (school, workplace, marketplace, …)
+├── prompts/               # runtime instruction + compiled-prompt format + 73 reference compiled prompts
+├── samples/               # 27 curated demo cases covering every taxonomy category
+├── benchmarks/            # committed latency benchmark results (JSON)
+├── compiler/              # pipeline, adapters, threshold policy, compiler, bias auditor, lifecycle, benchmarks
+├── tests/                 # pytest suites: global, jurisdictions, communities, adversarial
+└── docs/regulatory/       # EU DSA / NIST AI RMF / UNICEF · ITU COP alignment mappings
 
 /tools
-├── regenerate_compiled_examples.py  # refresh prompts/compiled_examples
-├── run_guardrail_demo.py            # sample-data demo (mock or XLM-R / ONNX Runtime)
-└── demo_guardrail.py                # cross-community / cross-country demo
+├── export_xlmr_onnx.py            # one-time HF → ONNX INT8/INT4 export
+├── regenerate_compiled_examples.py # refresh prompts/compiled_examples
+├── run_guardrail_demo.py          # sample-data demo (mock or XLM-R / ONNX Runtime)
+└── demo_guardrail.py              # cross-community / cross-country demo
 
-/results                             # demo run outputs (JSON + Markdown)
+/results                          # demo run outputs (JSON + Markdown)
 ```
 
 ### Test Tooling
@@ -1018,8 +938,7 @@ Concrete test files in this repository:
   child-safety floor of 5.
 - `kchat-skills/tests/global/test_output_schema.py` — Draft-07 classifier output
   schema (`kchat.guardrail.output.v1`).
-- `kchat-skills/tests/global/test_baseline.py` — global baseline skill
-  (Phase 1 complete).
+- `kchat-skills/tests/global/test_baseline.py` — global baseline skill.
 - `kchat-skills/tests/global/test_local_signal_schema.py` — Draft-07 classifier
   input contract (`kchat.guardrail.local_signal.v1`).
 - `kchat-skills/tests/global/test_privacy_contract.py` — eight
@@ -1037,11 +956,10 @@ Concrete test files in this repository:
   taxonomy categories, the four protected-speech contexts, and the
   decision-policy threshold boundaries (0.44, 0.45, 0.62, 0.78, 0.85).
 - `kchat-skills/tests/test_test_suite_template.py` — structural
-  validation of the Phase 1 metrics framework at
+  validation of the metrics framework at
   `kchat-skills/tests/test_suite_template.yaml`.
 - `kchat-skills/tests/communities/test_community_overlays.py` —
-  parametrised validation of the 38 community overlays (8 Phase 1
-  originals + 30 Phase 6 additions).
+  parametrised validation of the 38 community overlays.
 - `kchat-skills/tests/jurisdictions/test_jurisdiction_template.py` —
   jurisdiction overlay template (required keys, forbidden-criteria
   enumeration, protected-speech allowed contexts).
@@ -1098,18 +1016,15 @@ Concrete test files in this repository:
   signers, community-pack `trust_and_safety` requirement,
   protected-context handling for severity floors ≥ 4,
   privacy-rule immutability, lexicon-provenance requirement, and
-  end-to-end validation across every Phase 1–2 pack in the repo.
-- `kchat-skills/tests/global/test_compiled_examples.py` — Phase 4
-  compiled-prompt reference outputs under
+  end-to-end validation across the baseline skill packs in the repo.
+- `kchat-skills/tests/global/test_compiled_examples.py` — compiled-
+  prompt reference outputs under
   `kchat-skills/prompts/compiled_examples/`: existence and non-empty,
   required `[INSTRUCTION] / [GLOBAL_BASELINE] / [JURISDICTION_OVERLAY]
   / [COMMUNITY_OVERLAY] / [INPUT] / [OUTPUT]` sections, instruction
-  token budget < 1800, byte-for-byte equality with what the live
-  compiler emits today (catches drift). Phase 5 landed 35 additional
-  `country_<cc>.txt` references (54 total) and Phase 6 added 19 more
-  (73 total), plus a `test_phase5_all_40_country_packs_covered` and
-  a `test_phase6_all_19_country_packs_covered` assertion that pin
-  the full 59-country set.
+  token budget < 1800, and byte-for-byte equality with what the live
+  compiler emits today (catches drift). The corpus covers 73 compiled
+  prompts including all 59 country packs.
 - `kchat-skills/tests/jurisdictions/test_country_<cc>.py` — 59 per-
   country structural tests (one file per country) asserting the
   country-specific severity floors, marketplace ages, protected-class
@@ -1119,35 +1034,35 @@ Concrete test files in this repository:
   provenance) via the helpers in
   `kchat-skills/tests/jurisdictions/_country_pack_assertions.py`.
 - `kchat-skills/tests/adversarial/test_adversarial_corpus.py` —
-  Phase 6 adversarial / obfuscation corpus
+  adversarial / obfuscation corpus
   (`kchat-skills/tests/adversarial/corpus.yaml`). 60 cases across 6
   evasion techniques (homoglyph, leetspeak, code-switching, unicode
   tricks, whitespace insertion, image-text evasion). Per-technique
   detection-rate floor ≥ 0.80; aggregate detection-rate floor ≥ 0.80.
-- `kchat-skills/tests/global/test_regulatory_docs.py` — Phase 6
-  contract test pinning that every alignment doc under
+- `kchat-skills/tests/global/test_regulatory_docs.py` — contract
+  test pinning that every alignment doc under
   `kchat-skills/docs/regulatory/` exists, is non-empty, references
   the core source artefacts it maps, and — for the UNICEF / ITU
   doc — contains a statutory-grounding row for every one of the 59
   country packs.
-- `kchat-skills/tests/global/test_benchmark.py` — Phase 6 latency
-  benchmark (`kchat-skills/compiler/benchmark.py`). `BenchmarkReport`
+- `kchat-skills/tests/global/test_benchmark.py` — latency benchmark
+  (`kchat-skills/compiler/benchmark.py`). `BenchmarkReport`
   fails fast if p95 > 250 ms. Parametrised across all 16 taxonomy
   categories and the full 59-country set.
-- `kchat-skills/tests/global/test_appeal_flow.py` — Phase 6
-  community-feedback / appeal-flow spec
+- `kchat-skills/tests/global/test_appeal_flow.py` — community-
+  feedback / appeal-flow spec
   (`kchat-skills/compiler/appeal_flow.py`). Pins the privacy
   invariant (no text, hash, or embedding fields on `AppealCase` /
   `AppealReport`), plus threshold logic, aggregation window,
   duplicate-id rejection, multi-skill scoping, and edge cases.
-- `kchat-skills/tests/global/test_bias_audit.py` — Phase 6 bias
-  auditor (`kchat-skills/compiler/bias_audit.py`): per-protected-
+- `kchat-skills/tests/global/test_bias_audit.py` — bias auditor
+  (`kchat-skills/compiler/bias_audit.py`): per-protected-
   class and per-minority-language false-positive rate computation,
   disparity detection, configuration thresholds, edge cases
   (empty / single-group / all-SAFE), and an integration test
   running the auditor against the existing minority-language FP
   corpus.
-- `kchat-skills/tests/global/test_pack_lifecycle.py` — Phase 6 pack-
+- `kchat-skills/tests/global/test_pack_lifecycle.py` — pack-
   lifecycle store (`kchat-skills/compiler/pack_lifecycle.py`):
   registration / retrieval, version ordering, rollback, retention
   cap of `MAX_RETAINED_VERSIONS = 3`, expiry checks against the
@@ -1157,7 +1072,7 @@ Concrete test files in this repository:
 
 ## Bias Auditing
 
-The Phase 6 bias auditor at
+The bias auditor at
 [`kchat-skills/compiler/bias_audit.py`](kchat-skills/compiler/bias_audit.py)
 provides a structured way to detect protected-class and minority-
 language skew in a signed pack's behaviour. Inputs are
@@ -1192,7 +1107,7 @@ behaviour does not skew across protected classes or languages.
 
 ## Pack Lifecycle
 
-The Phase 6 pack store at
+The pack store at
 [`kchat-skills/compiler/pack_lifecycle.py`](kchat-skills/compiler/pack_lifecycle.py)
 is a JSON-serialisable, device-local ledger of signed pack
 versions. Each `PackVersion` records the `skill_id`,
@@ -1216,7 +1131,7 @@ versions. Each `PackVersion` records the `skill_id`,
   within `days_ahead` days (default 30).
 - `deactivate_expired(now=None)` — mark every active pack whose
   `expires_on < now` inactive. Expired packs cannot ship to
-  devices, matching PHASES.md Phase 6 ("no pack older than its
+  devices ("no pack older than its
   `expires_on` ships to devices").
 - `needs_review(days_ahead=30, now=None)` — return the active
   versions that need legal / cultural re-review before they
@@ -1231,7 +1146,7 @@ the documented values rather than hard-coding them.
 
 ## Performance Benchmarking
 
-The Phase 6 benchmark at
+The benchmark harness at
 [`kchat-skills/compiler/benchmark.py`](kchat-skills/compiler/benchmark.py)
 is the structured measurement harness that pins the
 "Performance envelope" latency target. Its moving parts:
@@ -1262,7 +1177,7 @@ the 250 ms p95 target fails CI immediately.
 
 ## Appeal Flow
 
-The Phase 6 community-feedback / appeal-flow spec at
+The community-feedback / appeal-flow spec at
 [`kchat-skills/compiler/appeal_flow.py`](kchat-skills/compiler/appeal_flow.py)
 provides the on-device primitive host applications wire into their
 notice-and-action / remediation surface (DSA Art. 16, 20).
@@ -1297,8 +1212,7 @@ Recommendation rules (first match wins):
 
 ## Supported Countries
 
-Phase 5 landed 40 country-specific jurisdiction packs and Phase 6
-added 19 more for a total of **59 country packs**. Each pack ships
+The repository ships **59 country-specific jurisdiction packs**. Each pack provides
 an `overlay.yaml` (severity floors, protected classes,
 listed-extremist-orgs, restricted symbols, election rules), a
 `normalization.yaml` (NFKC + case-fold + country-appropriate

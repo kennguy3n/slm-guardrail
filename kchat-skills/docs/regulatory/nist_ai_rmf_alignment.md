@@ -1,7 +1,5 @@
 # NIST AI Risk Management Framework (AI RMF 1.0) — Alignment Mapping
 
-Spec reference: PHASES.md Phase 6, "Regulatory alignment".
-
 This document maps each function of the NIST AI Risk Management
 Framework (NIST AI 100-1) to the corresponding concrete artefact in the
 KChat on-device guardrail skill-pack system. The AI RMF is a
@@ -12,7 +10,7 @@ functions: **Govern, Map, Measure, Manage**.
 
 The AI RMF identifies seven characteristics of trustworthy AI. The
 mapping below is the load-bearing cross-reference used by the
-Phase 6 regulatory gate; every characteristic must be addressed by at
+regulatory gate; every characteristic must be addressed by at
 least one named artefact.
 
 | Characteristic | Artefact |
@@ -23,7 +21,7 @@ least one named artefact.
 | **Accountable & Transparent** | Every pack carries `signers`, `expires_on`, and a `skill_passport` entry (`kchat-skills/compiler/skill_passport.py`). The compiled-prompt format (`kchat-skills/prompts/compiled_prompt_format.md`) exposes the exact rules to downstream reviewers. |
 | **Explainable & Interpretable** | The classifier output contract (`kchat-skills/global/output_schema.json`) carries a stable `rationale_id` pointing to a human-readable catalogue entry. Pack summaries are surfaced via `user_notice.visible_pack_summary`. |
 | **Privacy-Enhanced** | The baseline's 8 privacy rules (`kchat-skills/global/baseline.yaml` `privacy_rules`) are immutable — `anti_misuse.assert_privacy_rules_not_redefined` rejects any overlay that touches them. The appeal flow (`kchat-skills/compiler/appeal_flow.py`) records only metadata, never content. |
-| **Fair (Harmful bias managed)** | `kchat-skills/compiler/bias_audit.py` runs per-minority-language-target audits; `kchat-skills/tests/jurisdictions/test_minority_language_fp.py` exercises 62 archetypes × ≥4 minority-language / code-switching false-positive cases (≥140 from Phase 5 second wave alone). |
+| **Fair (Harmful bias managed)** | `kchat-skills/compiler/bias_audit.py` runs per-minority-language-target audits; `kchat-skills/tests/jurisdictions/test_minority_language_fp.py` exercises 62 archetypes × ≥4 minority-language / code-switching false-positive cases. |
 
 ---
 
@@ -122,7 +120,7 @@ least one named artefact.
 
 ## Performance benchmarking (AI RMF MEASURE 1)
 
-The Phase 6 benchmark (`kchat-skills/compiler/benchmark.py`) provides a
+The benchmark harness (`kchat-skills/compiler/benchmark.py`) provides a
 structured `PipelineBenchmark` that measures p50/p95/p99/mean/max
 latency against the full pack set, and a `BenchmarkReport` that
 records whether the `p95 <= 250ms` target is met. The target

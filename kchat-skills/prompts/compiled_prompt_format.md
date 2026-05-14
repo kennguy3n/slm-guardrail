@@ -3,14 +3,14 @@
 The on-device guardrail compiler takes the **active skill bundle** —
 global baseline + jurisdiction overlays + community overlay + runtime
 context — and emits a single compact text prompt that records the
-classifier-bundle configuration. The compiled prompt remains pinned
-to the historic instruction budget (**< 1800 tokens**, output budget
-**< 600 tokens**) so the bundle stays compatible with future
-generative-classifier backends, but the reference XLM-R encoder
+classifier-bundle configuration. The compiled prompt is pinned to
+the instruction budget (**< 1800 tokens**, output budget **< 600
+tokens**) so the bundle stays compatible with future
+generative-classifier backends. The reference XLM-R encoder
 consumes the bundle directly (no chat-completion call,
 deterministic argmax over fixed prototypes — "temperature **0.0**"
-is kept in the schema for back-compat but is not used by the encoder).
-See ARCHITECTURE.md "Compiled Prompt Example" (lines 627–660).
+is kept in the schema for backward compatibility but is not used by
+the encoder). See ARCHITECTURE.md.
 
 ## Sections
 

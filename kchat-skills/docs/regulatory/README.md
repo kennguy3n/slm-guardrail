@@ -1,7 +1,5 @@
 # Regulatory Alignment Index
 
-Spec reference: PHASES.md Phase 6 — "Regulatory alignment".
-
 This directory collects the concrete mappings between each
 regulatory instrument that applies to the KChat on-device guardrail
 system and the specific artefacts (YAML overlays, compiler modules,
