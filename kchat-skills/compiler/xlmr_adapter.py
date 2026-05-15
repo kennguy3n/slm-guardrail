@@ -86,6 +86,7 @@ from encoder_adapter import (  # type: ignore[import-not-found]
     CAT_SAFE,
     CAT_SCAM_FRAUD,
     CAT_SEXUAL_ADULT,
+    HEALTH_TO_MODEL_HEALTH_OUTPUT,
     EncoderAdapter,
 )
 
@@ -147,6 +148,16 @@ CATEGORY_PROTOTYPES: tuple[str, ...] = (
 
 
 # Output-schema bounds. Mirror ``kchat-skills/global/output_schema.json``.
+#
+# NOTE: ``WARN_WITH_CONTEXT`` is intentionally absent here even though
+# it is a valid reason code in the output schema. The adapter never
+# emits it — it is injected by :mod:`threshold_policy` AFTER the
+# adapter has already returned, when a non-SAFE verdict is paired
+# with a protected-speech context hint and the threshold policy
+# decides to "warn with context" rather than fully demote. The
+# canonical reason-code enum therefore lives in the output schema
+# (``kchat-skills/global/output_schema.json``); these two whitelists
+# (adapter-emitted vs schema-valid) intentionally do not coincide.
 _VALID_REASON_CODES = frozenset(
     {
         "LEXICON_HIT",
@@ -203,15 +214,13 @@ VALID_HEALTH_STATES: frozenset[str] = frozenset(
 
 # Mapping from internal ``health_state`` values to the coarser
 # ``model_health`` enum exposed on the output schema. The schema only
-# distinguishes the four values the UI needs to reason about; richer
+# distinguishes the values the UI needs to reason about; richer
 # states stay on the adapter instance for telemetry / debugging.
-_OUTPUT_MODEL_HEALTH: dict[str, str] = {
-    HEALTH_HEALTHY: "healthy",
-    HEALTH_MODEL_UNAVAILABLE: "model_unavailable",
-    HEALTH_TOKENIZER_UNAVAILABLE: "model_unavailable",
-    HEALTH_DEPENDENCY_MISSING: "model_unavailable",
-    HEALTH_INFERENCE_ERROR: "inference_error",
-}
+#
+# Canonical table lives on :mod:`encoder_adapter` so the pipeline and
+# every backend project internal states onto the output schema the
+# same way. Re-exported here for back-compat with older imports.
+_OUTPUT_MODEL_HEALTH: dict[str, str] = HEALTH_TO_MODEL_HEALTH_OUTPUT
 
 # Rationale id used when the encoder could not run and the verdict is
 # coming from the deterministic-detectors-only degraded path. The UI
@@ -1214,7 +1223,6 @@ def _coerce_to_output_schema(parsed: dict[str, Any]) -> dict[str, Any]:
     if isinstance(health, str) and health in {
         "healthy",
         "model_unavailable",
-        "rule_only",
         "inference_error",
     }:
         out["model_health"] = health

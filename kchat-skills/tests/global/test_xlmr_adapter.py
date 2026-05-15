@@ -145,6 +145,29 @@ def test_xlmr_adapter_has_classify_method():
     assert callable(getattr(adapter, "classify", None))
 
 
+def test_health_to_model_health_output_is_canonical():
+    """Pipeline and XLM-R adapter MUST agree on how internal
+    ``health_state`` values project onto the output schema's
+    ``model_health`` enum. The canonical table lives on
+    :mod:`encoder_adapter`; both the adapter and the pipeline must
+    import the SAME object, not their own copies.
+    """
+    from encoder_adapter import (  # type: ignore[import-not-found]
+        HEALTH_TO_MODEL_HEALTH_OUTPUT as canonical,
+    )
+    from pipeline import (  # type: ignore[import-not-found]
+        _ADAPTER_HEALTH_TO_OUTPUT as pipeline_view,
+    )
+    from xlmr_adapter import (  # type: ignore[import-not-found]
+        _OUTPUT_MODEL_HEALTH as adapter_view,
+    )
+    assert pipeline_view is canonical
+    assert adapter_view is canonical
+    # Every value is part of the output_schema model_health enum.
+    allowed = {"healthy", "model_unavailable", "inference_error"}
+    assert set(canonical.values()) <= allowed
+
+
 def test_default_constants_advertise_xlmr():
     assert XLMR_MODEL_NAME == "XLM-R"
     assert DEFAULT_ONNX_MODEL_PATH.endswith(".onnx")

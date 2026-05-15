@@ -640,3 +640,129 @@ class TestRevocation:
         )
         with pytest.raises(PassportValidationError, match="signature mismatch"):
             tampered.verify_signature(public_key=pk)
+
+    def test_verify_with_revocation_list_public_key_runs_signature_check(
+        self,
+    ):
+        # Recommended trust pattern: pass ``revocation_list_public_key``
+        # to ``passport.verify(...)`` so the list's own signature is
+        # verified inside the same call.
+        passport_sk, passport_pk = generate_keypair()
+        rev_sk, rev_pk = generate_keypair()
+        p = _build()
+        p.sign(private_key=passport_sk, key_id="k1")
+        rev = self._list(
+            entries=(
+                RevocationEntry(
+                    skill_id=p.skill_id,
+                    skill_version=p.skill_version,
+                    revoked_on=date.today(),
+                    reason="compromised-key",
+                    revoked_by="security-team",
+                ),
+            ),
+        )
+        rev.sign(private_key=rev_sk, key_id="rev-k1")
+        with pytest.raises(PassportValidationError, match="revoked"):
+            p.verify(
+                public_key=passport_pk,
+                revocation_list=rev,
+                revocation_list_public_key=rev_pk,
+            )
+
+    def test_verify_rejects_tampered_revocation_list_when_pubkey_supplied(
+        self,
+    ):
+        # A tampered (unsigned-mutated) list passed alongside its
+        # public key must fail closed — the list's signature check
+        # raises BEFORE the is_revoked() lookup.
+        passport_sk, passport_pk = generate_keypair()
+        rev_sk, rev_pk = generate_keypair()
+        p = _build()
+        p.sign(private_key=passport_sk, key_id="k1")
+        rev = self._list(
+            entries=(
+                RevocationEntry(
+                    skill_id=p.skill_id,
+                    skill_version=p.skill_version,
+                    revoked_on=date.today(),
+                    reason="testing",
+                    revoked_by="security-team",
+                ),
+            ),
+        )
+        rev.sign(private_key=rev_sk, key_id="rev-k1")
+        # Mutate after signing.
+        tampered = RevocationList(
+            entries=rev.entries + (
+                RevocationEntry(
+                    skill_id="kchat.injected",
+                    skill_version="1.0.0",
+                    revoked_on=date.today(),
+                    reason="injected-by-attacker",
+                    revoked_by="attacker",
+                ),
+            ),
+            issued_on=rev.issued_on,
+            expires_on=rev.expires_on,
+            signature=rev.signature,
+        )
+        with pytest.raises(
+            PassportValidationError,
+            match="revocation list signature mismatch",
+        ):
+            p.verify(
+                public_key=passport_pk,
+                revocation_list=tampered,
+                revocation_list_public_key=rev_pk,
+            )
+
+    def test_verify_rejects_expired_revocation_list_when_pubkey_supplied(
+        self,
+    ):
+        # An expired revocation list must also fail closed under the
+        # recommended trust pattern.
+        passport_sk, passport_pk = generate_keypair()
+        rev_sk, rev_pk = generate_keypair()
+        p = _build()
+        p.sign(private_key=passport_sk, key_id="k1")
+        rev = RevocationList(
+            entries=(),
+            issued_on=date.today() - timedelta(days=60),
+            expires_on=date.today() - timedelta(days=1),  # expired
+        )
+        rev.sign(private_key=rev_sk, key_id="rev-k1")
+        with pytest.raises(
+            PassportValidationError, match="revocation list expired"
+        ):
+            p.verify(
+                public_key=passport_pk,
+                revocation_list=rev,
+                revocation_list_public_key=rev_pk,
+            )
+
+    def test_verify_rejects_signature_before_revocation_check(self):
+        # Order check: even if the passport is on the revocation list,
+        # an invalid passport signature must surface first (so a
+        # forged passport doesn't masquerade as a known-revoked one).
+        good_sk, _good_pk = generate_keypair()
+        _other_sk, other_pk = generate_keypair()  # used for verify
+        p = _build()
+        p.sign(private_key=good_sk, key_id="k1")  # signed with good_sk
+        rev = self._list(
+            entries=(
+                RevocationEntry(
+                    skill_id=p.skill_id,
+                    skill_version=p.skill_version,
+                    revoked_on=date.today(),
+                    reason="testing",
+                    revoked_by="security-team",
+                ),
+            ),
+        )
+        # Verify with WRONG public key — signature check must fail
+        # before revocation check runs.
+        with pytest.raises(
+            PassportValidationError, match="signature mismatch"
+        ):
+            p.verify(public_key=other_pk, revocation_list=rev)

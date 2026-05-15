@@ -393,8 +393,19 @@ or `inference_error`, and emits a degraded output that carries
 "model_unavailable_rule_only_v1"`. **The deterministic detectors
 (PII, scam, URL risk, child-safety lexicon, NSFW media) remain
 active** — the pipeline does not silently return SAFE on encoder
-failure. The calling UI distinguishes "no harm signal" from "model
-couldn't run" by inspecting `model_health` on the output.
+failure.
+
+**Consumer contract.** When `model_health != "healthy"` the
+deterministic detectors are the only harm signal that ran, and the
+pipeline does NOT promote their hits to a non-SAFE category — the
+output may carry `category=0`, `severity=0`, no `actions=true` flags,
+and yet have reason codes such as `PRIVATE_DATA_PATTERN`,
+`SCAM_PATTERN`, `URL_RISK`, or `LEXICON_HIT` populated. **UI
+consumers MUST inspect `model_health` on every output** and, when it
+is anything other than `"healthy"`, surface those reason codes to
+the user (typically as a non-blocking warning banner). A UI that
+only branches on `severity` and `actions` will silently miss harm
+signals in degraded mode.
 
 The skill-pack files themselves remain pure YAML / JSON; the
 encoder runtime is an optional dependency of the demo and

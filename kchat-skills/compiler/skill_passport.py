@@ -204,13 +204,14 @@ class SkillPassport:
         now: Optional[date] = None,
         model: Optional[ModelCompatibility] = None,
         revocation_list: Optional["RevocationList"] = None,
+        revocation_list_public_key: Optional[Ed25519PublicKey] = None,
     ) -> None:
         """Validate the passport.
 
         Raises :class:`PassportValidationError` on any of:
 
-        * missing or wrong-algorithm signature;
-        * tampered signature;
+        * missing or wrong-algorithm passport signature;
+        * tampered passport signature;
         * passport already expired (``expires_on < now``);
         * passport overshooting the 18-month expiry budget
           (``expires_on > now + 18 months``);
@@ -219,20 +220,33 @@ class SkillPassport:
           passport and runtime ``ModelCompatibility`` supply them
           (P0-4);
         * skill_id + skill_version listed in ``revocation_list``
-          (P1-3).
-        """
-        if revocation_list is not None and revocation_list.is_revoked(
-            self.skill_id, self.skill_version
-        ):
-            entry = revocation_list.lookup(self.skill_id, self.skill_version)
-            reason = (
-                f" ({entry.reason})" if entry and entry.reason else ""
-            )
-            raise PassportValidationError(
-                f"passport revoked: {self.skill_id}@{self.skill_version}"
-                f"{reason}"
-            )
+          (P1-3);
+        * ``revocation_list`` signature / expiry invalid when
+          ``revocation_list_public_key`` is supplied (P1-3).
 
+        **Revocation-list trust model.** ``RevocationList`` instances
+        are themselves signed Ed25519 payloads with their own
+        ``expires_on`` window. Callers must establish trust in the
+        list before its ``is_revoked`` answer can be relied on:
+
+        1. **Recommended** — pass ``revocation_list_public_key``
+           alongside ``revocation_list``. ``verify()`` will run
+           :meth:`RevocationList.verify_signature` against that key
+           and fail closed if the list is unsigned, tampered, or
+           expired *before* asking it whether the passport is
+           revoked. This is the safest pattern and the one the
+           tests demonstrate.
+        2. Or, call ``revocation_list.verify_signature(...)``
+           yourself before invoking this method and omit
+           ``revocation_list_public_key``. The caller is then fully
+           responsible for the list's integrity — a tampered or
+           expired list passed in unverified is treated as trusted
+           and may either falsely revoke or fail to revoke.
+
+        Passing ``revocation_list`` without
+        ``revocation_list_public_key`` and without an out-of-band
+        verification step is a bug. There is no third option.
+        """
         if self.signature is None:
             raise PassportValidationError("passport is unsigned")
         if self.signature.algorithm != SIGNATURE_ALGORITHM:
@@ -246,6 +260,31 @@ class SkillPassport:
             )
         except (InvalidSignature, ValueError) as exc:
             raise PassportValidationError("signature mismatch") from exc
+
+        # Revocation check runs AFTER the passport's own signature
+        # check so an attacker who forges a passport cannot also use
+        # a forged revocation entry to make the passport appear to
+        # have been a known revoked one. Both outcomes are rejection,
+        # but the order keeps the failure modes distinct in the
+        # caller's exception path.
+        if revocation_list is not None:
+            if revocation_list_public_key is not None:
+                revocation_list.verify_signature(
+                    public_key=revocation_list_public_key, now=now
+                )
+            if revocation_list.is_revoked(
+                self.skill_id, self.skill_version
+            ):
+                entry = revocation_list.lookup(
+                    self.skill_id, self.skill_version
+                )
+                reason = (
+                    f" ({entry.reason})" if entry and entry.reason else ""
+                )
+                raise PassportValidationError(
+                    f"passport revoked: "
+                    f"{self.skill_id}@{self.skill_version}{reason}"
+                )
 
         today = now or _today_utc()
         if self.expires_on < today:

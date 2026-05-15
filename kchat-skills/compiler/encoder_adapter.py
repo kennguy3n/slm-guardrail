@@ -52,6 +52,33 @@ CAT_MISINFORMATION_CIVIC = 14
 CAT_COMMUNITY_RULE = 15
 
 
+# ---------------------------------------------------------------------------
+# Canonical adapter-health → output-schema mapping.
+#
+# Adapters carry a richer internal ``health_state`` (e.g.
+# ``tokenizer_unavailable``, ``dependency_missing``) than the
+# coarser ``model_health`` enum exposed on
+# ``kchat.guardrail.output.v1``. Both :mod:`pipeline` and
+# :mod:`xlmr_adapter` need to project the same set of internal
+# states onto the same set of output values, and historically each
+# kept its own copy of the table. Hosting the canonical mapping
+# here on the Protocol module means every backend and the pipeline
+# itself import the same dict — any new adapter that introduces a
+# new health state must extend this single table and the pipeline
+# and the XLM-R adapter pick it up for free.
+#
+# Keep the values in sync with the ``model_health`` enum in
+# ``kchat-skills/global/output_schema.json``.
+# ---------------------------------------------------------------------------
+HEALTH_TO_MODEL_HEALTH_OUTPUT: dict[str, str] = {
+    "healthy": "healthy",
+    "model_unavailable": "model_unavailable",
+    "tokenizer_unavailable": "model_unavailable",
+    "dependency_missing": "model_unavailable",
+    "inference_error": "inference_error",
+}
+
+
 def _zero_actions() -> dict[str, bool]:
     return {
         "label_only": False,
@@ -110,7 +137,7 @@ class EncoderAdapter(Protocol):
     ``classify(input) -> dict`` signature mentions explicitly):
 
     * ``model_health``: ``str`` — one of ``healthy`` /
-      ``model_unavailable`` / ``rule_only`` / ``inference_error``.
+      ``model_unavailable`` / ``inference_error``.
       Safety-relevant status signal. Absence is equivalent to
       ``healthy``. The pipeline uses this to decide whether to keep
       deterministic detectors active when the encoder cannot produce

@@ -16,6 +16,7 @@ from counters import (  # type: ignore[import-not-found]
     InMemoryKeystore,
 )
 from pipeline import (  # type: ignore[import-not-found]
+    DetectorRegistry,
     GuardrailPipeline,
     LexiconEntry,
     SkillBundle,
@@ -408,6 +409,104 @@ def test_bundle_jurisdiction_id_flows_into_packed_context():
         "kchat.jurisdiction.archetype-strict-marketplace.guardrail.v1"
     )
     assert ctx["community_overlay_id"] == "kchat.community.workplace.guardrail.v1"
+
+
+# ---------------------------------------------------------------------------
+# P1-5 — Detector registry wiring.
+# ---------------------------------------------------------------------------
+class TestDetectorRegistryWiring:
+    """The pipeline must consult ``self.detector_registry`` for every
+    deterministic detector kind in step 2. An empty registry resolves
+    every kind back to the reference detector defined in
+    ``pipeline.py``; a registry that overrides a kind makes the
+    pipeline call the override instead — without any change to the
+    pipeline's other behaviour.
+    """
+
+    def test_empty_registry_matches_reference_detectors(
+        self, output_schema
+    ):
+        bundle = SkillBundle()
+        reference = GuardrailPipeline(
+            skill_bundle=bundle, encoder_adapter=MockEncoderAdapter()
+        )
+        via_registry = GuardrailPipeline(
+            skill_bundle=bundle,
+            encoder_adapter=MockEncoderAdapter(),
+            detector_registry=DetectorRegistry(),
+        )
+        for msg in (
+            _benign_message(),
+            _pii_message(),
+            _scam_message(),
+            _url_risk_message(),
+        ):
+            ref_out = reference.classify(msg, _context())
+            reg_out = via_registry.classify(msg, _context())
+            jsonschema.validate(instance=ref_out, schema=output_schema)
+            jsonschema.validate(instance=reg_out, schema=output_schema)
+            assert ref_out == reg_out, (
+                "empty DetectorRegistry must produce identical output "
+                "to reference detectors for "
+                f"message={msg!r}; ref={ref_out!r} via_registry={reg_out!r}"
+            )
+
+    def test_registered_detector_is_called(self):
+        bundle = SkillBundle()
+        registry = DetectorRegistry()
+        calls: dict[str, list[str]] = {
+            "url_risk": [],
+            "pii": [],
+            "scam": [],
+        }
+
+        def fake_url_risk(text: str) -> float:
+            calls["url_risk"].append(text)
+            return 0.0
+
+        def fake_pii(text: str) -> list[str]:
+            calls["pii"].append(text)
+            return []
+
+        def fake_scam(text: str) -> list[str]:
+            calls["scam"].append(text)
+            return []
+
+        registry.register("url_risk", fake_url_risk)
+        registry.register("pii", fake_pii)
+        registry.register("scam", fake_scam)
+
+        pipeline_obj = GuardrailPipeline(
+            skill_bundle=bundle,
+            encoder_adapter=MockEncoderAdapter(),
+            detector_registry=registry,
+        )
+        pipeline_obj.classify(_benign_message(), _context())
+
+        assert len(calls["url_risk"]) == 1
+        assert len(calls["pii"]) == 1
+        assert len(calls["scam"]) == 1
+
+    def test_registered_detector_changes_pipeline_outcome(
+        self, output_schema
+    ):
+        # A registered PII detector that flags every message must
+        # cause MockEncoderAdapter to escalate to PRIVATE_DATA, just
+        # as the reference detect_pii would on a real PII message.
+        bundle = SkillBundle()
+        registry = DetectorRegistry()
+        registry.register(
+            "pii", lambda _text: ["FORCED_PII_HIT"]
+        )
+        pipeline_obj = GuardrailPipeline(
+            skill_bundle=bundle,
+            encoder_adapter=MockEncoderAdapter(),
+            detector_registry=registry,
+        )
+        out = pipeline_obj.classify(_benign_message(), _context())
+        jsonschema.validate(instance=out, schema=output_schema)
+        assert out["category"] == 9  # PRIVATE_DATA
+        assert out["actions"]["suggest_redact"] is True
 
 
 # ---------------------------------------------------------------------------

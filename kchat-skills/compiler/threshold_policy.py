@@ -306,7 +306,7 @@ def _forward_health_signal(
     ``model_health`` is the only adapter-emitted field that survives a
     fresh-dict branch in :meth:`ThresholdPolicy.apply`. It is a
     coarse, safety-relevant status signal (one of ``healthy`` /
-    ``model_unavailable`` / ``rule_only`` / ``inference_error``) so a
+    ``model_unavailable`` / ``inference_error``) so a
     calling UI can distinguish 'classifier produced a SAFE verdict'
     from 'classifier could not run, deterministic detectors only'.
 

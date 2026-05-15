@@ -32,7 +32,10 @@ from metric_validator import (  # type: ignore[import-not-found]
     MetricThresholds,
     MetricValidator,
 )
-from encoder_adapter import EncoderAdapter  # type: ignore[import-not-found]
+from encoder_adapter import (  # type: ignore[import-not-found]
+    HEALTH_TO_MODEL_HEALTH_OUTPUT,
+    EncoderAdapter,
+)
 from threshold_policy import ThresholdPolicy  # type: ignore[import-not-found]
 
 
@@ -390,9 +393,10 @@ _COUNTERSPEECH_CONTEXT_OVERLAY_TOKENS: tuple[str, ...] = (
 
 # Default confidence assigned to each context hint kind. P1-1: the
 # threshold policy reads these per-hint confidences and demotes only
-# when the supporting context is strong enough. Production overlays
-# should override these via a per-overlay confidence table rather
-# than relying on the defaults here.
+# when the supporting context is strong enough (see
+# ``CONTEXT_DEMOTION_CONFIDENCE_THRESHOLD`` below). Production
+# overlays should override these via a per-overlay confidence table
+# rather than relying on the defaults here.
 #
 # * QUOTED_SPEECH_CONTEXT is structurally observable — it comes from
 #   ``message.quoted_from_user`` which the chat client sets when the
@@ -400,13 +404,18 @@ _COUNTERSPEECH_CONTEXT_OVERLAY_TOKENS: tuple[str, ...] = (
 #   default confidence.
 # * NEWS_CONTEXT / EDUCATION_CONTEXT / COUNTERSPEECH_CONTEXT are
 #   derived from a *coarse substring match* on the community overlay
-#   id. They are useful signals but easy to spoof; production should
-#   not treat them as definitive demotion grounds.
+#   id. They are easy to spoof and production should not treat them
+#   as definitive demotion grounds. The defaults below sit just at
+#   the demotion floor so an overlay-id-only signal still preserves
+#   pre-P1-1 'protected-speech full demote' behaviour; **production
+#   deployments are strongly encouraged to override these values
+#   downward** (e.g. 0.3) so overlay-only context can only soften to
+#   'warn with context' rather than fully suppress harm labels.
 CONTEXT_HINT_CONFIDENCE: dict[str, float] = {
     "QUOTED_SPEECH_CONTEXT": 0.7,
-    "NEWS_CONTEXT": 0.3,
-    "EDUCATION_CONTEXT": 0.3,
-    "COUNTERSPEECH_CONTEXT": 0.3,
+    "NEWS_CONTEXT": 0.5,
+    "EDUCATION_CONTEXT": 0.5,
+    "COUNTERSPEECH_CONTEXT": 0.5,
 }
 
 # P1-1: minimum context confidence required for the threshold policy
@@ -559,6 +568,79 @@ def pack_signals(
 # ---------------------------------------------------------------------------
 # Pipeline orchestrator.
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# P1-5 — Detector registry.
+#
+# The current pipeline hard-wires its detectors. ``DetectorRegistry``
+# is a thin extensibility seam that lets a deployment plug in
+# production-grade detector implementations while keeping the
+# reference detectors above as a fallback. The registry is
+# intentionally minimal:
+#
+# * No automatic loading from disk / network — callers register
+#   detectors explicitly so the surface stays auditable.
+# * No precedence rules between detectors of the same kind — the
+#   registry stores a single detector per kind, but the *registered*
+#   detector can compose multiple sub-detectors however it likes.
+# * Detector callables share the simple ``(text) -> result`` shape
+#   already used by the reference detectors, so production detectors
+#   can wrap or replace the reference implementations without
+#   changing call sites.
+# ---------------------------------------------------------------------------
+DetectorKind = str  # "url_risk" | "pii" | "scam" | "lexicon" | ...
+
+
+_REFERENCE_DETECTORS: dict[DetectorKind, Any] = {
+    "url_risk": score_url_risk,
+    "pii": detect_pii,
+    "scam": detect_scam,
+    "lexicon": match_lexicons,
+    "context_hints": derive_context_hints_with_confidence,
+    "homoglyph_map": DEFAULT_HOMOGLYPH_MAP,
+}
+
+
+@dataclass
+class DetectorRegistry:
+    """Pluggable registry of deterministic detectors.
+
+    A deployment uses :meth:`register` to install production detector
+    implementations and :meth:`get` to look one up at pipeline-build
+    time. Unregistered kinds resolve to the reference detector defined
+    in this module.
+
+    Built-in defaults:
+
+    * ``url_risk`` → :func:`score_url_risk`
+    * ``pii``     → :func:`detect_pii`
+    * ``scam``    → :func:`detect_scam`
+    * ``lexicon`` → :func:`match_lexicons`
+    * ``context_hints`` → :func:`derive_context_hints_with_confidence`
+    * ``homoglyph_map`` → :data:`DEFAULT_HOMOGLYPH_MAP`
+
+    Production detectors plug in via ``registry.register(kind,
+    detector_fn)`` and :class:`GuardrailPipeline` calls them through
+    ``self.detector_registry.get(kind)`` during step 2 (deterministic
+    detectors) and step 1 (normalization homoglyph map).
+    """
+
+    _detectors: dict[DetectorKind, Any] = field(default_factory=dict)
+
+    def register(self, kind: DetectorKind, detector: Any) -> None:
+        """Register a detector for ``kind``, replacing any existing one."""
+        self._detectors[kind] = detector
+
+    def get(self, kind: DetectorKind) -> Any:
+        """Return the detector for ``kind`` (registered or reference)."""
+        if kind in self._detectors:
+            return self._detectors[kind]
+        return _REFERENCE_DETECTORS.get(kind)
+
+    def kinds(self) -> list[DetectorKind]:
+        """Return the union of registered and reference detector kinds."""
+        return sorted({*self._detectors, *_REFERENCE_DETECTORS})
+
+
 @dataclass
 class GuardrailPipeline:
     """The 7-step hybrid local pipeline.
@@ -578,12 +660,24 @@ class GuardrailPipeline:
     counter_store
         Optional device-local expiring-counter store. When provided,
         step 7 applies ``counter_updates`` from the output.
+    detector_registry
+        Pluggable :class:`DetectorRegistry` for deterministic
+        detectors. Defaults to an empty registry, in which case
+        :meth:`classify` falls back to the reference detectors
+        defined in this module (``score_url_risk``, ``detect_pii``,
+        ``detect_scam``, ``match_lexicons``,
+        ``derive_context_hints_with_confidence``). A deployment can
+        plug in production detectors by constructing the pipeline
+        with a populated registry — see :class:`DetectorRegistry`.
     """
 
     skill_bundle: SkillBundle
     encoder_adapter: EncoderAdapter
     threshold_policy: ThresholdPolicy = field(default_factory=ThresholdPolicy)
     counter_store: Optional[CounterStore] = None
+    detector_registry: DetectorRegistry = field(
+        default_factory=DetectorRegistry
+    )
 
     def classify(
         self,
@@ -598,6 +692,26 @@ class GuardrailPipeline:
         ``kchat.guardrail.local_signal.v1``. ``group_id`` is required
         only if the skill bundle configures a ``counter_store`` — it
         scopes counter updates to one group.
+
+        **Consumer contract — degraded mode.** When the encoder cannot
+        run (model file missing, dependency import failed, inference
+        threw, etc.) this method still returns a schema-valid output
+        dict, but the output is tagged with
+        ``model_health != "healthy"`` and the verdict is built from
+        the deterministic detectors alone. In that mode the
+        deterministic detectors are the ONLY harm signal, so reason
+        codes such as ``PRIVATE_DATA_PATTERN`` / ``SCAM_PATTERN`` /
+        ``URL_RISK`` / ``LEXICON_HIT`` may appear on a ``category=0``
+        (SAFE) verdict — the threshold policy does not promote SAFE
+        outputs to a harm category, so ``severity`` / ``actions`` will
+        not reflect those reason codes. Downstream UI consumers
+        **MUST** inspect ``model_health`` on every output and surface
+        the reason codes to the user when it is anything other than
+        ``"healthy"``. A consumer that only branches on
+        ``severity`` / ``actions`` will silently miss real harm in
+        degraded mode. See the ``model_health`` description in
+        ``kchat-skills/global/output_schema.json`` for the full
+        contract.
         """
         # --- Step 1: Normalize text.
         text = message.get("text", "") or ""
@@ -640,15 +754,30 @@ class GuardrailPipeline:
         }
 
         # --- Step 2: Deterministic local detectors + context hints.
-        hints_with_conf = derive_context_hints_with_confidence(
+        # P1-5: route through the detector registry so production
+        # deployments can swap reference detectors for their own
+        # implementations without touching this method. An empty
+        # registry resolves every kind back to the reference
+        # detector defined in this module — see
+        # :class:`DetectorRegistry`.
+        registry = self.detector_registry
+        url_risk_fn = registry.get("url_risk") or score_url_risk
+        pii_fn = registry.get("pii") or detect_pii
+        scam_fn = registry.get("scam") or detect_scam
+        lexicon_fn = registry.get("lexicon") or match_lexicons
+        context_hints_fn = (
+            registry.get("context_hints")
+            or derive_context_hints_with_confidence
+        )
+        hints_with_conf = context_hints_fn(
             message=packed_message,
             context=packed_context,
         )
         local_signals = {
-            "url_risk": score_url_risk(normalized),
-            "pii_patterns_hit": detect_pii(normalized),
-            "scam_patterns_hit": detect_scam(normalized),
-            "lexicon_hits": match_lexicons(
+            "url_risk": url_risk_fn(normalized),
+            "pii_patterns_hit": pii_fn(normalized),
+            "scam_patterns_hit": scam_fn(normalized),
+            "lexicon_hits": lexicon_fn(
                 normalized, self.skill_bundle.lexicons
             ),
             "media_descriptors": extract_media_descriptors(
@@ -766,13 +895,12 @@ class GuardrailPipeline:
 
 # P0-2: mapping from richer adapter-level ``health_state`` values to
 # the coarser ``model_health`` enum exposed on the output schema.
-_ADAPTER_HEALTH_TO_OUTPUT: dict[str, str] = {
-    "healthy": "healthy",
-    "model_unavailable": "model_unavailable",
-    "tokenizer_unavailable": "model_unavailable",
-    "dependency_missing": "model_unavailable",
-    "inference_error": "inference_error",
-}
+#
+# Canonical table lives on :mod:`encoder_adapter` so the pipeline and
+# every backend project internal states onto the output schema the
+# same way — see ``HEALTH_TO_MODEL_HEALTH_OUTPUT`` there. This
+# module-level alias is kept for readability at the call site.
+_ADAPTER_HEALTH_TO_OUTPUT: dict[str, str] = HEALTH_TO_MODEL_HEALTH_OUTPUT
 
 
 def _finalise_output(output: dict[str, Any]) -> dict[str, Any]:
@@ -804,76 +932,6 @@ def _finalise_output(output: dict[str, Any]) -> dict[str, Any]:
     # Internal threshold-policy hint; never leaves the pipeline.
     output.pop("context_hint_confidences", None)
     return output
-
-
-# ---------------------------------------------------------------------------
-# P1-5 — Detector registry.
-#
-# The current pipeline hard-wires its detectors. ``DetectorRegistry``
-# is a thin extensibility seam that lets a deployment plug in
-# production-grade detector implementations while keeping the
-# reference detectors above as a fallback. The registry is
-# intentionally minimal:
-#
-# * No automatic loading from disk / network — callers register
-#   detectors explicitly so the surface stays auditable.
-# * No precedence rules between detectors of the same kind — the
-#   registry stores a single detector per kind, but the *registered*
-#   detector can compose multiple sub-detectors however it likes.
-# * Detector callables share the simple ``(text) -> result`` shape
-#   already used by the reference detectors, so production detectors
-#   can wrap or replace the reference implementations without
-#   changing call sites.
-# ---------------------------------------------------------------------------
-DetectorKind = str  # "url_risk" | "pii" | "scam" | "lexicon" | ...
-
-
-@dataclass
-class DetectorRegistry:
-    """Pluggable registry of deterministic detectors.
-
-    A deployment uses :meth:`register` to install production detector
-    implementations and :meth:`get` to look one up at pipeline-build
-    time. Unregistered kinds resolve to the reference detector defined
-    in this module.
-
-    Built-in defaults:
-
-    * ``url_risk`` → :func:`score_url_risk`
-    * ``pii``     → :func:`detect_pii`
-    * ``scam``    → :func:`detect_scam`
-    * ``homoglyph_map`` → :data:`DEFAULT_HOMOGLYPH_MAP`
-
-    Production detectors plug in via ``registry.register(kind,
-    detector_fn)`` and the pipeline picks them up through
-    ``registry.get(kind)``.
-    """
-
-    _detectors: dict[DetectorKind, Any] = field(default_factory=dict)
-
-    def register(self, kind: DetectorKind, detector: Any) -> None:
-        """Register a detector for ``kind``, replacing any existing one."""
-        self._detectors[kind] = detector
-
-    def get(self, kind: DetectorKind) -> Any:
-        """Return the detector for ``kind`` (registered or reference)."""
-        if kind in self._detectors:
-            return self._detectors[kind]
-        return _REFERENCE_DETECTORS.get(kind)
-
-    def kinds(self) -> list[DetectorKind]:
-        """Return the union of registered and reference detector kinds."""
-        return sorted({*self._detectors, *_REFERENCE_DETECTORS})
-
-
-_REFERENCE_DETECTORS: dict[DetectorKind, Any] = {
-    "url_risk": score_url_risk,
-    "pii": detect_pii,
-    "scam": detect_scam,
-    "lexicon": match_lexicons,
-    "context_hints": derive_context_hints_with_confidence,
-    "homoglyph_map": DEFAULT_HOMOGLYPH_MAP,
-}
 
 
 __all__ = [
