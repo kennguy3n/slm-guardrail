@@ -490,7 +490,15 @@ class XLMRAdapter:
         self.last_latency_ms = (time.perf_counter() - start) * 1000.0
         self.health_state = HEALTH_HEALTHY
         raw_output["model_health"] = _OUTPUT_MODEL_HEALTH[HEALTH_HEALTHY]
-        return _coerce_to_output_schema(raw_output)
+        coerced = _coerce_to_output_schema(raw_output)
+        # Keep adapter telemetry in sync with what the caller actually
+        # gets. If _coerce_to_output_schema downgraded the response to
+        # the inference-error fallback, reflect that on self.health_state
+        # so the next .last_latency_ms / health probe doesn't claim
+        # "healthy" while we just shipped a degraded output.
+        if coerced.get("model_health") != _OUTPUT_MODEL_HEALTH[HEALTH_HEALTHY]:
+            self.health_state = HEALTH_INFERENCE_ERROR
+        return coerced
 
     # ------------------------------------------------------------------
     # Internals — model loading + encoding.
@@ -1105,28 +1113,39 @@ def _coerce_to_output_schema(parsed: dict[str, Any]) -> dict[str, Any]:
 
     Missing or out-of-range required fields are filled with safe
     defaults rather than raising. Any malformed structure that cannot
-    be repaired collapses to :func:`safe_fallback_output`.
+    be repaired collapses to a degraded fallback tagged with
+    ``model_health = inference_error``: the encoder ran, but produced
+    something the schema validator can't accept, which is
+    operationally indistinguishable from an inference failure as far
+    as the calling UI is concerned. This is **not** the same shape as
+    ``HEALTH_MODEL_UNAVAILABLE`` (model couldn't load at all) — the
+    distinction matters because the rule-only path stays in play in
+    both cases, but only the latter means "the encoder weights aren't
+    on disk".
     """
+    inference_error = lambda: degraded_fallback_output(  # noqa: E731
+        health_state=HEALTH_INFERENCE_ERROR
+    )
     try:
         category = int(parsed.get("category", CAT_SAFE))
     except (TypeError, ValueError):
-        return safe_fallback_output()
+        return inference_error()
     if not 0 <= category <= 15:
-        return safe_fallback_output()
+        return inference_error()
 
     try:
         severity = int(parsed.get("severity", 0))
     except (TypeError, ValueError):
-        return safe_fallback_output()
+        return inference_error()
     if not 0 <= severity <= 5:
-        return safe_fallback_output()
+        return inference_error()
 
     try:
         confidence = float(parsed.get("confidence", 0.0))
     except (TypeError, ValueError):
-        return safe_fallback_output()
+        return inference_error()
     if not 0.0 <= confidence <= 1.0:
-        return safe_fallback_output()
+        return inference_error()
 
     actions_in = parsed.get("actions") or {}
     if not isinstance(actions_in, dict):

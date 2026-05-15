@@ -32,9 +32,11 @@ from xlmr_adapter import (  # type: ignore[import-not-found]
     DEFAULT_ONNX_INT4_MODEL_PATH,
     DEFAULT_ONNX_MODEL_PATH,
     DEFAULT_TOKENIZER_PATH,
+    HEALTH_INFERENCE_ERROR,
     XLMR_MODEL_NAME,
     XLMRAdapter,
     _coerce_to_output_schema,
+    degraded_fallback_output,
     safe_fallback_output,
 )
 
@@ -211,7 +213,7 @@ def test_coerce_drops_invalid_reason_codes(output_schema):
     assert out["reason_codes"] == ["URL_RISK"]
 
 
-def test_coerce_out_of_range_category_collapses_to_safe():
+def test_coerce_out_of_range_category_collapses_to_inference_error():
     raw = {
         "severity": 0,
         "category": 99,
@@ -227,19 +229,42 @@ def test_coerce_out_of_range_category_collapses_to_safe():
         "rationale_id": "x",
     }
     out = _coerce_to_output_schema(raw)
-    assert out == safe_fallback_output()
+    # The encoder produced an out-of-range category, which is
+    # operationally a *bad inference* — not a missing model. The
+    # fallback must carry model_health="inference_error", not
+    # "model_unavailable".
+    assert out == degraded_fallback_output(
+        health_state=HEALTH_INFERENCE_ERROR
+    )
+    assert out["model_health"] == "inference_error"
 
 
-def test_coerce_out_of_range_severity_collapses_to_safe():
+def test_coerce_out_of_range_severity_collapses_to_inference_error():
     raw = {"severity": 99, "category": 0, "confidence": 0.5}
     out = _coerce_to_output_schema(raw)
-    assert out == safe_fallback_output()
+    assert out == degraded_fallback_output(
+        health_state=HEALTH_INFERENCE_ERROR
+    )
+    assert out["model_health"] == "inference_error"
 
 
-def test_coerce_out_of_range_confidence_collapses_to_safe():
+def test_coerce_out_of_range_confidence_collapses_to_inference_error():
     raw = {"severity": 0, "category": 0, "confidence": 2.5}
     out = _coerce_to_output_schema(raw)
-    assert out == safe_fallback_output()
+    assert out == degraded_fallback_output(
+        health_state=HEALTH_INFERENCE_ERROR
+    )
+    assert out["model_health"] == "inference_error"
+
+
+def test_safe_fallback_output_is_model_unavailable_shape():
+    # Backwards-compat shim must STILL return the
+    # model_unavailable shape (its historical default) so existing
+    # callers that explicitly want "no encoder ran" semantics keep
+    # working unchanged.
+    out = safe_fallback_output()
+    assert out["model_health"] == "model_unavailable"
+    assert out["rationale_id"] == "model_unavailable_rule_only_v1"
 
 
 def test_coerce_keeps_well_formed_counter_updates():
