@@ -5,11 +5,6 @@
   "description": "Constrained JSON output schema emitted by the on-device encoder classifier. The runtime rejects any output that does not validate against this schema. See ARCHITECTURE.md 'Output Schema'.",
   "type": "object",
   "additionalProperties": false,
-  "patternProperties": {
-    "^_": {
-      "description": "Internal underscore-prefixed extras (e.g. ``_embedding`` — the raw mean-pooled XLM-R embedding consumed by cross-pipeline caches such as chat-storage-search). Not part of the public output contract; runtime consumers may ignore these. Permitted by the schema so adapters can attach internal state without violating ``additionalProperties: false``."
-    }
-  },
   "required": [
     "severity",
     "category",
@@ -72,7 +67,8 @@
           "GROUP_AGE_MODE",
           "JURISDICTION_OVERRIDE",
           "COMMUNITY_RULE",
-          "CHILD_SAFETY_FLOOR"
+          "CHILD_SAFETY_FLOOR",
+          "WARN_WITH_CONTEXT"
         ]
       }
     },
@@ -96,6 +92,16 @@
           "delta": { "type": "integer" }
         }
       }
+    },
+    "model_health": {
+      "type": "string",
+      "enum": [
+        "healthy",
+        "model_unavailable",
+        "rule_only",
+        "inference_error"
+      ],
+      "description": "Safety-relevant status signal describing whether the encoder model produced this verdict (``healthy``) or whether the pipeline fell back to a degraded mode in which only the deterministic detectors fired (``model_unavailable`` / ``inference_error`` / ``rule_only``). Absence of the field is equivalent to ``healthy``. This is not message content or an embedding — it is a coarse health signal so the UI can distinguish 'safe message' from 'model couldn't run'."
     }
   }
 }

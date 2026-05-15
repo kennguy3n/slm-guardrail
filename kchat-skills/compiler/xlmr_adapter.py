@@ -30,15 +30,16 @@ The adapter:
    hits, media descriptors) — signals take precedence when they are
    strong, embeddings break ties otherwise.
 5. Coerces the final dict to the ``kchat.guardrail.output.v1`` schema
-   and returns it. Out-of-range fields collapse to a SAFE fallback.
-6. Attaches the raw mean-pooled, L2-normalised XLM-R embedding to
-   the returned dict under the internal key ``_embedding`` (a 384-dim
-   ``list[float]``). The underscore prefix signals this is not a
-   first-class ``kchat.guardrail.output.v1`` field; downstream
-   consumers (notably ``chat-storage-search``) cache the embedding in
-   their ``search_vector`` table so a message's XLM-R encoder pass is
-   computed at most once across the guardrail and search pipelines.
-   The schema permits ``_*`` extras via ``patternProperties``.
+   and returns it. Out-of-range fields collapse to a degraded
+   rule-only fallback.
+6. Stashes the raw mean-pooled, L2-normalised XLM-R embedding on the
+   adapter instance as :attr:`XLMRAdapter.last_embedding` (a 384-dim
+   ``list[float]`` or ``None``). The embedding is **never** attached
+   to the returned output dict — privacy contract rule 5 forbids
+   embeddings, hashes, or commitments to message content in the
+   public output schema. Cross-pipeline consumers that legitimately
+   need the embedding (e.g. ``chat-storage-search``) read it from
+   the adapter instance directly, never through the schema boundary.
 
 Design constraints inherited from the EncoderAdapter contract:
 
@@ -47,11 +48,17 @@ Design constraints inherited from the EncoderAdapter contract:
   identical output.
 * **Offline.** Model weights are loaded from a local path
   (``model_path``). No network calls during inference. If weights
-  are missing, the adapter falls back to a SAFE output.
-* **Privacy-safe fallback.** If the ONNX session fails to load,
-  raises an exception during inference, or produces an embedding
-  outside the expected shape, the adapter returns a SAFE output
-  (category 0, severity 0) rather than raising.
+  are missing, the adapter falls back to a degraded rule-only mode
+  (see :attr:`XLMRAdapter.health_state`).
+* **Degraded-mode fallback (not silent SAFE).** If the ONNX session
+  fails to load, raises an exception during inference, or produces
+  an embedding outside the expected shape, the adapter returns a
+  bare-shape output dict tagged with ``model_health="model_unavailable"``
+  / ``"inference_error"`` and ``rationale_id="model_unavailable_rule_only_v1"``.
+  The pipeline keeps the deterministic detectors active so PII,
+  scam, URL-risk, child-safety lexicon, and NSFW media verdicts
+  still fire — the encoder being unavailable must not be silently
+  laundered into a confident SAFE verdict.
 * **No PyTorch / transformers runtime dependency.** The adapter only
   needs :mod:`onnxruntime` + :mod:`sentencepiece` + :mod:`numpy` at
   runtime — small, ship-friendly dependencies suitable for iOS,
@@ -65,6 +72,7 @@ Design constraints inherited from the EncoderAdapter contract:
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 import math
 import time
@@ -169,22 +177,95 @@ def _zero_actions() -> dict[str, bool]:
     return {key: False for key in _ACTION_KEYS}
 
 
-def safe_fallback_output() -> dict[str, Any]:
-    """Return a SAFE ``kchat.guardrail.output.v1``-shaped dict.
+# ---------------------------------------------------------------------------
+# Health state — P0-2.
+#
+# ``XLMRAdapter.health_state`` records why the encoder could not run
+# on the most recent call so the pipeline can keep the deterministic
+# detectors active and surface ``model_health`` to the UI rather than
+# silently emitting a confident SAFE verdict.
+# ---------------------------------------------------------------------------
+HEALTH_HEALTHY = "healthy"
+HEALTH_MODEL_UNAVAILABLE = "model_unavailable"
+HEALTH_TOKENIZER_UNAVAILABLE = "tokenizer_unavailable"
+HEALTH_DEPENDENCY_MISSING = "dependency_missing"
+HEALTH_INFERENCE_ERROR = "inference_error"
 
-    Used whenever the encoder cannot run (ONNX model missing,
-    onnxruntime / sentencepiece import error, runtime exception during
-    inference). Matches the privacy-first invariant: when in doubt,
-    the runtime degrades to SAFE rather than to a permissive label.
+VALID_HEALTH_STATES: frozenset[str] = frozenset(
+    {
+        HEALTH_HEALTHY,
+        HEALTH_MODEL_UNAVAILABLE,
+        HEALTH_TOKENIZER_UNAVAILABLE,
+        HEALTH_DEPENDENCY_MISSING,
+        HEALTH_INFERENCE_ERROR,
+    }
+)
+
+# Mapping from internal ``health_state`` values to the coarser
+# ``model_health`` enum exposed on the output schema. The schema only
+# distinguishes the four values the UI needs to reason about; richer
+# states stay on the adapter instance for telemetry / debugging.
+_OUTPUT_MODEL_HEALTH: dict[str, str] = {
+    HEALTH_HEALTHY: "healthy",
+    HEALTH_MODEL_UNAVAILABLE: "model_unavailable",
+    HEALTH_TOKENIZER_UNAVAILABLE: "model_unavailable",
+    HEALTH_DEPENDENCY_MISSING: "model_unavailable",
+    HEALTH_INFERENCE_ERROR: "inference_error",
+}
+
+# Rationale id used when the encoder could not run and the verdict is
+# coming from the deterministic-detectors-only degraded path. The UI
+# uses this to distinguish 'classifier confidently produced SAFE'
+# from 'classifier could not run; only rules fired'.
+DEGRADED_RATIONALE_ID = "model_unavailable_rule_only_v1"
+
+
+def degraded_fallback_output(
+    *,
+    health_state: str = HEALTH_MODEL_UNAVAILABLE,
+) -> dict[str, Any]:
+    """Return a degraded ``kchat.guardrail.output.v1``-shaped dict.
+
+    Emitted whenever the XLM-R encoder cannot produce a verdict
+    (ONNX model missing, onnxruntime / sentencepiece import error,
+    runtime exception during inference). Unlike a bare SAFE output,
+    the dict is explicitly tagged with the schema-level
+    ``model_health`` enum and a distinct ``rationale_id`` so the
+    pipeline can keep deterministic detectors active and the calling
+    UI can distinguish 'safe message' from 'model could not run'.
+
+    The privacy contract requires the encoder to fail closed, not
+    open — the output category is still SAFE so the pipeline never
+    invents a harm label out of thin air, but every consumer can see
+    that the verdict came from the fallback path.
     """
+    if health_state not in VALID_HEALTH_STATES:
+        health_state = HEALTH_MODEL_UNAVAILABLE
     return {
         "severity": 0,
         "category": CAT_SAFE,
         "confidence": 0.05,
         "actions": _zero_actions(),
         "reason_codes": [],
-        "rationale_id": "xlmr_safe_fallback_v1",
+        "rationale_id": DEGRADED_RATIONALE_ID,
+        "model_health": _OUTPUT_MODEL_HEALTH.get(
+            health_state, "model_unavailable"
+        ),
     }
+
+
+# Backwards-compatibility shim — a number of older callers (tests,
+# benchmarks, demo scripts) still import ``safe_fallback_output``. The
+# function now returns the degraded fallback shape; the new name is
+# preferred for clarity.
+def safe_fallback_output() -> dict[str, Any]:
+    """Deprecated alias for :func:`degraded_fallback_output`.
+
+    Retained so existing callers keep working. Prefer
+    :func:`degraded_fallback_output` in new code; it accepts an
+    explicit ``health_state`` argument.
+    """
+    return degraded_fallback_output()
 
 
 # ---------------------------------------------------------------------------
@@ -268,8 +349,39 @@ class XLMRAdapter:
     min_margin: float = 0.10
     head_weights_path: Optional[str] = None
     prefer_int4: bool = False
+    # P0-4: optional SHA-256 hex digests of the ONNX model file and the
+    # SentencePiece tokenizer file. When supplied, the adapter computes
+    # the on-disk digests at load time and refuses to load any artefact
+    # whose digest does not match (``_load_failed`` is set and the
+    # adapter degrades to the rule-only mode). ``None`` skips the
+    # check and only records ``loaded_*_checksum`` for attestation.
+    expected_model_checksum: Optional[str] = None
+    expected_tokenizer_checksum: Optional[str] = None
     logger: Optional[logging.Logger] = None
     last_latency_ms: float = field(default=0.0, init=False)
+    # P0-1: the raw mean-pooled, L2-normalised XLM-R embedding from the
+    # most recent ``classify()`` call. The privacy contract forbids
+    # embeddings on the public output dict, so cross-pipeline consumers
+    # that legitimately need the vector (notably ``chat-storage-search``)
+    # read it from this attribute instead of through the schema
+    # boundary. ``None`` when the adapter has not yet run or the most
+    # recent call took the degraded fallback path.
+    last_embedding: Optional[list[float]] = field(
+        default=None, init=False, repr=False
+    )
+    # P0-2: health state recorded after every load attempt and every
+    # ``classify()`` call. ``healthy`` means the encoder produced the
+    # verdict; everything else is a degraded path and the pipeline
+    # keeps deterministic detectors active.
+    health_state: str = field(default=HEALTH_HEALTHY, init=False)
+    # P0-4: SHA-256 digests of the model / tokenizer files actually
+    # loaded into the session. Populated on a successful load even
+    # when the caller does not supply ``expected_*_checksum``, so
+    # attestation / passport-verification flows can read them back.
+    loaded_model_checksum: Optional[str] = field(default=None, init=False)
+    loaded_tokenizer_checksum: Optional[str] = field(
+        default=None, init=False
+    )
     _tokenizer: Any = field(default=None, init=False, repr=False)
     _session: Any = field(default=None, init=False, repr=False)
     _input_names: tuple[str, ...] = field(
@@ -289,26 +401,44 @@ class XLMRAdapter:
     def classify(self, input: dict[str, Any]) -> dict[str, Any]:
         """Run the encoder over ``input`` and return a validated output dict.
 
-        Returns :func:`safe_fallback_output` whenever the encoder
+        Returns :func:`degraded_fallback_output` whenever the encoder
         cannot be loaded, raises during inference, or produces output
-        that cannot be coerced into the output schema.
+        that cannot be coerced into the output schema. The returned
+        dict carries a ``model_health`` field (one of
+        ``healthy`` / ``model_unavailable`` / ``inference_error``) so
+        the pipeline can keep deterministic detectors active even
+        when the encoder fails.
         """
         log = self.logger or _module_logger
         start = time.perf_counter()
+        # Reset transient per-call state. ``last_embedding`` is cleared
+        # so a previous call's vector is never observable on the
+        # current call's fallback path.
+        self.last_embedding = None
 
         try:
             self._ensure_loaded()
         except Exception as exc:  # noqa: BLE001 — defensive boundary
             self.last_latency_ms = (time.perf_counter() - start) * 1000.0
+            self.health_state = HEALTH_MODEL_UNAVAILABLE
             log.warning(
-                "XLM-R model load failed (%s); falling back to SAFE",
+                "XLM-R model load failed (%s); falling back to degraded",
                 exc,
             )
-            return safe_fallback_output()
+            return degraded_fallback_output(
+                health_state=self.health_state
+            )
 
         if self._load_failed or self._session is None:
             self.last_latency_ms = (time.perf_counter() - start) * 1000.0
-            return safe_fallback_output()
+            # ``_ensure_loaded`` records the precise reason in
+            # ``self.health_state``; preserve it but ensure we never
+            # report ``healthy`` when the session is gone.
+            if self.health_state == HEALTH_HEALTHY:
+                self.health_state = HEALTH_MODEL_UNAVAILABLE
+            return degraded_fallback_output(
+                health_state=self.health_state
+            )
 
         message = input.get("message") or {}
         text = message.get("text") if isinstance(message, dict) else ""
@@ -322,11 +452,14 @@ class XLMRAdapter:
             embedding = self._encode(text)
         except Exception as exc:  # noqa: BLE001 — defensive boundary
             self.last_latency_ms = (time.perf_counter() - start) * 1000.0
+            self.health_state = HEALTH_INFERENCE_ERROR
             log.warning(
-                "XLM-R inference error (%s); falling back to SAFE",
+                "XLM-R inference error (%s); falling back to degraded",
                 exc,
             )
-            return safe_fallback_output()
+            return degraded_fallback_output(
+                health_state=self.health_state
+            )
 
         try:
             raw_output = self._classify_from_embedding_and_signals(
@@ -334,25 +467,29 @@ class XLMRAdapter:
             )
         except Exception as exc:  # noqa: BLE001 — defensive boundary
             self.last_latency_ms = (time.perf_counter() - start) * 1000.0
+            self.health_state = HEALTH_INFERENCE_ERROR
             log.warning(
-                "XLM-R classification error (%s); falling back to SAFE",
+                "XLM-R classification error (%s); falling back to degraded",
                 exc,
             )
-            return safe_fallback_output()
+            return degraded_fallback_output(
+                health_state=self.health_state
+            )
 
-        # Attach the raw mean-pooled, L2-normalised embedding as an
-        # internal extra (key prefixed with ``_`` to signal it is not
-        # part of the public output schema). Downstream consumers
-        # (e.g. ``chat-storage-search``) cache this 384-dim vector in
-        # the ``search_vector`` table so a message's XLM-R embedding
-        # is computed at most once across guardrail + search. The
-        # field is preserved by ``_coerce_to_output_schema``.
+        # P0-1: Stash the raw mean-pooled, L2-normalised embedding on
+        # the adapter instance for cross-pipeline consumers (e.g.
+        # ``chat-storage-search``). Privacy rule 5 forbids attaching
+        # the embedding to the output dict — readers fetch it from
+        # ``adapter.last_embedding`` directly so it never crosses the
+        # schema boundary.
         try:
-            raw_output["_embedding"] = [float(x) for x in _to_list(embedding)]
+            self.last_embedding = [float(x) for x in _to_list(embedding)]
         except Exception:  # noqa: BLE001 — never block on a malformed embedding
-            pass
+            self.last_embedding = None
 
         self.last_latency_ms = (time.perf_counter() - start) * 1000.0
+        self.health_state = HEALTH_HEALTHY
+        raw_output["model_health"] = _OUTPUT_MODEL_HEALTH[HEALTH_HEALTHY]
         return _coerce_to_output_schema(raw_output)
 
     # ------------------------------------------------------------------
@@ -367,17 +504,19 @@ class XLMRAdapter:
             import sentencepiece as spm  # type: ignore[import-not-found]
         except Exception as exc:  # noqa: BLE001 — soft dependency
             self._load_failed = True
+            self.health_state = HEALTH_DEPENDENCY_MISSING
             (self.logger or _module_logger).warning(
                 "onnxruntime/sentencepiece/numpy unavailable (%s); "
-                "XLM-R adapter will return SAFE for every call",
+                "XLM-R adapter will degrade to rule-only for every call",
                 exc,
             )
             return
 
         if not Path(self.tokenizer_path).is_file():
             self._load_failed = True
+            self.health_state = HEALTH_TOKENIZER_UNAVAILABLE
             (self.logger or _module_logger).warning(
-                "XLM-R tokenizer not found at %r; falling back to SAFE",
+                "XLM-R tokenizer not found at %r; degrading to rule-only",
                 self.tokenizer_path,
             )
             return
@@ -402,20 +541,73 @@ class XLMRAdapter:
 
         if not Path(resolved_model_path).is_file():
             self._load_failed = True
+            self.health_state = HEALTH_MODEL_UNAVAILABLE
             (self.logger or _module_logger).warning(
-                "XLM-R ONNX model not found at %r; falling back to SAFE",
+                "XLM-R ONNX model not found at %r; degrading to rule-only",
                 resolved_model_path,
             )
             return
+
+        # P0-4: compute on-disk SHA-256 digests for both artefacts so
+        # callers can attest 'what model is actually running on this
+        # device?' through ``loaded_model_checksum`` /
+        # ``loaded_tokenizer_checksum``. If the caller supplied an
+        # expected digest, refuse to load any artefact whose digest
+        # does not match — the adapter must not silently load a
+        # tampered model.
+        try:
+            model_digest = _sha256_file(resolved_model_path)
+            tokenizer_digest = _sha256_file(self.tokenizer_path)
+        except Exception as exc:  # noqa: BLE001 — defensive boundary
+            self._load_failed = True
+            self.health_state = HEALTH_MODEL_UNAVAILABLE
+            (self.logger or _module_logger).warning(
+                "Failed to hash XLM-R artefacts (%s); degrading to rule-only",
+                exc,
+            )
+            return
+        if (
+            self.expected_model_checksum is not None
+            and not _checksums_match(
+                self.expected_model_checksum, model_digest
+            )
+        ):
+            self._load_failed = True
+            self.health_state = HEALTH_MODEL_UNAVAILABLE
+            (self.logger or _module_logger).warning(
+                "XLM-R model checksum mismatch (expected %r, got %r); "
+                "refusing to load. Degrading to rule-only.",
+                self.expected_model_checksum,
+                model_digest,
+            )
+            return
+        if (
+            self.expected_tokenizer_checksum is not None
+            and not _checksums_match(
+                self.expected_tokenizer_checksum, tokenizer_digest
+            )
+        ):
+            self._load_failed = True
+            self.health_state = HEALTH_TOKENIZER_UNAVAILABLE
+            (self.logger or _module_logger).warning(
+                "XLM-R tokenizer checksum mismatch (expected %r, got %r); "
+                "refusing to load. Degrading to rule-only.",
+                self.expected_tokenizer_checksum,
+                tokenizer_digest,
+            )
+            return
+        self.loaded_model_checksum = model_digest
+        self.loaded_tokenizer_checksum = tokenizer_digest
 
         try:
             tokenizer = spm.SentencePieceProcessor()
             tokenizer.Load(self.tokenizer_path)
         except Exception as exc:  # noqa: BLE001 — defensive boundary
             self._load_failed = True
+            self.health_state = HEALTH_TOKENIZER_UNAVAILABLE
             (self.logger or _module_logger).warning(
                 "Failed to load SentencePiece tokenizer from %r (%s); "
-                "falling back to SAFE",
+                "degrading to rule-only",
                 self.tokenizer_path,
                 exc,
             )
@@ -433,9 +625,10 @@ class XLMRAdapter:
             )
         except Exception as exc:  # noqa: BLE001 — model load failed
             self._load_failed = True
+            self.health_state = HEALTH_MODEL_UNAVAILABLE
             (self.logger or _module_logger).warning(
-                "Failed to load XLM-R ONNX model from %r (%s); falling "
-                "back to SAFE",
+                "Failed to load XLM-R ONNX model from %r (%s); degrading "
+                "to rule-only",
                 self.model_path,
                 exc,
             )
@@ -455,15 +648,21 @@ class XLMRAdapter:
             )
         except Exception as exc:  # noqa: BLE001 — defensive boundary
             self._load_failed = True
+            self.health_state = HEALTH_INFERENCE_ERROR
             (self.logger or _module_logger).warning(
                 "Failed to encode XLM-R category prototypes (%s); "
-                "falling back to SAFE",
+                "degrading to rule-only",
                 exc,
             )
             self._tokenizer = None
             self._session = None
             self._prototype_embeddings = None
             return
+
+        # Successful end-to-end load — record health and continue with
+        # optional trained-head loading. The trained head is optional;
+        # its absence is not a degradation.
+        self.health_state = HEALTH_HEALTHY
 
         # Optional: load the trained linear head produced by
         # ``train_xlmr_head.py``. When present, the adapter uses it
@@ -867,6 +1066,31 @@ def _to_list(arr: Any) -> list[float]:
     return list(arr)
 
 
+def _sha256_file(path: str, *, chunk_size: int = 1 << 20) -> str:
+    """Return the SHA-256 hex digest of the file at ``path``.
+
+    Streams the file in 1 MiB chunks so the model artefact does not
+    have to fit in memory. Raises if the path does not exist or is
+    unreadable (callers treat the exception as a load failure and
+    degrade to rule-only).
+    """
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        while True:
+            chunk = f.read(chunk_size)
+            if not chunk:
+                break
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _checksums_match(expected: str, actual: str) -> bool:
+    """Case-insensitive, whitespace-insensitive hex-digest comparison."""
+    if not isinstance(expected, str) or not isinstance(actual, str):
+        return False
+    return expected.strip().lower() == actual.strip().lower()
+
+
 def _softmax(values: list[float]) -> list[float]:
     if not values:
         return []
@@ -963,17 +1187,18 @@ def _coerce_to_output_schema(parsed: dict[str, Any]) -> dict[str, Any]:
         if cleaned:
             out["counter_updates"] = cleaned
 
-    # Pass through internal underscore-prefixed extras (e.g. ``_embedding``
-    # — the raw mean-pooled XLM-R embedding consumed by downstream
-    # cross-pipeline caches such as ``chat-storage-search``). These
-    # keys are not part of ``kchat.guardrail.output.v1`` proper; the
-    # schema admits them via ``patternProperties: {"^_": {}}``.
-    embedding_in = parsed.get("_embedding")
-    if isinstance(embedding_in, list) and all(
-        isinstance(x, (int, float)) and not isinstance(x, bool)
-        for x in embedding_in
-    ):
-        out["_embedding"] = [float(x) for x in embedding_in]
+    # Pass through the safety-relevant ``model_health`` status signal
+    # so downstream consumers (pipeline + UI) can distinguish a
+    # confident SAFE verdict from a degraded fallback. Any value not
+    # in the schema enum is dropped silently rather than crashing.
+    health = parsed.get("model_health")
+    if isinstance(health, str) and health in {
+        "healthy",
+        "model_unavailable",
+        "rule_only",
+        "inference_error",
+    }:
+        out["model_health"] = health
 
     return out
 
@@ -989,7 +1214,15 @@ __all__ = [
     "DEFAULT_ONNX_INT4_MODEL_PATH",
     "DEFAULT_ONNX_MODEL_PATH",
     "DEFAULT_TOKENIZER_PATH",
+    "DEGRADED_RATIONALE_ID",
+    "HEALTH_DEPENDENCY_MISSING",
+    "HEALTH_HEALTHY",
+    "HEALTH_INFERENCE_ERROR",
+    "HEALTH_MODEL_UNAVAILABLE",
+    "HEALTH_TOKENIZER_UNAVAILABLE",
+    "VALID_HEALTH_STATES",
     "XLMR_MODEL_NAME",
     "XLMRAdapter",
+    "degraded_fallback_output",
     "safe_fallback_output",
 ]

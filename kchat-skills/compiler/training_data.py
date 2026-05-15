@@ -34,6 +34,17 @@ the head trained on it is **not** intended to ship as a state-of-the-
 art classifier. Its role is to outperform zero-shot prototype argmax
 on the existing benchmark cases (currently 27/27) without regressing
 the privacy contract.
+
+.. warning::
+
+    This is a **training corpus only**. Accuracy on
+    :data:`TRAINING_EXAMPLES` is not a meaningful safety metric —
+    the head was fit on these exact strings and will memorise them.
+    See ``kchat-skills/eval/`` for the held-out evaluation set that
+    the pack lifecycle gate (Phase 4 compiler) treats as the source
+    of truth. Held-out cases have no overlap with this corpus and
+    cover benign-false-positive, adversarial, and multilingual
+    cases that the training corpus does not.
 """
 from __future__ import annotations
 

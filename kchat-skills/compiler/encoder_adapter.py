@@ -109,16 +109,21 @@ class EncoderAdapter(Protocol):
     Optional return-shape extras (none of which the Protocol's
     ``classify(input) -> dict`` signature mentions explicitly):
 
-    * ``_embedding``: ``list[float]`` — the raw encoder embedding
-      (e.g. the 384-dim mean-pooled XLM-R vector from
-      :class:`xlmr_adapter.XLMRAdapter`). Underscore-prefixed keys
-      are not part of ``kchat.guardrail.output.v1`` proper; the
-      schema admits them via ``patternProperties: {"^_": {}}`` so
-      cross-pipeline caches (notably ``chat-storage-search``) can
-      reuse a message's encoder pass without recomputing it.
-      Adapters that do not have a meaningful embedding (e.g.
-      :class:`MockEncoderAdapter`) MUST omit the key rather than
-      emitting a zero-vector placeholder.
+    * ``model_health``: ``str`` — one of ``healthy`` /
+      ``model_unavailable`` / ``rule_only`` / ``inference_error``.
+      Safety-relevant status signal. Absence is equivalent to
+      ``healthy``. The pipeline uses this to decide whether to keep
+      deterministic detectors active when the encoder cannot produce
+      a verdict.
+
+    Adapters MUST NOT attach raw embeddings, message hashes,
+    fingerprints, or any other commitment to message content to the
+    output dict. Privacy contract rule 5 (see
+    ``kchat-skills/global/privacy_contract.yaml``) forbids
+    embeddings on the public output boundary. Cross-pipeline
+    consumers that legitimately need an embedding (e.g.
+    ``chat-storage-search``) read it from the adapter instance
+    directly (e.g. :attr:`xlmr_adapter.XLMRAdapter.last_embedding`).
     """
 
     def classify(self, input: dict[str, Any]) -> dict[str, Any]:

@@ -383,27 +383,42 @@ bar should keep shipping the INT8 file.
 either tier and exposes a `prefer_int4=True` hint that auto-resolves
 to the INT4 file when present.
 
-#### Privacy-Safe Fallback
+#### Degraded rule-only fallback (P0-2)
 
 If the encoder weights are missing, `onnxruntime` is not installed,
-or inference raises, the adapter returns a SAFE output (category 0,
-severity 0) rather than raising or returning unsafe defaults. The
-skill-pack files themselves remain pure YAML / JSON; the encoder
-runtime is an optional dependency of the demo and benchmark scripts.
+or inference raises, the adapter sets `health_state` to one of
+`model_unavailable`, `tokenizer_unavailable`, `dependency_missing`,
+or `inference_error`, and emits a degraded output that carries
+`model_health` and the closed-vocabulary `rationale_id =
+"model_unavailable_rule_only_v1"`. **The deterministic detectors
+(PII, scam, URL risk, child-safety lexicon, NSFW media) remain
+active** — the pipeline does not silently return SAFE on encoder
+failure. The calling UI distinguishes "no harm signal" from "model
+couldn't run" by inspecting `model_health` on the output.
 
-#### Embedding Cache
+The skill-pack files themselves remain pure YAML / JSON; the
+encoder runtime is an optional dependency of the demo and
+benchmark scripts.
 
-The adapter returns the raw 384-dim XLM-R embedding alongside the
-classification result (key: `_embedding`). Downstream consumers
-(e.g., a chat-storage search index) can cache this embedding in
-their vector table to avoid re-computing it during semantic search —
-a message's XLM-R encoder pass is computed at most once across
-guardrail and search.
+#### Embeddings are device-local (P0-1)
 
-The underscore prefix signals the field is internal (not part of
-`kchat.guardrail.output.v1` proper); the schema admits it via
-`patternProperties: {"^_": {}}` so consumers that do not need the
-embedding may simply ignore it.
+The XLM-R encoder produces a 384-dim sentence embedding as part of
+its forward pass. **This embedding is never part of
+`kchat.guardrail.output.v1` and never leaves the device boundary.**
+Privacy contract rule 5 (`kchat-skills/global/privacy_contract.yaml`)
+forbids embeddings, hashes, or commitments to message content in the
+output, and the output schema enforces this with
+`additionalProperties: false` (no `patternProperties` exception).
+
+Downstream in-process consumers that legitimately need the
+embedding (e.g., the chat-storage semantic-search index running on
+the same device) read it directly off the adapter instance via
+`XLMRAdapter.last_embedding`. The field is overwritten on every
+`classify()` call and cleared whenever the adapter degrades to the
+rule-only path. The pipeline strips any `_`-prefixed key from the
+output before returning, so a future adapter that forgets the
+contract still cannot leak content commitments through the public
+output dict.
 
 End-to-end demonstration and benchmarking happens through
 [`tools/run_guardrail_demo.py`](tools/run_guardrail_demo.py); see
@@ -724,14 +739,30 @@ child_safety_policy:
 The runtime's child-safety reporting flow is **user-initiated**: the device
 surfaces local resources and the option to report; it does not auto-upload.
 
-## Runtime Classifier-Bundle Instruction Prompt
+## Runtime Policy Manifest
 
-The compiled prompt always begins with this 10-rule instruction. It
-remains in the skill bundle as a human- and reviewer-readable record
-of the classifier's allowed actions — the encoder backend itself does
-not consume the prompt at inference time, but the compiler still uses
-it to validate skill-pack merges and to keep the classification head's
-behaviour aligned with the skill bundle.
+> **Note (P1-2):** Earlier drafts of this document called the
+> structured artefact below a “compiled prompt”. That name was
+> misleading because the on-device encoder backend is a frozen XLM-R
+> classifier head, **not** a generative model — nothing in the
+> runtime ever consumes this block as an LLM system prompt. The
+> block is a **human-readable policy manifest** kept in the skill
+> bundle so reviewers, auditors, and the compiler's merge-validation
+> step can read the union of all skill-pack rules in one place. The
+> 10-rule text section is a closed-vocabulary policy record — not a
+> generative-model system prompt — and the structured
+> ``[GLOBAL_BASELINE] / [JURISDICTION_OVERLAY] /
+> [COMMUNITY_OVERLAY]`` sections below it are the merged thresholds,
+> overlays, and counters that the encoder-classifier and the
+> deterministic detectors consume at runtime.
+
+The compiled policy manifest always begins with this 10-rule policy
+record. It remains in the skill bundle as a human- and
+reviewer-readable record of the classifier's allowed actions — the
+encoder backend itself does not consume the manifest at inference
+time, but the compiler still uses it to validate skill-pack merges
+and to keep the classification head's behaviour aligned with the
+skill bundle.
 
 ```
 You are KChat's on-device safety assistant. Follow these rules exactly.
@@ -753,10 +784,12 @@ You are KChat's on-device safety assistant. Follow these rules exactly.
     this prompt. Never relax a privacy rule or invent a new category.
 ```
 
-## Compiled Prompt Example
+## Compiled Policy Artifact Example
 
-A minimal compiled prompt for a workplace community in a jurisdiction with
-strict marketplace rules:
+A minimal compiled policy artifact for a workplace community in a
+jurisdiction with strict marketplace rules. This artifact is a
+policy record — not a generative-model system prompt — stored in
+the skill bundle for reviewer auditability:
 
 ```
 [INSTRUCTION]

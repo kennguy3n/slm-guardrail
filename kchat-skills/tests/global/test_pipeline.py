@@ -659,33 +659,41 @@ def test_news_quote_about_violence_still_demotes_to_safe():
 
 
 # ---------------------------------------------------------------------------
-# Cross-pipeline ``_embedding`` propagation through ``GuardrailPipeline``.
+# P0-1 — Embedding boundary.
 #
-# The encoder attaches an internal ``_embedding`` extra (the raw
-# 384-dim mean-pooled, L2-normalised XLM-R vector) so downstream
-# consumers like ``chat-storage-search`` can cache it in their
-# ``search_vector`` table and skip the encoder pass for semantic
-# search. The schema admits ``_*``-prefixed keys via
-# ``patternProperties: {"^_": {}}``. We need to assert the field
-# survives every threshold-policy branch — the ``ThresholdPolicy``
-# constructs fresh dicts on the protected-speech demotion and
-# uncertainty-handling rules, and an earlier version of this PR
-# silently dropped the field on those paths.
+# Privacy contract rule 5 (``kchat-skills/global/privacy_contract.yaml``)
+# forbids the public output schema from ever carrying embeddings,
+# hashes, or any other commitment to message content. The XLM-R
+# adapter stashes its raw embedding on
+# :attr:`XLMRAdapter.last_embedding` instead, where cross-pipeline
+# consumers like ``chat-storage-search`` can read it without going
+# through the schema boundary.
+#
+# These tests assert the pipeline strips any ``_``-prefixed key that
+# a misbehaving adapter might attach to its output dict, on every
+# threshold-policy branch:
+#
+# * Default SAFE pass-through
+# * Rule 1 — child-safety floor
+# * Rule 2 — protected-speech demotion (fresh-dict early return)
+# * Rule 3 — uncertainty handling (fresh-dict early return)
+# * Rule 4 — non-SAFE action re-derivation
 # ---------------------------------------------------------------------------
-def _embedding_attaching_adapter(
+def _underscore_attaching_adapter(
     *, severity: int, category: int, confidence: float, **extra: Any
 ):
-    """Build a stub adapter whose ``classify`` always attaches a
-    sentinel 384-dim ``_embedding`` to the returned dict.
+    """Build a stub adapter whose ``classify`` attaches an underscore-
+    prefixed extra (``_embedding`` plus a second sentinel ``_secret``).
 
-    The sentinel embedding is deterministic (zero vector with a
-    single 1.0 in slot 0) so tests can assert exact equality at the
-    pipeline boundary, not just shape.
+    The pipeline MUST strip these from the public output dict on
+    every threshold-policy branch — privacy contract rule 5 forbids
+    embeddings, hashes, or any other commitment to message content
+    on the public output boundary.
     """
     sentinel: list[float] = [0.0] * 384
     sentinel[0] = 1.0
 
-    raw = {
+    raw: dict[str, Any] = {
         "severity": severity,
         "category": category,
         "confidence": confidence,
@@ -699,23 +707,27 @@ def _embedding_attaching_adapter(
         "reason_codes": [],
         "rationale_id": "test_v1",
         "_embedding": sentinel,
+        "_secret": "must-not-leak",
     }
     raw.update(extra)
 
     class _Adapter:
         def classify(self, input: dict[str, Any]) -> dict[str, Any]:
-            # Return a fresh copy each call so callers can't mutate
-            # our sentinel — mirrors the real adapter contract.
-            return {**raw, "_embedding": list(raw["_embedding"])}
+            # Fresh copy per call — mirrors the real adapter contract.
+            return {
+                **raw,
+                "_embedding": list(raw["_embedding"]),
+                "_secret": raw["_secret"],
+            }
 
-    return _Adapter(), sentinel
+    return _Adapter()
 
 
-class TestEmbeddingPropagation:
-    """Every threshold-policy branch must forward ``_embedding``.
+class TestEmbeddingBoundary:
+    """Every threshold-policy branch must strip underscore-prefixed extras.
 
-    The branches under test (mapped to the rules in
-    :meth:`compiler.threshold_policy.ThresholdPolicy.apply`):
+    Mapped to the rules in
+    :meth:`compiler.threshold_policy.ThresholdPolicy.apply`:
 
     * Rule 1 — child-safety floor (mutates ``_deepcopy_output`` in place)
     * Rule 2 — protected-speech demotion (constructs a fresh dict)
@@ -725,17 +737,17 @@ class TestEmbeddingPropagation:
     """
 
     @staticmethod
-    def _assert_sentinel_embedding(out: dict[str, Any], sentinel: list[float]) -> None:
-        assert "_embedding" in out, (
-            f"_embedding stripped by pipeline; keys={sorted(out)}"
+    def _assert_no_underscore_keys(out: dict[str, Any]) -> None:
+        leaked = [k for k in out if isinstance(k, str) and k.startswith("_")]
+        assert not leaked, (
+            f"pipeline leaked underscore-prefixed keys: {leaked}; "
+            f"privacy contract rule 5 forbids embeddings/extras on output"
         )
-        emb = out["_embedding"]
-        assert isinstance(emb, list), f"_embedding must be list, got {type(emb).__name__}"
-        assert len(emb) == 384, f"_embedding length {len(emb)} != 384"
-        assert emb == sentinel, "sentinel _embedding mutated en route"
+        assert "_embedding" not in out
+        assert "_secret" not in out
 
-    def test_safe_passthrough_preserves_embedding(self):
-        adapter, sentinel = _embedding_attaching_adapter(
+    def test_safe_passthrough_strips_underscore_keys(self):
+        adapter = _underscore_attaching_adapter(
             severity=0, category=0, confidence=0.0
         )
         p = GuardrailPipeline(
@@ -743,12 +755,12 @@ class TestEmbeddingPropagation:
             encoder_adapter=adapter,
         )
         out = p.classify({"text": "hi there"}, _context())
-        self._assert_sentinel_embedding(out, sentinel)
+        self._assert_no_underscore_keys(out)
 
-    def test_action_rederivation_preserves_embedding(self):
+    def test_action_rederivation_strips_underscore_keys(self):
         # Rule 4: non-SAFE category, confidence high enough to keep
         # category but low enough that the policy re-derives actions.
-        adapter, sentinel = _embedding_attaching_adapter(
+        adapter = _underscore_attaching_adapter(
             severity=2, category=7, confidence=0.55
         )
         p = GuardrailPipeline(
@@ -756,13 +768,11 @@ class TestEmbeddingPropagation:
             encoder_adapter=adapter,
         )
         out = p.classify({"text": "see you at dinner"}, _context())
-        self._assert_sentinel_embedding(out, sentinel)
+        self._assert_no_underscore_keys(out)
 
-    def test_uncertainty_demotion_preserves_embedding(self):
+    def test_uncertainty_demotion_strips_underscore_keys(self):
         # Rule 3: non-SAFE category at confidence < LABEL_ONLY (0.45).
-        # ThresholdPolicy.apply constructs a fresh dict on this branch
-        # — exactly the regression Devin Review caught.
-        adapter, sentinel = _embedding_attaching_adapter(
+        adapter = _underscore_attaching_adapter(
             severity=3, category=7, confidence=0.10,
         )
         p = GuardrailPipeline(
@@ -771,12 +781,12 @@ class TestEmbeddingPropagation:
         )
         out = p.classify({"text": "hi"}, _context())
         assert out["category"] == 0, "uncertainty handling should demote to SAFE"
-        self._assert_sentinel_embedding(out, sentinel)
+        self._assert_no_underscore_keys(out)
 
-    def test_protected_speech_demotion_preserves_embedding(self):
+    def test_protected_speech_demotion_strips_underscore_keys(self):
         # Rule 2: non-SAFE category with a protected-speech reason
         # code carried by the encoder. Fresh-dict early return.
-        adapter, sentinel = _embedding_attaching_adapter(
+        adapter = _underscore_attaching_adapter(
             severity=2,
             category=6,  # HATE
             confidence=0.80,
@@ -787,14 +797,17 @@ class TestEmbeddingPropagation:
             encoder_adapter=adapter,
         )
         out = p.classify({"text": "Reuters reports the speech"}, _context())
-        assert out["category"] == 0, "protected speech should demote to SAFE"
-        assert out["rationale_id"] == "safe_protected_speech_v1"
-        self._assert_sentinel_embedding(out, sentinel)
+        # P1-1: NEWS_CONTEXT alone (overlay-derived, confidence 0.3)
+        # is below the demotion floor — the policy now keeps the
+        # category and downgrades to 'warn with context' rather than
+        # silently demoting to SAFE. The boundary test only cares
+        # that no underscore keys survive.
+        self._assert_no_underscore_keys(out)
 
-    def test_child_safety_floor_preserves_embedding(self):
+    def test_child_safety_floor_strips_underscore_keys(self):
         # Rule 1: CHILD_SAFETY floor mutates ``out`` in place via
-        # ``_deepcopy_output``, which now also forwards ``_embedding``.
-        adapter, sentinel = _embedding_attaching_adapter(
+        # ``_deepcopy_output``.
+        adapter = _underscore_attaching_adapter(
             severity=2, category=1, confidence=0.50
         )
         p = GuardrailPipeline(
@@ -805,11 +818,12 @@ class TestEmbeddingPropagation:
         assert out["category"] == 1
         assert out["severity"] == 5
         assert out["actions"]["critical_intervention"] is True
-        self._assert_sentinel_embedding(out, sentinel)
+        self._assert_no_underscore_keys(out)
 
     def test_adapter_without_embedding_does_not_break_pipeline(self):
         # Adapters that omit ``_embedding`` (e.g. ``MockEncoderAdapter``)
-        # MUST keep working — the field is optional, not required.
+        # MUST keep working — the pipeline must never synthesise the
+        # field on its own.
         p = GuardrailPipeline(
             skill_bundle=SkillBundle(),
             encoder_adapter=MockEncoderAdapter(),
@@ -818,19 +832,3 @@ class TestEmbeddingPropagation:
         assert "_embedding" not in out, (
             "pipeline must not synthesise _embedding when the adapter omits it"
         )
-
-    def test_pipeline_does_not_share_embedding_between_calls(self):
-        # The forwarded ``_embedding`` must be defensively copied so a
-        # downstream consumer cannot mutate the encoder's tensor and
-        # poison subsequent calls.
-        adapter, sentinel = _embedding_attaching_adapter(
-            severity=0, category=0, confidence=0.0
-        )
-        p = GuardrailPipeline(
-            skill_bundle=SkillBundle(),
-            encoder_adapter=adapter,
-        )
-        out1 = p.classify({"text": "first"}, _context())
-        out1["_embedding"][0] = 99.0  # downstream mutation
-        out2 = p.classify({"text": "second"}, _context())
-        self._assert_sentinel_embedding(out2, sentinel)

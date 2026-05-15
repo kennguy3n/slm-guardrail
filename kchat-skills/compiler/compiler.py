@@ -35,7 +35,9 @@ from typing import Any, Iterable, Optional
 import yaml
 
 
-# Token budgets — mirror compiled_prompt_format.md.
+# Token budgets — mirror prompts/compiled_prompt_format.md (the
+# policy-manifest format spec; see P1-2 in ARCHITECTURE.md — the
+# artefact is a policy manifest, not a generative-model prompt).
 MAX_INSTRUCTION_TOKENS = 1800
 MAX_OUTPUT_TOKENS = 600
 
@@ -99,7 +101,8 @@ class ActiveSkillBundle:
     """Resolved bundle = global baseline + jurisdiction + community.
 
     Construct via :func:`resolve_active_bundle`. The compiler converts
-    one of these into a compiled prompt string via :func:`compile_prompt`.
+    one of these into a compiled policy artifact via
+    :func:`compile_policy_manifest` (alias: :func:`compile_prompt`).
     """
 
     baseline: dict[str, Any]
@@ -412,7 +415,7 @@ def _section_community(
     return "\n".join(lines) + "\n"
 
 
-def compile_prompt(
+def compile_policy_manifest(
     bundle: ActiveSkillBundle,
     *,
     prompts_dir: Path,
@@ -421,13 +424,23 @@ def compile_prompt(
     output_placeholder: str = "<JSON conforming to kchat.guardrail.output.v1>",
     max_instruction_tokens: int = MAX_INSTRUCTION_TOKENS,
 ) -> CompiledPrompt:
-    """Compile ``bundle`` into a single compact prompt string.
+    """Compile ``bundle`` into a single compact policy-manifest string.
 
-    Format mirrors :file:`prompts/compiled_prompt_format.md` with six
-    sections: ``[INSTRUCTION]``, ``[GLOBAL_BASELINE]``,
-    ``[JURISDICTION_OVERLAY]``, ``[COMMUNITY_OVERLAY]``, ``[INPUT]``,
-    ``[OUTPUT]``. The first four form the "instruction" budget that
-    must fit under ``max_instruction_tokens``.
+    Format mirrors :file:`prompts/compiled_prompt_format.md` (named
+    that way for backwards compatibility; the artefact is a
+    **policy manifest**, not a generative-model prompt — see P1-2
+    in ARCHITECTURE.md) with six sections: ``[INSTRUCTION]``,
+    ``[GLOBAL_BASELINE]``, ``[JURISDICTION_OVERLAY]``,
+    ``[COMMUNITY_OVERLAY]``, ``[INPUT]``, ``[OUTPUT]``. The first
+    four form the "instruction" budget that must fit under
+    ``max_instruction_tokens``.
+
+    The returned :class:`CompiledPrompt` is the canonical compiled
+    policy artifact — the on-device encoder backend (XLM-R
+    classifier head) does NOT consume it as a generative prompt;
+    it is kept in the skill bundle so reviewers and the compiler's
+    merge-validation step can read the union of all skill-pack
+    rules in one place.
     """
     instruction = _load_runtime_instruction(prompts_dir)
     taxonomy_names = _load_taxonomy_names(global_dir)
@@ -585,11 +598,20 @@ class SkillPackCompiler:
             community=c_pack,
             runtime_context=runtime_context,
         )
-        return compile_prompt(
+        return compile_policy_manifest(
             bundle,
             prompts_dir=self.prompts_dir,
             global_dir=self.global_dir,
         )
+
+
+# P1-2 backwards-compatible alias. ``compile_prompt`` was the
+# original public name when the artefact was misleadingly called a
+# "compiled prompt"; callers should migrate to
+# ``compile_policy_manifest``. The alias is kept so existing skill
+# pack pipelines (and ``kchat-skills/tests/global/test_*``) keep
+# working without churn.
+compile_prompt = compile_policy_manifest
 
 
 __all__ = [
@@ -603,7 +625,8 @@ __all__ = [
     "PrivacyRuleViolation",
     "SkillPackCompiler",
     "assert_privacy_rules_intact",
-    "compile_prompt",
+    "compile_policy_manifest",
+    "compile_prompt",  # P1-2 alias of compile_policy_manifest
     "estimate_tokens",
     "load_pack",
     "parse_compiled_sections",

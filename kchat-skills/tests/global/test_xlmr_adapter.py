@@ -561,69 +561,91 @@ def test_trained_head_then_deterministic_signal_takes_precedence(
 
 
 # ---------------------------------------------------------------------------
-# Cross-pipeline `_embedding` pass-through.
+# P0-1: embedding is stashed on the adapter instance, never on the output.
 # ---------------------------------------------------------------------------
-def test_embedding_present_in_classify_output(monkeypatch, output_schema):
-    """``XLMRAdapter.classify()`` exposes the raw mean-pooled
-    embedding under the ``_embedding`` key so cross-pipeline caches
-    (e.g. ``chat-storage-search``) can reuse it without recomputing."""
-    np = pytest.importorskip("numpy")
+def test_classify_output_has_no_underscore_keys(monkeypatch, output_schema):
+    """``XLMRAdapter.classify()`` MUST NOT attach any ``_``-prefixed
+    extras to the returned dict. Privacy rule 5 forbids embeddings,
+    hashes, or any other commitment to message content on the public
+    output boundary."""
+    pytest.importorskip("numpy")
     adapter = _stub_loaded_adapter(monkeypatch, hidden=384)
     out = adapter.classify(_input("hello"))
     jsonschema.validate(instance=out, schema=output_schema)
 
-    assert "_embedding" in out, (
-        "XLMRAdapter must expose the raw embedding under '_embedding'"
+    leaked = [k for k in out if isinstance(k, str) and k.startswith("_")]
+    assert not leaked, (
+        f"XLMRAdapter leaked underscore-prefixed keys on output: {leaked}"
     )
-    embedding = out["_embedding"]
-    assert isinstance(embedding, list)
-    assert all(isinstance(x, float) for x in embedding), (
-        "_embedding values must be plain Python floats (no numpy types) so "
-        "the dict is JSON-serialisable across the FFI boundary"
-    )
-    # 384-dim — matches the XLM-R MiniLM-L6 hidden size.
-    assert len(embedding) == 384
+    assert "_embedding" not in out
 
 
-def test_embedding_present_for_signal_branches(monkeypatch, output_schema):
+def test_classify_stashes_embedding_on_adapter(monkeypatch):
+    """The raw mean-pooled embedding is exposed on the *adapter*
+    instance as ``last_embedding`` for cross-pipeline consumers
+    (e.g. ``chat-storage-search``). It never crosses the schema
+    boundary."""
+    pytest.importorskip("numpy")
+    adapter = _stub_loaded_adapter(monkeypatch, hidden=384)
+    out = adapter.classify(_input("hello"))
+    assert "_embedding" not in out
+    assert adapter.last_embedding is not None
+    assert isinstance(adapter.last_embedding, list)
+    assert len(adapter.last_embedding) == 384
+    assert all(isinstance(x, float) for x in adapter.last_embedding), (
+        "last_embedding values must be plain Python floats so the "
+        "vector is JSON-serialisable across the FFI boundary"
+    )
+
+
+def test_signal_branch_still_stashes_embedding(monkeypatch, output_schema):
     """Even when a deterministic-signal branch (PII / SCAM / etc.)
     overrides the embedding-head argmax, the raw embedding is still
-    attached so the cache stays consistent across all output paths."""
+    stashed on the adapter so the search cache stays consistent."""
     pytest.importorskip("numpy")
     adapter = _stub_loaded_adapter(monkeypatch, hidden=384)
     out = adapter.classify(_input("hello", pii_patterns_hit=["EMAIL"]))
     jsonschema.validate(instance=out, schema=output_schema)
     assert out["category"] == 9  # PRIVATE_DATA wins over the embedding head
-    assert "_embedding" in out
-    assert len(out["_embedding"]) == 384
+    assert "_embedding" not in out
+    assert adapter.last_embedding is not None
+    assert len(adapter.last_embedding) == 384
 
 
 def test_embedding_is_deterministic(monkeypatch):
     """Identical input → identical embedding (matches the EncoderAdapter
     Protocol's determinism contract)."""
     pytest.importorskip("numpy")
-    adapter = _stub_loaded_adapter(monkeypatch, hidden=384)
-    a = adapter.classify(_input("scam alert"))
-    b = adapter.classify(_input("scam alert"))
-    assert a["_embedding"] == b["_embedding"]
+    adapter_a = _stub_loaded_adapter(monkeypatch, hidden=384)
+    adapter_a.classify(_input("scam alert"))
+    first = list(adapter_a.last_embedding or [])
+
+    adapter_b = _stub_loaded_adapter(monkeypatch, hidden=384)
+    adapter_b.classify(_input("scam alert"))
+    second = list(adapter_b.last_embedding or [])
+    assert first == second
 
 
-def test_safe_fallback_omits_embedding():
-    """When the encoder cannot run, the SAFE fallback dict has no
-    ``_embedding`` key — adapters MUST NOT emit a placeholder vector
-    just to keep the schema 'consistent'."""
+def test_degraded_fallback_clears_last_embedding():
+    """When the encoder cannot run, the degraded fallback dict has no
+    embedding extras and the adapter's ``last_embedding`` is cleared
+    so a previous call's vector is never observable."""
     adapter = XLMRAdapter(
         model_path="/does/not/exist.onnx",
         tokenizer_path="/does/not/exist.spm",
     )
     out = adapter.classify(_input())
     assert "_embedding" not in out
+    assert adapter.last_embedding is None
+    # And the degraded mode is surfaced to the UI.
+    assert out["model_health"] == "model_unavailable"
+    assert out["rationale_id"] == "model_unavailable_rule_only_v1"
 
 
-def test_coerce_preserves_embedding(output_schema):
-    """``_coerce_to_output_schema`` must pass ``_embedding`` through
-    instead of stripping it. The schema permits ``_*`` extras via
-    ``patternProperties``."""
+def test_coerce_strips_embedding(output_schema):
+    """``_coerce_to_output_schema`` MUST drop any ``_embedding`` a
+    misbehaving caller hands it. Privacy rule 5 forbids embeddings
+    on the public output boundary."""
     raw = {
         "severity": 0,
         "category": 0,
@@ -641,8 +663,7 @@ def test_coerce_preserves_embedding(output_schema):
     }
     out = _coerce_to_output_schema(raw)
     jsonschema.validate(instance=out, schema=output_schema)
-    assert "_embedding" in out
-    assert len(out["_embedding"]) == 384
+    assert "_embedding" not in out
 
 
 def test_coerce_drops_malformed_embedding(output_schema):
@@ -668,11 +689,12 @@ def test_coerce_drops_malformed_embedding(output_schema):
     assert "_embedding" not in out
 
 
-def test_output_schema_admits_underscore_extras(output_schema):
-    """The output schema's ``patternProperties: {"^_": {}}`` rule
-    must permit any underscore-prefixed key alongside the public
-    fields without violating ``additionalProperties: false``."""
-    valid = {
+def test_output_schema_rejects_underscore_extras(output_schema):
+    """P0-1: the output schema's ``additionalProperties: false`` rule
+    must REJECT any ``_``-prefixed extra. Privacy rule 5 forbids
+    embeddings / hashes / commitments to message content on the
+    public output boundary."""
+    invalid = {
         "severity": 0,
         "category": 0,
         "confidence": 0.1,
@@ -686,9 +708,9 @@ def test_output_schema_admits_underscore_extras(output_schema):
         "reason_codes": [],
         "rationale_id": "xlmr_safe_proto_v1",
         "_embedding": [0.1, 0.2, 0.3],
-        "_internal_telemetry_id": "abc123",
     }
-    jsonschema.validate(instance=valid, schema=output_schema)
+    with pytest.raises(jsonschema.exceptions.ValidationError):
+        jsonschema.validate(instance=invalid, schema=output_schema)
 
 
 # ---------------------------------------------------------------------------

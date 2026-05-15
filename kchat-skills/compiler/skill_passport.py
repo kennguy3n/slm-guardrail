@@ -51,18 +51,37 @@ MAX_EXPIRY_DAYS = 18 * 30  # ~18 months — matches ARCHITECTURE.md.
 # ---------------------------------------------------------------------------
 @dataclass(frozen=True)
 class ModelCompatibility:
+    """Pack-level pin on the on-device model and tokenizer.
+
+    P0-4: when ``model_checksum`` / ``tokenizer_checksum`` are
+    populated the compiler also records the SHA-256 hex digest of
+    the ONNX file and tokenizer file the pack was tested against.
+    :meth:`SkillPassport.verify` cross-checks those digests against
+    the runtime ``ModelCompatibility`` supplied by the host so a
+    tampered or swapped binary is rejected before the pack is
+    activated. Empty checksums on either side disable the check (for
+    backwards compatibility with passports issued before P0-4).
+    """
+
     model_id: str
     model_min_version: str
     max_instruction_tokens: int = 1800
     max_output_tokens: int = 600
+    model_checksum: Optional[str] = None
+    tokenizer_checksum: Optional[str] = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        out: dict[str, Any] = {
             "model_id": self.model_id,
             "model_min_version": self.model_min_version,
             "max_instruction_tokens": int(self.max_instruction_tokens),
             "max_output_tokens": int(self.max_output_tokens),
         }
+        if self.model_checksum:
+            out["model_checksum"] = self.model_checksum
+        if self.tokenizer_checksum:
+            out["tokenizer_checksum"] = self.tokenizer_checksum
+        return out
 
 
 @dataclass(frozen=True)
@@ -184,6 +203,7 @@ class SkillPassport:
         public_key: Ed25519PublicKey,
         now: Optional[date] = None,
         model: Optional[ModelCompatibility] = None,
+        revocation_list: Optional["RevocationList"] = None,
     ) -> None:
         """Validate the passport.
 
@@ -194,8 +214,25 @@ class SkillPassport:
         * passport already expired (``expires_on < now``);
         * passport overshooting the 18-month expiry budget
           (``expires_on > now + 18 months``);
-        * model-id mismatch when ``model`` is supplied.
+        * model-id mismatch when ``model`` is supplied;
+        * model / tokenizer SHA-256 checksum mismatch when both
+          passport and runtime ``ModelCompatibility`` supply them
+          (P0-4);
+        * skill_id + skill_version listed in ``revocation_list``
+          (P1-3).
         """
+        if revocation_list is not None and revocation_list.is_revoked(
+            self.skill_id, self.skill_version
+        ):
+            entry = revocation_list.lookup(self.skill_id, self.skill_version)
+            reason = (
+                f" ({entry.reason})" if entry and entry.reason else ""
+            )
+            raise PassportValidationError(
+                f"passport revoked: {self.skill_id}@{self.skill_version}"
+                f"{reason}"
+            )
+
         if self.signature is None:
             raise PassportValidationError("passport is unsigned")
         if self.signature.algorithm != SIGNATURE_ALGORITHM:
@@ -223,20 +260,238 @@ class SkillPassport:
             )
 
         if model is not None:
-            ok = any(
-                mc.model_id == model.model_id
-                and _version_at_least(model.model_min_version, mc.model_min_version)
-                for mc in self.model_compatibility
-            )
-            if not ok:
+            compatible: list[ModelCompatibility] = [
+                mc for mc in self.model_compatibility
+                if mc.model_id == model.model_id
+                and _version_at_least(
+                    model.model_min_version, mc.model_min_version
+                )
+            ]
+            if not compatible:
                 raise PassportValidationError(
                     f"passport not compatible with model "
                     f"{model.model_id}@{model.model_min_version}"
                 )
+            # P0-4: checksums are advisory — a mismatch on any of
+            # them is a hard verify failure, but pre-P0-4 passports
+            # without checksums still verify against runtimes that
+            # do have checksums and vice versa.
+            self._verify_artefact_checksums(model, compatible)
+
+
+    @staticmethod
+    def _verify_artefact_checksums(
+        runtime: ModelCompatibility,
+        compatible: list[ModelCompatibility],
+    ) -> None:
+        """P0-4: cross-check model/tokenizer checksums.
+
+        Either side may omit a checksum (older passports, runtimes
+        that have not computed them). When BOTH sides supply a
+        checksum for the same artefact, they MUST agree — a
+        mismatch is a hard verify failure so a tampered or swapped
+        binary cannot pass verification.
+        """
+        for mc in compatible:
+            pairs = (
+                ("model_checksum", mc.model_checksum, runtime.model_checksum),
+                (
+                    "tokenizer_checksum",
+                    mc.tokenizer_checksum,
+                    runtime.tokenizer_checksum,
+                ),
+            )
+            for field_name, passport_checksum, runtime_checksum in pairs:
+                if not passport_checksum or not runtime_checksum:
+                    continue
+                if (
+                    passport_checksum.strip().lower()
+                    != runtime_checksum.strip().lower()
+                ):
+                    raise PassportValidationError(
+                        f"{field_name} mismatch for model "
+                        f"{runtime.model_id}@{runtime.model_min_version} "
+                        f"(passport={passport_checksum}, "
+                        f"runtime={runtime_checksum})"
+                    )
 
 
 class PassportValidationError(ValueError):
     """Raised when a skill passport fails verification."""
+
+
+# ---------------------------------------------------------------------------
+# P1-3 — Revocation.
+# ---------------------------------------------------------------------------
+@dataclass(frozen=True)
+class RevocationEntry:
+    """A single revoked (skill_id, skill_version) tuple.
+
+    ``revoked_on`` is an ISO-8601 date; ``reason`` is free-text
+    operator-facing context (e.g. ``"compromised-key"``,
+    ``"safety-regression"``); ``revoked_by`` is the identity of the
+    operator who added the entry (mirrors ``authored_by`` on the
+    passport itself).
+    """
+
+    skill_id: str
+    skill_version: str
+    revoked_on: date
+    reason: str
+    revoked_by: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "skill_id": self.skill_id,
+            "skill_version": self.skill_version,
+            "revoked_on": self.revoked_on.isoformat(),
+            "reason": self.reason,
+            "revoked_by": self.revoked_by,
+        }
+
+
+@dataclass
+class RevocationList:
+    """A signed list of revoked passports.
+
+    The list is itself authenticated by an ed25519 signature over a
+    deterministic JSON serialisation of every non-signature field so
+    a tampered revocation list cannot silently un-revoke a known-bad
+    pack.
+
+    The list is intentionally tiny in the reference implementation —
+    production deployments should keep the file under a few hundred
+    entries and rely on monotonic ``issued_on`` / ``expires_on``
+    rotation to retire old entries. The signing / verification
+    surface mirrors :class:`SkillPassport`.
+    """
+
+    entries: tuple[RevocationEntry, ...]
+    issued_on: date
+    expires_on: date
+    signature: Optional[Signature] = None
+
+    def to_dict(self, *, include_signature: bool = True) -> dict[str, Any]:
+        out: dict[str, Any] = {
+            "entries": [e.to_dict() for e in self.entries],
+            "issued_on": self.issued_on.isoformat(),
+            "expires_on": self.expires_on.isoformat(),
+        }
+        if include_signature and self.signature is not None:
+            out["signature"] = self.signature.to_dict()
+        return out
+
+    def signing_payload(self) -> bytes:
+        return json.dumps(
+            self.to_dict(include_signature=False),
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+
+    def sign(
+        self, *, private_key: Ed25519PrivateKey, key_id: str
+    ) -> "RevocationList":
+        sig_bytes = private_key.sign(self.signing_payload())
+        self.signature = Signature(
+            algorithm=SIGNATURE_ALGORITHM,
+            key_id=key_id,
+            value=base64.b64encode(sig_bytes).decode("ascii"),
+        )
+        return self
+
+    def verify_signature(
+        self,
+        *,
+        public_key: Ed25519PublicKey,
+        now: Optional[date] = None,
+    ) -> None:
+        """Verify the list's own signature + expiry."""
+        if self.signature is None:
+            raise PassportValidationError("revocation list is unsigned")
+        if self.signature.algorithm != SIGNATURE_ALGORITHM:
+            raise PassportValidationError(
+                f"unsupported signature algorithm: {self.signature.algorithm}"
+            )
+        try:
+            public_key.verify(
+                base64.b64decode(self.signature.value),
+                self.signing_payload(),
+            )
+        except (InvalidSignature, ValueError) as exc:
+            raise PassportValidationError(
+                "revocation list signature mismatch"
+            ) from exc
+        today = now or _today_utc()
+        if self.expires_on < today:
+            raise PassportValidationError(
+                f"revocation list expired on {self.expires_on.isoformat()}"
+            )
+
+    def is_revoked(self, skill_id: str, skill_version: str) -> bool:
+        return self.lookup(skill_id, skill_version) is not None
+
+    def lookup(
+        self, skill_id: str, skill_version: str
+    ) -> Optional[RevocationEntry]:
+        for e in self.entries:
+            if e.skill_id == skill_id and e.skill_version == skill_version:
+                return e
+        return None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "RevocationList":
+        entries = tuple(
+            RevocationEntry(
+                skill_id=str(e["skill_id"]),
+                skill_version=str(e["skill_version"]),
+                revoked_on=date.fromisoformat(str(e["revoked_on"])),
+                reason=str(e.get("reason", "")),
+                revoked_by=str(e.get("revoked_by", "")),
+            )
+            for e in data.get("entries", [])
+        )
+        sig = None
+        sig_block = data.get("signature")
+        if isinstance(sig_block, dict):
+            sig = Signature(
+                algorithm=str(sig_block.get("algorithm", "")),
+                key_id=str(sig_block.get("key_id", "")),
+                value=str(sig_block.get("value", "")),
+            )
+        return cls(
+            entries=entries,
+            issued_on=date.fromisoformat(str(data["issued_on"])),
+            expires_on=date.fromisoformat(str(data["expires_on"])),
+            signature=sig,
+        )
+
+    @classmethod
+    def load(cls, path: Any) -> "RevocationList":
+        """Load a JSON or YAML revocation list from disk.
+
+        YAML is preferred for operator-edited lists; JSON is preferred
+        when the list is produced by tooling. Both forms encode the
+        same schema as :meth:`to_dict`.
+        """
+        import pathlib
+
+        p = pathlib.Path(path)
+        text = p.read_text(encoding="utf-8")
+        if p.suffix in {".yaml", ".yml"}:
+            try:
+                import yaml  # type: ignore[import-not-found]
+            except ImportError as exc:  # pragma: no cover - exercised in setups w/o yaml
+                raise PassportValidationError(
+                    "PyYAML is required to load a YAML revocation list"
+                ) from exc
+            data = yaml.safe_load(text)
+        else:
+            data = json.loads(text)
+        if not isinstance(data, dict):
+            raise PassportValidationError(
+                "revocation list root must be an object"
+            )
+        return cls.from_dict(data)
 
 
 # ---------------------------------------------------------------------------
@@ -313,6 +568,8 @@ __all__ = [
     "ModelCompatibility",
     "PASSPORT_SCHEMA_VERSION",
     "PassportValidationError",
+    "RevocationEntry",
+    "RevocationList",
     "Reviewers",
     "SIGNATURE_ALGORITHM",
     "Signature",

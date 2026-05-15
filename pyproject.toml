@@ -4,12 +4,43 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kchat-guardrail"
-version = "0.0.0"
+# P1-4: pre-1.0 alpha. Versioning follows PEP 440. The pack
+# distributable carries its own ``schema_version`` (see
+# `kchat-skills/compiler/skill_passport.py`) which is independent of
+# this number.
+version = "0.1.0a0"
 description = "KChat Guardrail Skills — on-device safety skill packs for E2EE messaging, backed by the XLM-R encoder classifier (ONNX Runtime)."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "TBD" }
-dependencies = []
+# P1-4: license intent is "Proprietary — KChat internal" while the
+# code base is in pre-1.0 alpha and undergoing legal review. The
+# wheel metadata reflects this so a casual ``pip install`` does not
+# imply an OSS license that has not yet been granted. Flip this to
+# the chosen OSS identifier (e.g. ``Apache-2.0``) when the legal
+# review concludes.
+license = { text = "Proprietary" }
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: Other/Proprietary License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+# P1-4: core runtime dependencies. The on-device skill-pack files are
+# static YAML / JSON; the XLM-R adapter, the deterministic detectors,
+# and the threshold policy module need the libraries below at import
+# time, so they are declared as a hard dependency rather than an
+# optional extra.
+dependencies = [
+    "PyYAML>=6.0",
+    "jsonschema>=4.0",
+    "cryptography>=42.0",
+]
 
 [project.optional-dependencies]
 test = [
@@ -17,10 +48,18 @@ test = [
     "PyYAML>=6.0",
     "jsonschema>=4.0",
     "cryptography>=42.0",
-    # The XLM-R adapter degrades to a SAFE fallback when
+    # The XLM-R adapter degrades to a rule-only path when
     # onnxruntime / sentencepiece / numpy are missing, so unit tests
     # do not strictly require them — but the encoder-head tests use
     # ``numpy`` for stub embeddings, hence the soft dep here.
+    "onnxruntime>=1.16.0",
+    "sentencepiece>=0.1.99",
+    "numpy>=1.24.0",
+]
+# P1-4: on-device encoder runtime. Pull this in to actually run the
+# XLM-R classifier head; otherwise the pipeline degrades to the
+# rule-only path described in ARCHITECTURE.md.
+encoder = [
     "onnxruntime>=1.16.0",
     "sentencepiece>=0.1.99",
     "numpy>=1.24.0",
@@ -59,6 +98,23 @@ export = [
     # ``onnxruntime`` itself, so we pin it here.
     "onnx_ir>=0.1",
 ]
+
+# P1-4: explicit package discovery. The repo is laid out as
+# ``kchat-skills/compiler/*.py`` (hyphen + no ``__init__.py``) and is
+# consumed by the test suite via ``pythonpath``. The wheel build
+# previously broke because setuptools' flat-layout auto-discovery
+# picked up the top-level ``models/`` and ``results/`` data dirs.
+# Declaring an empty package list (and an empty ``py_modules`` list)
+# tells setuptools: the wheel is metadata-only, the actual on-device
+# artefacts (skill packs, ONNX model, prompts) ship separately via
+# the signed-passport / pack-distribution channel — not via pip.
+[tool.setuptools]
+py-modules = []
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = []  # no Python packages installed by the wheel today
+exclude = ["kchat-skills*", "tools*", "tests*", "models*", "results*"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
