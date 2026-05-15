@@ -1,17 +1,31 @@
-# Test and validation dependencies for KChat Guardrail Skills.
-# Skill-pack files themselves are static YAML / JSON; these
-# packages are used by the test suite, the (Phase 4) compiler,
-# and the XLM-R encoder classifier adapter.
-pytest>=8.0
-PyYAML>=6.0
-jsonschema>=4.0
-# ed25519 signing / verification of compiled skill passports (Phase 4).
-cryptography>=42.0
-# XLM-R encoder classifier (kchat-skills/compiler/xlmr_adapter.py).
+# P1-4: pinned runtime / test dependencies for KChat Guardrail Skills.
+#
+# Skill-pack files themselves are static YAML / JSON; the packages
+# below are used by the test suite, the (Phase 4) compiler, and the
+# XLM-R encoder classifier adapter. Versions are pinned with the
+# ``~=`` (compatible-release) operator so security patches still
+# install but major-version bumps require a deliberate review.
+#
+# For reproducible CI builds, install with hashes:
+#     pip install --require-hashes -r requirements.lock
+# (see ``requirements.lock`` once generated; the source-of-truth
+# pin lives here.)
+
+# --- Core runtime (mirrored in pyproject.toml [project.dependencies]).
+PyYAML~=6.0
+jsonschema~=4.0
+# ed25519 signing / verification of compiled skill passports.
+cryptography~=42.0
+
+# --- Test runner. Not required at runtime.
+pytest~=8.0
+
+# --- XLM-R encoder classifier (kchat-skills/compiler/xlmr_adapter.py).
 # The adapter loads an ONNX model via onnxruntime and tokenises with
-# sentencepiece — no PyTorch / transformers dependency on-device. The
-# adapter degrades gracefully to a SAFE fallback if any of these are
-# missing.
-onnxruntime>=1.16.0
-sentencepiece>=0.1.99
-numpy>=1.24.0
+# sentencepiece — no PyTorch / transformers dependency on-device.
+# The adapter degrades to the rule-only path (P0-2) when any of
+# these are missing, but the unit-test suite needs them to exercise
+# the encoder path end-to-end.
+onnxruntime~=1.16
+sentencepiece~=0.1.99
+numpy~=1.24

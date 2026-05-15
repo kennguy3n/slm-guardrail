@@ -47,6 +47,16 @@ PROTECTED_SPEECH_REASON_CODES: frozenset[str] = frozenset(
     }
 )
 
+# P1-1: minimum context-hint confidence required to *fully* demote a
+# non-CHILD_SAFETY non-SAFE verdict to SAFE. Below this floor the
+# pipeline downgrades the verdict to 'warn with context' instead of
+# wiping it entirely. Hints whose confidence is unknown (e.g. older
+# pipelines that did not forward ``context_hint_confidences``) are
+# treated as if they sat at the legacy default of ``1.0`` for
+# backwards compatibility — the new conditional path is opt-in.
+CONTEXT_DEMOTION_CONFIDENCE_THRESHOLD: float = 0.5
+DEFAULT_CONTEXT_CONFIDENCE_WHEN_MISSING: float = 1.0
+
 
 @dataclass(frozen=True)
 class ThresholdPolicy:
@@ -123,19 +133,49 @@ class ThresholdPolicy:
             r for r in reason_codes_in if r in PROTECTED_SPEECH_REASON_CODES
         ]
         if category != SAFE_CATEGORY and protected_present:
-            demoted: dict[str, Any] = {
-                "severity": 0,
-                "category": SAFE_CATEGORY,
+            # P1-1: only fully demote to SAFE when at least one of the
+            # protected-speech hints is sufficiently confident. The
+            # pipeline forwards a per-hint ``context_hint_confidences``
+            # map; absent map means we fall back to the legacy
+            # always-demote behaviour for backwards compatibility.
+            confidences = (
+                raw_output.get("context_hint_confidences")
+                if isinstance(raw_output, dict)
+                else None
+            )
+            best_conf = _best_context_confidence(
+                protected_present, confidences
+            )
+            if best_conf >= CONTEXT_DEMOTION_CONFIDENCE_THRESHOLD:
+                demoted: dict[str, Any] = {
+                    "severity": 0,
+                    "category": SAFE_CATEGORY,
+                    "confidence": confidence,
+                    "actions": _blank_actions(),
+                    "reason_codes": sorted(set(protected_present)),
+                    "rationale_id": "safe_protected_speech_v1",
+                }
+                _forward_health_signal(demoted, raw_output)
+                return demoted
+            # Below the floor: keep the category but downgrade the
+            # action set to at most ``warn`` so the UI surfaces the
+            # context as a warning rather than acting on it.
+            warn_actions = _blank_actions(warn=True)
+            warn_actions["suggest_redact"] = bool(
+                (out.get("actions") or {}).get("suggest_redact", False)
+            )
+            warn = {
+                "severity": min(int(out.get("severity", 0)), 2),
+                "category": category,
                 "confidence": confidence,
-                "actions": _blank_actions(),
-                "reason_codes": sorted(set(protected_present)),
-                "rationale_id": "safe_protected_speech_v1",
+                "actions": warn_actions,
+                "reason_codes": sorted(
+                    set(reason_codes_in) | {"WARN_WITH_CONTEXT"}
+                ),
+                "rationale_id": "warn_low_confidence_context_v1",
             }
-            # Carry the encoder's internal extras (e.g. ``_embedding``)
-            # forward — without this the cross-pipeline cache breaks
-            # for every protected-speech demotion.
-            _carry_internal_extras(demoted, raw_output)
-            return demoted
+            _forward_health_signal(warn, raw_output)
+            return warn
 
         # Rule 3: Uncertainty handling.
         if category != SAFE_CATEGORY and confidence < self.LABEL_ONLY:
@@ -147,7 +187,7 @@ class ThresholdPolicy:
                 "reason_codes": [],
                 "rationale_id": out.get("rationale_id") or "safe_benign_v1",
             }
-            _carry_internal_extras(uncertain, raw_output)
+            _forward_health_signal(uncertain, raw_output)
             return uncertain
 
         # Rule 4: Re-derive action flags from confidence for non-SAFE
@@ -210,6 +250,34 @@ def _blank_actions(
     }
 
 
+def _best_context_confidence(
+    hints: list[str],
+    confidences: Any,
+) -> float:
+    """Return the highest reported ``context_confidence`` across ``hints``.
+
+    ``confidences`` is the optional ``context_hint_confidences`` map
+    that the pipeline forwards on ``raw_output``. When the map is
+    missing entirely the helper returns
+    :data:`DEFAULT_CONTEXT_CONFIDENCE_WHEN_MISSING` so older pipelines
+    that did not forward confidences keep their legacy 'always demote'
+    behaviour. When the map is present but does not list a particular
+    hint, that hint contributes ``0.0`` so a partial map cannot
+    accidentally re-enable always-demote.
+    """
+    if not isinstance(confidences, dict):
+        return DEFAULT_CONTEXT_CONFIDENCE_WHEN_MISSING
+    best = 0.0
+    for h in hints:
+        try:
+            value = float(confidences.get(h, 0.0))
+        except (TypeError, ValueError):
+            value = 0.0
+        if value > best:
+            best = value
+    return best
+
+
 def _deepcopy_output(raw: dict[str, Any]) -> dict[str, Any]:
     # Hand-rolled shallow+nested copy — the output shape is known and
     # avoids pulling copy.deepcopy for every pipeline call.
@@ -226,44 +294,33 @@ def _deepcopy_output(raw: dict[str, Any]) -> dict[str, Any]:
         out["resource_link_id"] = raw["resource_link_id"]
     if "counter_updates" in raw:
         out["counter_updates"] = [dict(u) for u in raw["counter_updates"]]
-    _carry_internal_extras(out, raw)
+    _forward_health_signal(out, raw)
     return out
 
 
-def _carry_internal_extras(
+def _forward_health_signal(
     out: dict[str, Any], raw: dict[str, Any]
 ) -> dict[str, Any]:
-    """Forward underscore-prefixed extras from ``raw`` to ``out``.
+    """Forward the optional ``model_health`` field from ``raw`` to ``out``.
+
+    ``model_health`` is the only adapter-emitted field that survives a
+    fresh-dict branch in :meth:`ThresholdPolicy.apply`. It is a
+    coarse, safety-relevant status signal (one of ``healthy`` /
+    ``model_unavailable`` / ``inference_error``) so a
+    calling UI can distinguish 'classifier produced a SAFE verdict'
+    from 'classifier could not run, deterministic detectors only'.
 
     The public output schema (``kchat-skills/global/output_schema.json``)
-    admits arbitrary ``_*``-prefixed keys via
-    ``patternProperties: {"^_": {}}`` so adapters can attach internal
-    state without violating ``additionalProperties: false``. The
-    canonical example is ``_embedding`` — the raw 384-dim mean-pooled
-    XLM-R vector that ``XLMRAdapter.classify()`` attaches for the
-    cross-pipeline cache (``chat-storage-search``'s ``search_vector``
-    table).
-
-    Both ``_deepcopy_output`` and the early-return paths in
-    :meth:`ThresholdPolicy.apply` (rules 2 and 3) construct fresh
-    dicts containing only known schema keys; without this helper the
-    encoder's internal extras are silently dropped before the output
-    leaves :class:`compiler.pipeline.GuardrailPipeline`, and the
-    cross-pipeline cache is non-functional for every message that
-    flows through the standard pipeline. Mutates ``out`` in place
-    and returns it for chained-call ergonomics.
-
-    Lists / tuples are shallow-copied (``list(...)``) so downstream
-    consumers cannot mutate the encoder's tensors via the cached
-    value; everything else is forwarded by reference.
+    forbids any other adapter extras — in particular, no
+    underscore-prefixed keys (``_embedding`` is forbidden by privacy
+    rule 5 and intentionally never leaves the
+    :class:`XLMRAdapter` instance). Cross-pipeline consumers that need
+    the embedding read it from the adapter's ``last_embedding``
+    attribute directly instead of from the output dict.
     """
-    for key, value in raw.items():
-        if not isinstance(key, str) or not key.startswith("_"):
-            continue
-        if isinstance(value, (list, tuple)):
-            out[key] = list(value)
-        else:
-            out[key] = value
+    health = raw.get("model_health")
+    if isinstance(health, str) and health:
+        out["model_health"] = health
     return out
 
 

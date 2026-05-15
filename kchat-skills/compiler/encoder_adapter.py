@@ -52,6 +52,33 @@ CAT_MISINFORMATION_CIVIC = 14
 CAT_COMMUNITY_RULE = 15
 
 
+# ---------------------------------------------------------------------------
+# Canonical adapter-health → output-schema mapping.
+#
+# Adapters carry a richer internal ``health_state`` (e.g.
+# ``tokenizer_unavailable``, ``dependency_missing``) than the
+# coarser ``model_health`` enum exposed on
+# ``kchat.guardrail.output.v1``. Both :mod:`pipeline` and
+# :mod:`xlmr_adapter` need to project the same set of internal
+# states onto the same set of output values, and historically each
+# kept its own copy of the table. Hosting the canonical mapping
+# here on the Protocol module means every backend and the pipeline
+# itself import the same dict — any new adapter that introduces a
+# new health state must extend this single table and the pipeline
+# and the XLM-R adapter pick it up for free.
+#
+# Keep the values in sync with the ``model_health`` enum in
+# ``kchat-skills/global/output_schema.json``.
+# ---------------------------------------------------------------------------
+HEALTH_TO_MODEL_HEALTH_OUTPUT: dict[str, str] = {
+    "healthy": "healthy",
+    "model_unavailable": "model_unavailable",
+    "tokenizer_unavailable": "model_unavailable",
+    "dependency_missing": "model_unavailable",
+    "inference_error": "inference_error",
+}
+
+
 def _zero_actions() -> dict[str, bool]:
     return {
         "label_only": False,
@@ -109,16 +136,21 @@ class EncoderAdapter(Protocol):
     Optional return-shape extras (none of which the Protocol's
     ``classify(input) -> dict`` signature mentions explicitly):
 
-    * ``_embedding``: ``list[float]`` — the raw encoder embedding
-      (e.g. the 384-dim mean-pooled XLM-R vector from
-      :class:`xlmr_adapter.XLMRAdapter`). Underscore-prefixed keys
-      are not part of ``kchat.guardrail.output.v1`` proper; the
-      schema admits them via ``patternProperties: {"^_": {}}`` so
-      cross-pipeline caches (notably ``chat-storage-search``) can
-      reuse a message's encoder pass without recomputing it.
-      Adapters that do not have a meaningful embedding (e.g.
-      :class:`MockEncoderAdapter`) MUST omit the key rather than
-      emitting a zero-vector placeholder.
+    * ``model_health``: ``str`` — one of ``healthy`` /
+      ``model_unavailable`` / ``inference_error``.
+      Safety-relevant status signal. Absence is equivalent to
+      ``healthy``. The pipeline uses this to decide whether to keep
+      deterministic detectors active when the encoder cannot produce
+      a verdict.
+
+    Adapters MUST NOT attach raw embeddings, message hashes,
+    fingerprints, or any other commitment to message content to the
+    output dict. Privacy contract rule 5 (see
+    ``kchat-skills/global/privacy_contract.yaml``) forbids
+    embeddings on the public output boundary. Cross-pipeline
+    consumers that legitimately need an embedding (e.g.
+    ``chat-storage-search``) read it from the adapter instance
+    directly (e.g. :attr:`xlmr_adapter.XLMRAdapter.last_embedding`).
     """
 
     def classify(self, input: dict[str, Any]) -> dict[str, Any]:

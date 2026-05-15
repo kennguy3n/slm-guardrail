@@ -79,6 +79,16 @@
             "type": "integer",
             "maximum": 600,
             "exclusiveMinimum": 0
+          },
+          "model_checksum": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64}$",
+            "description": "Optional SHA-256 hex digest of the ONNX model file the pack was tested against (P0-4). When both passport and runtime supply a value they must agree; an empty value on either side disables the check for backwards compatibility."
+          },
+          "tokenizer_checksum": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64}$",
+            "description": "Optional SHA-256 hex digest of the tokenizer file the pack was tested against (P0-4). Same matching rules as ``model_checksum``."
           }
         }
       }
