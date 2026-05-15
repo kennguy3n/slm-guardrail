@@ -436,6 +436,84 @@ class TestModelChecksums:
         ):
             p.verify(public_key=pk, model=runtime)
 
+    def test_multiple_compatible_entries_accepts_matching(self):
+        # Regression test for the case where a passport pins multiple
+        # model_compatibility entries for the same model_id at
+        # different model_min_versions, each with its own checksum.
+        # The runtime is at the newer version with the newer checksum;
+        # the older entry's checksum legitimately differs. Verification
+        # must accept as long as AT LEAST ONE compatible entry agrees
+        # with the runtime — not fail because the older entry doesn't.
+        sk, pk = generate_keypair()
+        p = build_passport(
+            skill_id="kchat.community.x",
+            skill_version="1.0.0",
+            parent=None,
+            authored_by="ts",
+            model_compatibility=(
+                ModelCompatibility(
+                    model_id="kchat.encoder.tiny",
+                    model_min_version="1.0.0",
+                    model_checksum=_HEX64_A,
+                ),
+                ModelCompatibility(
+                    model_id="kchat.encoder.tiny",
+                    model_min_version="2.0.0",
+                    model_checksum=_HEX64_B,
+                ),
+            ),
+            expires_on=date.today() + timedelta(days=30),
+            test_results=_passing_test_results(),
+        )
+        p.sign(private_key=sk, key_id="k1")
+        runtime = ModelCompatibility(
+            model_id="kchat.encoder.tiny",
+            model_min_version="2.0.0",
+            model_checksum=_HEX64_B,
+        )
+        # Both entries are >= compatible (1.0.0 and 2.0.0 both satisfy
+        # ``model_min_version <= runtime.model_min_version``), so both
+        # land in the cross-check list. The 1.0.0 entry's checksum
+        # disagrees with the runtime, but the 2.0.0 entry agrees,
+        # so verification must pass.
+        p.verify(public_key=pk, model=runtime)  # must not raise
+
+    def test_all_compatible_entries_mismatch_rejected(self):
+        # If EVERY compatible entry has a checksum mismatch against
+        # the runtime, verification must fail.
+        sk, pk = generate_keypair()
+        p = build_passport(
+            skill_id="kchat.community.x",
+            skill_version="1.0.0",
+            parent=None,
+            authored_by="ts",
+            model_compatibility=(
+                ModelCompatibility(
+                    model_id="kchat.encoder.tiny",
+                    model_min_version="1.0.0",
+                    model_checksum=_HEX64_A,
+                ),
+                ModelCompatibility(
+                    model_id="kchat.encoder.tiny",
+                    model_min_version="2.0.0",
+                    model_checksum=_HEX64_A,
+                ),
+            ),
+            expires_on=date.today() + timedelta(days=30),
+            test_results=_passing_test_results(),
+        )
+        p.sign(private_key=sk, key_id="k1")
+        runtime = ModelCompatibility(
+            model_id="kchat.encoder.tiny",
+            model_min_version="2.0.0",
+            model_checksum=_HEX64_B,
+        )
+        with pytest.raises(
+            PassportValidationError,
+            match="no compatible model entry matched runtime checksums",
+        ):
+            p.verify(public_key=pk, model=runtime)
+
     def test_missing_runtime_checksum_skips_check(self):
         # Backwards-compat: pre-P0-4 runtimes that have no checksum
         # must still verify against new passports that do.

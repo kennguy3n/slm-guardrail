@@ -114,13 +114,24 @@ DEFAULT_HOMOGLYPH_MAP: dict[str, str] = {
     "\u03a5": "y",  # Υ -> Y
     "\u03a7": "x",  # Χ -> X
     # ----- Greek → Latin (lowercase). -----
+    # NOTE: ``normalize_text`` applies ``casefold()`` before this map,
+    # so the uppercase Greek entries above are only there to document
+    # intent — at runtime they have already been folded to lowercase
+    # by the time the map is applied. The lowercase entries here are
+    # the ones that actually do the work. Keep both in sync.
     "\u03b1": "a",  # α -> a
+    "\u03b2": "b",  # β -> b
+    "\u03b5": "e",  # ε -> e
+    "\u03b6": "z",  # ζ -> z
+    "\u03b7": "h",  # η -> h
     "\u03b9": "i",  # ι -> i (Greek small iota)
     "\u03ba": "k",  # κ -> k
+    "\u03bc": "m",  # μ -> m
     "\u03bd": "v",  # ν -> v
     "\u03bf": "o",  # ο -> o
     "\u03c1": "p",  # ρ -> p
     "\u03c4": "t",  # τ -> t
+    "\u03c5": "y",  # υ -> y
     "\u03c7": "x",  # χ -> x
     # ----- Fullwidth digits → ASCII. -----
     "\uff10": "0",

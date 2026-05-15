@@ -47,6 +47,35 @@ class TestNormalizeText:
         # Cyrillic 'а' → Latin 'a'.
         assert "a" in normalize_text("\u0430bc")
 
+    def test_homoglyph_uppercase_greek_via_casefold(self):
+        # ``normalize_text`` runs casefold() BEFORE the homoglyph map,
+        # so the map's uppercase Greek entries are unreachable. The
+        # lowercase entries must catch any uppercase Greek input that
+        # casefold lowered into them.
+        for upper, expected in [
+            ("\u0392", "b"),  # Β
+            ("\u0395", "e"),  # Ε
+            ("\u0396", "z"),  # Ζ
+            ("\u0397", "h"),  # Η
+            ("\u039c", "m"),  # Μ
+            ("\u03a5", "y"),  # Υ
+        ]:
+            out = normalize_text(upper)
+            assert out == expected, (upper, out, expected)
+
+    def test_homoglyph_lowercase_greek_direct(self):
+        # Lowercase Greek directly mapped (no casefold dependence).
+        for lower, expected in [
+            ("\u03b2", "b"),  # β
+            ("\u03b5", "e"),  # ε
+            ("\u03b6", "z"),  # ζ
+            ("\u03b7", "h"),  # η
+            ("\u03bc", "m"),  # μ
+            ("\u03c5", "y"),  # υ
+        ]:
+            out = normalize_text(lower)
+            assert out == expected, (lower, out, expected)
+
     def test_disable_nfkc(self):
         text = "\uff48\uff45\uff4c\uff4c\uff4f"
         out = normalize_text(text, nfkc=False)

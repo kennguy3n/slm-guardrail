@@ -441,7 +441,9 @@ def main(argv: list[str] | None = None) -> int:
     for case in benign + adversarial:
         pipeline_input = _build_pipeline_input(case)
         try:
-            out = pipeline.classify(pipeline_input)
+            out = pipeline.classify(
+                pipeline_input["message"], pipeline_input["context"]
+            )
         except Exception as exc:
             results.append(
                 CaseResult(

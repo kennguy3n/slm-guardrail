@@ -291,8 +291,24 @@ class SkillPassport:
         checksum for the same artefact, they MUST agree — a
         mismatch is a hard verify failure so a tampered or swapped
         binary cannot pass verification.
+
+        Note: a passport may carry multiple ``ModelCompatibility``
+        entries for the same ``model_id`` (e.g. a v1.0 entry pinning
+        an older checksum and a v2.0 entry pinning the current one).
+        ``verify()`` only passes us entries whose ``model_min_version``
+        is ≤ the runtime version, so for a v2.0 runtime BOTH entries
+        appear here. We accept the passport if **at least one**
+        compatible entry's checksums are consistent with the runtime
+        (either matching or vacuously skipped). Only if every
+        compatible entry has a concrete mismatch do we fail — that
+        case really does mean none of the pinned binaries are the
+        one we loaded.
         """
+        if not compatible:
+            return
+        mismatches: list[str] = []
         for mc in compatible:
+            entry_mismatch: str | None = None
             pairs = (
                 ("model_checksum", mc.model_checksum, runtime.model_checksum),
                 (
@@ -308,12 +324,23 @@ class SkillPassport:
                     passport_checksum.strip().lower()
                     != runtime_checksum.strip().lower()
                 ):
-                    raise PassportValidationError(
+                    entry_mismatch = (
                         f"{field_name} mismatch for model "
                         f"{runtime.model_id}@{runtime.model_min_version} "
                         f"(passport={passport_checksum}, "
                         f"runtime={runtime_checksum})"
                     )
+                    break
+            if entry_mismatch is None:
+                # At least one compatible entry agrees with the runtime
+                # (or has nothing to check). Passport verifies.
+                return
+            mismatches.append(entry_mismatch)
+
+        raise PassportValidationError(
+            "no compatible model entry matched runtime checksums: "
+            + "; ".join(mismatches)
+        )
 
 
 class PassportValidationError(ValueError):
